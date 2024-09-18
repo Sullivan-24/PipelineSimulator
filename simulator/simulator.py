@@ -48,12 +48,78 @@ class Simulator:
         self._backward_w_offsets = [[] for i in range(self._pp_size)]            
 
     def _virtual_stage_sequential_order_constraint_strict(self):
-        self._solver.add(
-            self._forward_offsets[0][0] == 0
-        )
-        # V-shape virtual stage
+        # fix warmup stage
+        for i in range(self._pp_size):
+            self._solver.add(
+                self._forward_offsets[i][0]
+                == sum(self._forward_length[0:i])
+            )
+        # for i in range(self._pp_size):
+        #     for j in range(self._pp_size - i):
+        #         self._solver.add(
+        #             self._forward_offsets[i][j]
+        #             == (sum(self._forward_length[0:i]) + sum(self._forward_length[0:j]))
+        #         )
         mb_offset = self._num_real_microbatches
+        # natural number order
+        for i in range(self._num_real_microbatches):
+            if i > 0:
+                self._solver.add(
+                    self._forward_offsets[0][i]
+                    >= self._forward_offsets[0][i - 1] + self._forward_length[0]
+                )
+                self._solver.add(
+                    self._forward_offsets[0][i + mb_offset]
+                    >= self._forward_offsets[0][i + mb_offset - 1] + self._forward_length[0]
+                )
+        # V-shape virtual stage
         for mb in range(self._num_real_microbatches):
+            # F stage constraint
+            for i in range(0, self._pp_size):
+                if i > 0:
+                    self._solver.add(
+                        self._forward_offsets[i][mb]
+                        >= self._forward_offsets[i - 1][mb] + self._forward_length[i-1]
+                    )
+                if i < self._pp_size - 1:
+                    self._solver.add(
+                        self._forward_offsets[i][mb + mb_offset] 
+                        >= self._forward_offsets[i+1][mb + mb_offset] + self._forward_length[i+1]
+                    )
+                self._solver.add(
+                        self._forward_offsets[i][mb + mb_offset]
+                        >= self._forward_offsets[i][mb] + self._forward_length[i]
+                    )
+                self._solver.add(
+                        self._backward_b_offsets[i][mb]
+                        >= self._forward_offsets[i][mb + mb_offset] + self._forward_length[i]
+                    )
+            # B stage constraint
+            for i in range(0, self._pp_size):
+                # wrong constraint
+                # if i > 0 :
+                #     self._solver.add(
+                #         self._backward_b_offsets[i][mb]
+                #         >= self._backward_b_offsets[i - 1][mb] + self._backward_b_length[i - 1]
+                #     )
+                #     self._solver.add(
+                #         self._backward_b_offsets[i - 1][mb + mb_offset] 
+                #         >= self._backward_b_offsets[i][mb + mb_offset] + self._backward_b_length[i]
+                #     )
+                if i > 0 :
+                    self._solver.add(
+                        self._backward_b_offsets[i][mb]
+                        >= self._backward_b_offsets[i - 1][mb] + self._backward_b_length[i - 1]
+                    )
+                if i < self._pp_size - 1:
+                    self._solver.add(
+                        self._backward_b_offsets[i][mb + mb_offset] 
+                        >= self._backward_b_offsets[i + 1][mb + mb_offset] + self._backward_b_length[i + 1]
+                    )
+                self._solver.add(
+                        self._backward_b_offsets[i][mb + mb_offset]
+                        >= self._backward_b_offsets[i][mb] + self._backward_b_length[i]
+                    )
             # W stage constraint
             for i in range(self._pp_size):
                 self._solver.add(
@@ -62,40 +128,6 @@ class Simulator:
                 )
                 self._solver.add(
                     self._backward_w_offsets[i][mb + mb_offset]
-                    >= self._backward_b_offsets[i][mb + mb_offset] + self._backward_b_length[i]
-                )
-            # F stage constraint
-            for i in range(1, self._pp_size):
-                self._solver.add(
-                    self._forward_offsets[i][mb]
-                    >= self._forward_offsets[i - 1][mb] + self._forward_length[i-1]
-                )
-            self._solver.add(
-                    self._forward_offsets[self._pp_size - 1][mb + mb_offset]
-                    >= self._forward_offsets[self._pp_size - 1][mb] + self._forward_length[self._pp_size - 1]
-                )
-            for i in range(self._pp_size - 1, 0, -1):
-                self._solver.add(
-                    self._forward_offsets[i - 1][mb + mb_offset] 
-                    >= self._forward_offsets[i][mb + mb_offset] + self._forward_length[i]
-                )
-            self._solver.add(
-                    self._backward_b_offsets[0][mb]
-                    >= self._forward_offsets[0][mb + mb_offset] + self._forward_length[0]
-                )
-            # B stage constraint
-            for i in range(1, self._pp_size):
-                self._solver.add(
-                    self._backward_b_offsets[i][mb]
-                    >= self._backward_b_offsets[i - 1][mb] + self._backward_b_length[i - 1]
-                )
-            self._solver.add(
-                    self._backward_b_offsets[self._pp_size - 1][mb + mb_offset]
-                    >= self._backward_b_offsets[self._pp_size - 1][mb] + self._backward_b_length[self._pp_size-1]
-                )
-            for i in range(self._pp_size - 1, 0, -1):
-                self._solver.add(
-                    self._backward_b_offsets[i - 1][mb + mb_offset] 
                     >= self._backward_b_offsets[i][mb + mb_offset] + self._backward_b_length[i]
                 )
 
@@ -256,9 +288,9 @@ class Simulator:
                 self._solver.add(self._backward_w_offsets[i][-1] >= self._forward_length[0] * self._pp_size * self.virtual_stage[0] + self._backward_b_length[0])
                 
                 # Constrain bubble size smaller to Zerobubble-GPipe, leading to up to a speedup of 15x 
-                self._solver.add(self._forward_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length))
-                self._solver.add(self._backward_b_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length) - self._backward_b_length[i])
-                self._solver.add(self._backward_w_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length) - self._backward_w_length[i])
+                self._solver.add(self._forward_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size * self.virtual_stage[0] + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length))
+                self._solver.add(self._backward_b_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size * self.virtual_stage[0] + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length) - self._backward_b_length[i])
+                self._solver.add(self._backward_w_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size * self.virtual_stage[0] + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length) - self._backward_w_length[i])
 
 
         if self._sequential_order_constraint_strategy == "strict":
@@ -281,7 +313,7 @@ class Simulator:
         self._serial_computation_within_pipeline_constraint()
 
         # constraint 3: the accumulation count of activations does not exceed max_activation_counts
-        self._pipeline_activation_accumulation_constraint()
+        # self._pipeline_activation_accumulation_constraint()
 
     def _build_optimize_objectives(self) -> None:
         # 1. minimize the execution time of each microbatch
