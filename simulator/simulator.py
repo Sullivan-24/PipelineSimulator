@@ -304,9 +304,9 @@ class Simulator:
 
         self._solver = z3.Optimize()
 
-        self._forward_offsets = [[] for i in range(self._pp_size)]
-        self._backward_b_offsets = [[] for i in range(self._pp_size)]
-        self._backward_w_offsets = [[] for i in range(self._pp_size)]            
+        self._forward_offsets = [[] for _ in range(self._pp_size)]
+        self._backward_b_offsets = [[] for _ in range(self._pp_size)]
+        self._backward_w_offsets = [[] for _ in range(self._pp_size)]            
 
     def _virtual_stage_sequential_order_constraint_strict(self):
         # fix warmup stage
@@ -315,6 +315,7 @@ class Simulator:
         #         self._forward_offsets[i][0]
         #         == sum(self._forward_length[0:i])
         #     )
+        # Only when mb >= stage, else do not use the following contraints.
         for i in range(self._pp_size):
             for j in range(self._pp_size - i):
                 self._solver.add(
@@ -592,13 +593,11 @@ class Simulator:
     def _build_optimize_objectives(self) -> None:
         # 1. minimize the execution time of each microbatch
         max_var = z3.Int("max_start_offset")
-
         for pp in range(self._pp_size):
             # Change to optimize W instead of B
             for var in self._backward_w_offsets[pp]:
-                self._solver.add(max_var >= var)
-                # self._solver.minimize(var)
-            # self._solver.add(max_var >= self._backward_w_offsets[pp][-1])
+                # self._solver.add(max_var >= var)
+                self._solver.add(max_var >= (var - self._forward_offsets[pp][0]))
         self._solver.minimize(max_var)
 
     def _draw(self, results: dict) -> None:

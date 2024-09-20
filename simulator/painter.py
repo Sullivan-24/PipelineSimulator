@@ -43,7 +43,7 @@ class SchedulingPainter:
 
         # Convert data offset to pixels
         data = {key: val * self._pixel_base for key, val in data.items()}
-        print(data)
+        
         max_key = max(data, key=data.get)
         _, max_key_pid, _ = parse_microbatch_key(max_key)
 
@@ -58,7 +58,7 @@ class SchedulingPainter:
         label_canvas.create_text(
             self._pp_align + 127,
             y_label,
-            text=f"{(data[max_key] + self._backward_length[max_key_pid])//self._pixel_base}",
+            text=f"{(data[max_key] + self._backward_length2[max_key_pid])//self._pixel_base}",
         )
 
         label_canvas.create_text(
