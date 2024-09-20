@@ -2,7 +2,7 @@
 main package
 """
 import sys
-from simulator.simulator import Simulator
+from simulator.simulator import Simulator, SimulatorGurobipy
 forward_execution_time = [4, 4]
 backward_execution_time = [t * 1.5 for t in forward_execution_time]
 backward_execution_time2 = [t for t in forward_execution_time]
@@ -31,7 +31,8 @@ def main():
 
     simulator = Simulator(config)
     simulator.run()
-
+    # simulator = SimulatorGurobipy(config)
+    # simulator.run()
 
 if __name__ == "__main__":
     if len(sys.argv) == 2:
