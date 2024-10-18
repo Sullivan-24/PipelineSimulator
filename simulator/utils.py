@@ -2,7 +2,7 @@
 utils package
 """
 from typing import Dict, Tuple
-
+from z3 import If
 
 # def parse_microbatch_key(key: str) -> Tuple[bool, int, int]:
 #     "parse microbatch key"
@@ -28,6 +28,10 @@ def _replace_mid_in_key(key: str, new_mid: int) -> str:
 
 def resort_microbatch_index(num_microbatches: int, model_res: Dict[str, int]) -> dict:
     "resort microbatch index"
+    # max_value = -1
+    # for k in model_res:
+    #     print(k, model_res[k], type(model_res[k]))
+    #     max_value = max_value if max_value > model_res[k] else model_res[k]
     max_value = max(model_res.values())
     only_forward_starts = {mb: max_value for mb in range(num_microbatches)}
 

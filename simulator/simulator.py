@@ -20,8 +20,8 @@ class SimulatorGurobipy:
 
         self._max_activation_counts = config["max_activation_counts"]
         self._forward_length = [t // self.virtual_stage[0] for t in config["forward_execution_time"]]
-        self._backward_b_length = [t // self.virtual_stage[0] for t in config["backward_execution_time"]]
-        self._backward_w_length = [t // self.virtual_stage[0] for t in config["backward_execution_time2"]]
+        self._backward_b_length = [t // self.virtual_stage[0] for t in config["backward_execution_i_time"]]
+        self._backward_w_length = [t // self.virtual_stage[0] for t in config["backward_execution_g_time"]]
         self._sequential_order_constraint_strategy = config[
             "sequential_order_constraint_strategy"
         ]
@@ -274,14 +274,17 @@ class Simulator:
 
     def __init__(self, config: dict) -> None:
         self._pp_size = config["pp_size"]
+        self._model_size = config["model_size"]
         self.virtual_stage = config["virtual_stage"]
         self._num_real_microbatches = config["num_microbatches"]
         self._num_microbatches = config["num_microbatches"] * self.virtual_stage[0]
 
         self._max_activation_counts = config["max_activation_counts"]
         self._forward_length = [t // self.virtual_stage[0] for t in config["forward_execution_time"]]
-        self._backward_b_length = [t // self.virtual_stage[0] for t in config["backward_execution_time"]]
-        self._backward_w_length = [t // self.virtual_stage[0] for t in config["backward_execution_time2"]]
+        self._backward_b_length = [t // self.virtual_stage[0] for t in config["backward_execution_i_time"]]
+        self._backward_w_length = [t // self.virtual_stage[0] for t in config["backward_execution_g_time"]]
+        self._comm_length = [t // self.virtual_stage[0] for t in config["communication_time"]]
+
         self._sequential_order_constraint_strategy = config[
             "sequential_order_constraint_strategy"
         ]
@@ -303,7 +306,8 @@ class Simulator:
         ), "sequential order constraint strategy is not supported"
 
         self._solver = z3.Optimize()
-
+        self._recomputing_rate = []
+        self._layers = []
         self._forward_offsets = [[] for _ in range(self._pp_size)]
         self._backward_b_offsets = [[] for _ in range(self._pp_size)]
         self._backward_w_offsets = [[] for _ in range(self._pp_size)]            
@@ -433,6 +437,35 @@ class Simulator:
                 >= self._forward_offsets[self._pp_size - 1][mb] + self._forward_length[self._pp_size - 1]
             )
 
+    def _real_pipeline_modeling_constraint_strict(self):
+        for mb in range(self._num_microbatches):
+            # forward stages sequential constraint
+            for i in range(1, self._pp_size):
+                self._solver.add(
+                    self._forward_offsets[i][mb] >= 
+                    self._forward_offsets[i - 1][mb] + self._forward_length[i-1] * self._layers[i-1] + self._comm_length[i-1]
+                )
+            # W stage constraint
+            for i in range(self._pp_size):
+                self._solver.add(
+                    self._backward_w_offsets[i][mb]
+                    >= self._backward_b_offsets[i][mb] + self._layers[i] * (self._backward_b_length[i] + self._forward_length[i] * self._recomputing_rate[i])
+                )
+            # backward stages sequential constraint
+            for i in range(self._pp_size - 1, 0, -1):
+                self._solver.add(
+                    self._backward_b_offsets[i - 1][mb]
+                       >= self._backward_b_offsets[i][mb]
+                        + self._layers[i] * (self._backward_b_length[i] + self._forward_length[i] * self._recomputing_rate[i])
+                        + self._comm_length[i]
+                )
+                
+            # forward-backward connection sequential constraint
+            self._solver.add(
+                self._backward_b_offsets[self._pp_size - 1][mb]
+                >= self._forward_offsets[self._pp_size - 1][mb] + self._forward_length[self._pp_size - 1]
+            )
+
     def _sequential_order_constraint_double_interleaving(self):
         for mb in range(self._num_microbatches):
             # down pipe
@@ -549,9 +582,28 @@ class Simulator:
 
                 self._solver.add(_actvaition_count <= self._max_activation_counts[pp])
 
+    def _build_layer_constraint(self):
+        for i in range(self._pp_size):
+            self._solver.add(
+                self._layers[i] >= 1,
+                self._layers[i] <= self._model_size
+            )
+        self._solver.add(sum(self._layers) == self._model_size)
+    
+    def _build_recomputing_rate_constraint(self):
+        for i in range(self._pp_size):
+            # self._solver.add(
+            #     self._recomputing_rate[i] >= 0,
+            #     self._recomputing_rate[i] <= 1
+            # )
+            discrete_values = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+            self._solver.add(z3.Or([self._recomputing_rate[i] == v for v in discrete_values]))
+
     def _build_constraints(self) -> None:
         
         for i in range(self._pp_size):
+            self._layers.append(z3.Int(f"l_{i}"))
+            self._recomputing_rate.append(z3.Real(f"r_{i}"))
             for mb in range(self._num_microbatches):
                 self._forward_offsets[i].append(z3.Int(f"f_{mb}_{i}"))
                 self._backward_b_offsets[i].append(z3.Int(f"b_{mb}_{i}"))
@@ -567,14 +619,19 @@ class Simulator:
                 # self._solver.add(self._forward_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size * self.virtual_stage[0] + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length))
                 # self._solver.add(self._backward_b_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size * self.virtual_stage[0] + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length) - self._backward_b_length[i])
                 # self._solver.add(self._backward_w_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size * self.virtual_stage[0] + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length) - self._backward_w_length[i])
-
+        
+        self._build_layer_constraint()
+        self._build_recomputing_rate_constraint()
+        
         if self._sequential_order_constraint_strategy == "strict":
             # constraint 1-0: forward and backward of each microbatch
             # are executed in sequential order
-            if self.virtual_stage:
+            if self.virtual_stage and self.virtual_stage[0] > 1:
                 self._virtual_stage_sequential_order_constraint_strict()
+                # self._sequential_order_constraint_strict()
             else:
-                self._sequential_order_constraint_strict()
+                # self._sequential_order_constraint_strict()
+                self._real_pipeline_modeling_constraint_strict()
         elif self._sequential_order_constraint_strategy == "double_interleaving":
             # constraint 1-1: forward and backward of each microbatch
             # are executed in sequential order (allowing double interleaving)
@@ -596,8 +653,8 @@ class Simulator:
         for pp in range(self._pp_size):
             # Change to optimize W instead of B
             for var in self._backward_w_offsets[pp]:
-                # self._solver.add(max_var >= var)
-                self._solver.add(max_var >= (var - self._forward_offsets[pp][0]))
+                self._solver.add(max_var >= var)
+                # self._solver.add(max_var >= (var - self._forward_offsets[pp][0]))
         self._solver.minimize(max_var)
 
     def _draw(self, results: dict) -> None:
@@ -631,9 +688,12 @@ class Simulator:
             print(f"Result: SAT, Cost: {end_time - start_time:.2f}")
             # tranforms the result to a dictionary.
             model = self._solver.model()
-            # print(model)
-            results = {str(key): model[key].as_long() for key in model}
-            results.pop("max_start_offset")
+
+            for k in model:
+                print(k, '\t', model[k])
+
+            results = {str(key): model[key].as_long() for key in model if str(key)[0:2] in ["f_","b_","w_"]}            
+            # results.pop("max_start_offset")
             # 4. draws the result.
             self._draw(resort_microbatch_index(self._num_microbatches ,results))
         else:
