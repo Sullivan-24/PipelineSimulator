@@ -1,12 +1,12 @@
-pp_size = 5            # Size of pipeline.
-model_size = pp_size    # Model layers.
+pp_size = 4            # Size of pipeline.
+model_size = 5    # Model layers.
 nvs = (1,)              # Number of virtual stages / number of stages.
-nmb = 5                 # Number of microbatch.
+nmb = 4                 # Number of microbatch.
 ft_bt_rate = 1.50
-ft_wt_rate = 1.00       
+ft_wt_rate = 0.90      
 ft = 10                  # Forward pass time.
 bt = ft * ft_bt_rate    # Backpropagation time for compute the gradients of layer inputs.
-wt = ft                 # Backpropagation time for compute the gradients of layer parameters.
+wt = ft * ft_wt_rate    # Backpropagation time for compute the gradients of layer parameters.
 rr = 0.50               # Recomputing rate.
 comm = 1
 

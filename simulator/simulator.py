@@ -280,9 +280,13 @@ class Simulator:
         self._num_microbatches = config["num_microbatches"] * self.virtual_stage[0]
 
         self._max_activation_counts = config["max_activation_counts"]
-        self._forward_length = [t // self.virtual_stage[0] for t in config["forward_execution_time"]]
-        self._backward_b_length = [t // self.virtual_stage[0] for t in config["backward_execution_i_time"]]
-        self._backward_w_length = [t // self.virtual_stage[0] for t in config["backward_execution_g_time"]]
+        self._basic_forward_length = [t // self.virtual_stage[0] for t in config["forward_execution_time"]]
+        self._basic_backward_b_length = [t // self.virtual_stage[0] for t in config["backward_execution_i_time"]]
+        self._basic_backward_w_length = [t // self.virtual_stage[0] for t in config["backward_execution_g_time"]]
+
+        self._forward_length = self._basic_forward_length
+        self._backward_b_length = self._basic_backward_b_length
+        self._backward_w_length = self._basic_backward_w_length
         self._comm_length = [t // self.virtual_stage[0] for t in config["communication_time"]]
 
         self._sequential_order_constraint_strategy = config[
@@ -442,21 +446,24 @@ class Simulator:
             # forward stages sequential constraint
             for i in range(1, self._pp_size):
                 self._solver.add(
-                    self._forward_offsets[i][mb] >= 
-                    self._forward_offsets[i - 1][mb] + self._forward_length[i-1] * self._layers[i-1] + self._comm_length[i-1]
+                    self._forward_offsets[i][mb] 
+                    >= self._forward_offsets[i - 1][mb] 
+                    + self._forward_length[i-1] 
+                    + self._comm_length[i-1]
                 )
             # W stage constraint
             for i in range(self._pp_size):
                 self._solver.add(
                     self._backward_w_offsets[i][mb]
-                    >= self._backward_b_offsets[i][mb] + self._layers[i] * (self._backward_b_length[i] + self._forward_length[i] * self._recomputing_rate[i])
+                    >= self._backward_b_offsets[i][mb]
+                     + self._backward_b_length[i]
                 )
             # backward stages sequential constraint
             for i in range(self._pp_size - 1, 0, -1):
                 self._solver.add(
                     self._backward_b_offsets[i - 1][mb]
                        >= self._backward_b_offsets[i][mb]
-                        + self._layers[i] * (self._backward_b_length[i] + self._forward_length[i] * self._recomputing_rate[i])
+                        + self._backward_b_length[i]
                         + self._comm_length[i]
                 )
                 
@@ -589,7 +596,7 @@ class Simulator:
                 self._layers[i] <= self._model_size
             )
         self._solver.add(sum(self._layers) == self._model_size)
-    
+        
     def _build_recomputing_rate_constraint(self):
         for i in range(self._pp_size):
             # self._solver.add(
@@ -598,6 +605,12 @@ class Simulator:
             # )
             discrete_values = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
             self._solver.add(z3.Or([self._recomputing_rate[i] == v for v in discrete_values]))
+    
+    def _update_fbw_length(self):
+        self._forward_length = [self._layers[i] * self._basic_forward_length[i] for i in range(self._pp_size)]
+        self._backward_b_length = [self._layers[i] * (self._basic_backward_b_length[i] + self._basic_forward_length[i] * self._recomputing_rate[i]) for i in range(self._pp_size)]
+        self._backward_w_length = [self._layers[i] * self._basic_backward_w_length[i] for i in range(self._pp_size)]
+    
 
     def _build_constraints(self) -> None:
         
@@ -622,7 +635,8 @@ class Simulator:
         
         self._build_layer_constraint()
         self._build_recomputing_rate_constraint()
-        
+        self._update_fbw_length()
+
         if self._sequential_order_constraint_strategy == "strict":
             # constraint 1-0: forward and backward of each microbatch
             # are executed in sequential order
