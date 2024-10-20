@@ -1,5 +1,5 @@
-pp_size = 4            # Size of pipeline.
-model_size = 5    # Model layers.
+pp_size = 3            # Size of pipeline.
+model_size = 4    # Model layers.
 nvs = (1,)              # Number of virtual stages / number of stages.
 nmb = 4                 # Number of microbatch.
 ft_bt_rate = 1.50
@@ -7,7 +7,6 @@ ft_wt_rate = 0.90
 ft = 10                  # Forward pass time.
 bt = ft * ft_bt_rate    # Backpropagation time for compute the gradients of layer inputs.
 wt = ft * ft_wt_rate    # Backpropagation time for compute the gradients of layer parameters.
-rr = 0.50               # Recomputing rate.
 comm = 1
 
 def set_execution_time(time_value, 

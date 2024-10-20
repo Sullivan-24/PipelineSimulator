@@ -611,7 +611,6 @@ class Simulator:
         self._backward_b_length = [self._layers[i] * (self._basic_backward_b_length[i] + self._basic_forward_length[i] * self._recomputing_rate[i]) for i in range(self._pp_size)]
         self._backward_w_length = [self._layers[i] * self._basic_backward_w_length[i] for i in range(self._pp_size)]
     
-
     def _build_constraints(self) -> None:
         
         for i in range(self._pp_size):
@@ -676,7 +675,7 @@ class Simulator:
             "pp_size": self._pp_size,
             "pp_height": 50,
             "pp_align": 10,
-            "pixel_base": 10,
+            "pixel_base": 4,
             "num_real_microbatches": self._num_real_microbatches,
             "forward_length": self._forward_length,
             "backward_length": self._backward_b_length,
@@ -704,9 +703,22 @@ class Simulator:
             model = self._solver.model()
 
             for k in model:
+                # print(type(k), k, '\t', model[k])
                 print(k, '\t', model[k])
 
-            results = {str(key): model[key].as_long() for key in model if str(key)[0:2] in ["f_","b_","w_"]}            
+            for i in range(self._pp_size):
+                number_of_layers = model[self._layers[i]].as_long()
+                recompute_rate = float(model[self._recomputing_rate[i]].as_fraction())
+                self._forward_length[i] = self._basic_forward_length[i] * number_of_layers
+                self._backward_b_length[i] = (self._basic_backward_b_length[i] + self._basic_forward_length[i] * recompute_rate) * number_of_layers 
+                # self._backward_b_length[i] = z3.substitute(
+                #     self._backward_b_length[i],
+                #     (self._layers[i], z3.IntVal(number_of_layers)),
+                #     (self._recomputing_rate[i], z3.RealVal(recompute_rate))
+                # )
+                self._backward_w_length[i] = self._basic_backward_w_length[i] * number_of_layers
+
+            results = {str(key) : model[key].as_long() for key in model if str(key)[0:2] in ["f_","b_","w_"]}
             # results.pop("max_start_offset")
             # 4. draws the result.
             self._draw(resort_microbatch_index(self._num_microbatches ,results))

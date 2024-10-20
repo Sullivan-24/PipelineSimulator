@@ -3,7 +3,6 @@ painter package
 """
 import tkinter as tk
 from tkinter import font
-
 from .utils import parse_microbatch_key
 
 
@@ -19,8 +18,8 @@ class SchedulingPainter:
         self._num_real_microbatches = config["num_real_microbatches"]
 
         self._forward_length = [_len * config["pixel_base"] for _len in config["forward_length"]]
-        self._backward_length = [_len * config["pixel_base"] for _len in config["backward_length"]]
-        self._backward_length2 = [_len * config["pixel_base"] for _len in config["backward_length2"]]
+        self._backward_b_length = [_len * config["pixel_base"] for _len in config["backward_length"]]
+        self._backward_w_length = [_len * config["pixel_base"] for _len in config["backward_length2"]]
 
         self._tk_root = tk.Tk()
         self._tk_root.title("SchedulingPainter")
@@ -47,7 +46,7 @@ class SchedulingPainter:
         max_key = max(data, key=data.get)
         _, max_key_pid, _ = parse_microbatch_key(max_key)
 
-        canvas_width = data[max_key] + self._backward_length[max_key_pid] + 2 * self._pp_align
+        canvas_width = data[max_key] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
         canvas_height = (self._pp_height + self._pp_align) * self._pp_size
 
         # 0. Create label canvas
@@ -58,7 +57,7 @@ class SchedulingPainter:
         label_canvas.create_text(
             self._pp_align + 127,
             y_label,
-            text=f"{(data[max_key] + self._backward_length2[max_key_pid])//self._pixel_base}",
+            text=f"{(data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base}",
         )
 
         label_canvas.create_text(
@@ -88,7 +87,7 @@ class SchedulingPainter:
             x0 = self._pp_align + offset
             y0 = (self._pp_height + self._pp_align) * pid + 5
             #修改画图中每个block的宽度
-            block_width = self._forward_length[pid] if k == 'f' else (self._backward_length[pid] if k == 'b' else self._backward_length2[pid])
+            block_width = self._forward_length[pid] if k == 'f' else (self._backward_b_length[pid] if k == 'b' else self._backward_w_length[pid])
             x1 = x0 + block_width
             y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
 
