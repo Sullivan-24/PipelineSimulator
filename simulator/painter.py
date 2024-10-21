@@ -10,10 +10,12 @@ class SchedulingPainter:
     """Scheduling Painter"""
 
     def __init__(self, config: dict) -> None:
-        self._pp_size = config["pp_size"]
-        self._pp_height = config["pp_height"]
-        self._pp_align = config["pp_align"]
-        self._pixel_base = config["pixel_base"]
+        self._device_size   = config["device_size"]
+        self._devices       = config["devices"]
+        self._pp_size       = config["pp_size"]
+        self._pp_height     = config["pp_height"]
+        self._pp_align      = config["pp_align"]
+        self._pixel_base    = config["pixel_base"]
         
         self._num_real_microbatches = config["num_real_microbatches"]
 
@@ -48,6 +50,7 @@ class SchedulingPainter:
 
         canvas_width = data[max_key] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
         canvas_height = (self._pp_height + self._pp_align) * self._pp_size
+        # canvas_height = (self._pp_height + self._pp_align) * self._device_size
 
         # 0. Create label canvas
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)

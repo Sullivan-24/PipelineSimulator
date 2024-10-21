@@ -3,7 +3,7 @@ main package
 """
 import sys
 from simulator.config import *
-from simulator.simulator import Simulator, SimulatorGurobipy
+from simulator.simulator import Simulator, SPSimulator
 
 def main():
     """main function"""
@@ -29,7 +29,9 @@ def main():
         "max_activation_counts": [8 for _ in range(pp_size)],
     }
 
-    simulator = Simulator(config)
+    # simulator = Simulator(config)
+    # simulator.run()
+    simulator = SPSimulator(config)
     simulator.run()
 
 if __name__ == "__main__":

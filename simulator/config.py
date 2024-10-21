@@ -1,8 +1,9 @@
-device_size = 4         # Size of devices.
-pp_size = 4             # Size of pipeline.
-model_size = 4          # Model layers.
-nvs = (1,)              # Number of virtual stages / number of stages.
-nmb = 4                 # Number of microbatch.
+device_size = 2             # Size of devices.
+pp_size = device_size * 2   # Size of pipeline.
+model_size = pp_size + 0    # Model layers, should be equal or larger than pipeline size.
+nvs = (1,)                  # Number of virtual stages / number of stages.
+nmb = device_size + 0       # Number of microbatch.
+
 ft_bt_rate = 1.50
 ft_wt_rate = 0.90      
 ft = 10                 # Forward pass time.

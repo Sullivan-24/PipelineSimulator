@@ -4,268 +4,9 @@ simulator package
 import itertools
 import time
 import z3
-import gurobipy
 
 from .painter import SchedulingPainter
 from .utils import resort_microbatch_index
-
-class SimulatorGurobipy:
-    """Simulator"""
-
-    def __init__(self, config: dict) -> None:
-        self._pp_size = config["pp_size"]
-        self.virtual_stage = config["virtual_stage"]
-        self._num_real_microbatches = config["num_microbatches"]
-        self._num_microbatches = config["num_microbatches"] * self.virtual_stage[0]
-
-        self._max_activation_counts = config["max_activation_counts"]
-        self._forward_length = [t // self.virtual_stage[0] for t in config["forward_execution_time"]]
-        self._backward_b_length = [t // self.virtual_stage[0] for t in config["backward_execution_i_time"]]
-        self._backward_w_length = [t // self.virtual_stage[0] for t in config["backward_execution_g_time"]]
-        self._sequential_order_constraint_strategy = config[
-            "sequential_order_constraint_strategy"
-        ]
-
-        assert isinstance(
-            self._forward_length, (list, tuple)
-        ), "forward_execution_time must be list or tuple"
-        assert isinstance(
-            self._backward_b_length, (list, tuple)
-        ), "backward_execution_time must be list or tuple"
-        assert isinstance(
-            self._backward_w_length, (list, tuple)
-        ), "backward_execution_time must be list or tuple"
-
-        assert self._sequential_order_constraint_strategy in (
-            "strict",
-            "double_interleaving",
-            "full_interleaving",
-        ), "sequential order constraint strategy is not supported"
-
-        self._solver = gurobipy.Model("PipelineScheduleSearcher")
-        self._forward_offsets = [[] for i in range(self._pp_size)]
-        self._backward_b_offsets = [[] for i in range(self._pp_size)]
-        self._backward_w_offsets = [[] for i in range(self._pp_size)]            
-
-    def _virtual_stage_sequential_order_constraint_strict(self):
-        # fix warmup stage
-        for i in range(self._pp_size):
-            self._solver.addConstr(
-                self._forward_offsets[i][0]
-                == sum(self._forward_length[0:i])
-            )
-        # for i in range(self._pp_size):
-        #     for j in range(self._pp_size - i):
-        #         self._solver.addConstr(
-        #             self._forward_offsets[i][j]
-        #             == (sum(self._forward_length[0:i]) + sum(self._forward_length[0:j]))
-        #         )
-        mb_offset = self._num_real_microbatches
-        # natural number order
-        for i in range(self._num_real_microbatches):
-            if i > 0:
-                self._solver.addConstr(
-                    self._forward_offsets[0][i]
-                    >= self._forward_offsets[0][i - 1] + self._forward_length[0]
-                )
-                self._solver.addConstr(
-                    self._forward_offsets[0][i + mb_offset]
-                    >= self._forward_offsets[0][i + mb_offset - 1] + self._forward_length[0]
-                )
-        # V-shape virtual stage
-        for mb in range(self._num_real_microbatches):
-            # F stage constraint
-            for i in range(0, self._pp_size):
-                if i > 0:
-                    self._solver.addConstr(
-                        self._forward_offsets[i][mb]
-                        >= self._forward_offsets[i - 1][mb] + self._forward_length[i-1]
-                    )
-                if i < self._pp_size - 1:
-                    self._solver.addConstr(
-                        self._forward_offsets[i][mb + mb_offset] 
-                        >= self._forward_offsets[i+1][mb + mb_offset] + self._forward_length[i+1]
-                    )
-                self._solver.addConstr(
-                        self._forward_offsets[i][mb + mb_offset]
-                        >= self._forward_offsets[i][mb] + self._forward_length[i]
-                    )
-                self._solver.addConstr(
-                        self._backward_b_offsets[i][mb]
-                        >= self._forward_offsets[i][mb + mb_offset] + self._forward_length[i]
-                    )
-            # B stage constraint
-            for i in range(0, self._pp_size):
-                # wrong constraint
-                # if i > 0 :
-                #     self._solver.addConstr(
-                #         self._backward_b_offsets[i][mb]
-                #         >= self._backward_b_offsets[i - 1][mb] + self._backward_b_length[i - 1]
-                #     )
-                #     self._solver.addConstr(
-                #         self._backward_b_offsets[i - 1][mb + mb_offset] 
-                #         >= self._backward_b_offsets[i][mb + mb_offset] + self._backward_b_length[i]
-                #     )
-                if i > 0 :
-                    self._solver.addConstr(
-                        self._backward_b_offsets[i][mb]
-                        >= self._backward_b_offsets[i - 1][mb] + self._backward_b_length[i - 1]
-                    )
-                if i < self._pp_size - 1:
-                    self._solver.addConstr(
-                        self._backward_b_offsets[i][mb + mb_offset] 
-                        >= self._backward_b_offsets[i + 1][mb + mb_offset] + self._backward_b_length[i + 1]
-                    )
-                self._solver.addConstr(
-                        self._backward_b_offsets[i][mb + mb_offset]
-                        >= self._backward_b_offsets[i][mb] + self._backward_b_length[i]
-                    )
-            # W stage constraint
-            for i in range(self._pp_size):
-                self._solver.addConstr(
-                    self._backward_w_offsets[i][mb]
-                    >= self._backward_b_offsets[i][mb] + self._backward_b_length[i]
-                )
-                self._solver.addConstr(
-                    self._backward_w_offsets[i][mb + mb_offset]
-                    >= self._backward_b_offsets[i][mb + mb_offset] + self._backward_b_length[i]
-                )
-
-    def _serial_computation_within_pipeline_constraint(self):
-        for pp in range(self._pp_size):
-            # 加入对w的判断，同时修改_length的判断
-            _pp_vars = self._forward_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
-            for i, _ in enumerate(_pp_vars):
-                for j in range(i + 1, len(_pp_vars)):
-                    _i_length = (
-                        self._forward_length[pp]
-                        if i // self._num_microbatches == 0 
-                        else(
-                            self._backward_b_length[pp] 
-                            if i // self._num_microbatches == 1 
-                            else self._backward_w_length[pp]
-                        )
-                    )
-                    _j_length = (
-                        self._forward_length[pp]
-                        if j // self._num_microbatches == 0
-                        else(
-                            self._backward_b_length[pp] 
-                            if j // self._num_microbatches == 1 
-                            else self._backward_w_length[pp]
-                        )
-                    )
-                    z = self._solver.addVar(vtype=gurobipy.GRB.BINARY, name="z_{}_{}".format(i,j))
-                    self._solver.addGenConstrIndicator(z, True,  _pp_vars[j] >= _pp_vars[i] + _i_length, name="or_constraint1_{}_{}".format(i,j))
-                    self._solver.addGenConstrIndicator(z, False, _pp_vars[j] + _j_length <= _pp_vars[i], name="or_constraint2_{}_{}".format(i,j))
-                    
-                    # self._solver.addConstr(
-                    #     (_pp_vars[j] + _j_length - _pp_vars[i]) * ( _pp_vars[i] + _i_length - _pp_vars[j]) <= 0,
-                    # )
-
-                    # self._solver.addConstr(
-                    #     _pp_vars[j] >= _pp_vars[i] + _i_length,
-                    # )
-                    # self._solver.addConstr(
-                    #     _pp_vars[j] + _j_length <= _pp_vars[i],
-                    # )
-
-    def _pipeline_activation_accumulation_constraint(self):
-        # for pp in range(self._pp_size):
-        #     # calculate the maximum activation value for this pp
-        #     for mb in range(self._num_microbatches):
-        #         _backward_var = self._backward_b_offsets[pp][mb]
-        #         _actvaition_count = 1
-
-        #         for other_mb in range(self._num_microbatches):
-        #             if other_mb == mb:
-        #                 continue
-        #             _actvaition_count += z3.If(
-        #                 gurobipy.Model.addGenConstrAnd(
-        #                     self._backward_b_offsets[pp][other_mb] > _backward_var,
-        #                     self._forward_offsets[pp][other_mb] < _backward_var,
-        #                 ),
-        #                 1,
-        #                 0,
-        #             )
-
-        #         self._solver.addConstr(_actvaition_count <= self._max_activation_counts[pp])
-        pass
-    
-    def _build_constraints(self) -> None:
-        for i in range(self._pp_size):
-            for mb in range(self._num_microbatches):
-                self._forward_offsets[i].append(self._solver.addVar(name=f"f_{mb}_{i}", vtype=gurobipy.GRB.INTEGER))
-                self._backward_b_offsets[i].append(self._solver.addVar(name=f"b_{mb}_{i}", vtype=gurobipy.GRB.INTEGER))
-                self._backward_w_offsets[i].append(self._solver.addVar(name=f"w_{mb}_{i}", vtype=gurobipy.GRB.INTEGER))
-
-                self._solver.addConstr(self._forward_offsets[i][-1] >= 0)
-                # Skip warmup stage
-                self._solver.addConstr(self._backward_b_offsets[i][-1] >= self._forward_length[0] * self._pp_size * self.virtual_stage[0])
-                # Skip first microbatch F+B stage
-                self._solver.addConstr(self._backward_w_offsets[i][-1] >= self._forward_length[0] * self._pp_size * self.virtual_stage[0] + self._backward_b_length[0])
-                
-                # Constrain bubble size smaller to Zerobubble-GPipe, leading to up to a speedup of 15x 
-                self._solver.addConstr(self._forward_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size * self.virtual_stage[0] + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length))
-                self._solver.addConstr(self._backward_b_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size * self.virtual_stage[0] + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length) - self._backward_b_length[i])
-                self._solver.addConstr(self._backward_w_offsets[i][-1] <= ( max(self._forward_length) + max(self._backward_b_length) ) * (self._pp_size * self.virtual_stage[0] + self._num_microbatches - 1) + self._num_microbatches * max(self._backward_w_length) - self._backward_w_length[i])
-
-        self._virtual_stage_sequential_order_constraint_strict()
-        # constraint 2: no overlapping of forward and backward within each pipeline
-        self._serial_computation_within_pipeline_constraint()
-
-        # constraint 3: the accumulation count of activations does not exceed max_activation_counts
-        # self._pipeline_activation_accumulation_constraint()
-
-    def _build_optimize_objectives(self) -> None:
-        # 1. minimize the execution time of each microbatch
-        max_var = self._solver.addVar(name="max_var", vtype=gurobipy.GRB.INTEGER)
-        self._solver.setObjective(max_var, gurobipy.GRB.MINIMIZE)
-        for pp in range(self._pp_size):
-            # Change to optimize W instead of B
-            for var in self._backward_w_offsets[pp]:
-                self._solver.addConstr(max_var >= var)
-        self._solver.optimize()
-
-    def _draw(self, results: dict) -> None:
-        painter_conf = {
-            "pp_size": self._pp_size,
-            "pp_height": 50,
-            "pp_align": 10,
-            "pixel_base": 10,
-            "num_real_microbatches": self._num_real_microbatches,
-            "forward_length": self._forward_length,
-            "backward_length": self._backward_b_length,
-            "backward_length2": self._backward_w_length,
-        }
-
-        SchedulingPainter(painter_conf).draw(results)
-
-    def run(self) -> None:
-        """run simulation"""
-        # 1. builds the solver constraints.
-        self._build_constraints()
-
-        # 2. builds the solver optimize objectives.
-        self._build_optimize_objectives()
-
-        # 3. runs the solver.
-        start_time = time.time()
-        print("gurobipy Solver Solving...")
-        check = self._solver.status
-        end_time = time.time()
-        if  check == gurobipy.GRB.OPTIMAL:
-            print(f"Result: SAT, Cost: {end_time - start_time:.2f}")
-            # tranforms the result to a dictionary.
-            model = self._solver
-            # print(model)
-            results = {str(key.VarName): key.X for key in model.getVars() if not str(key.VarName).startswith("z")}
-            print(results)
-            results.pop("max_var")
-            # 4. draws the result.
-            self._draw(resort_microbatch_index(self._num_microbatches ,results))
-        else:
-            print(f"Result: UNSAT, Cost: {end_time - start_time:.2f}")
 
 class Simulator:
     """Simulator"""
@@ -810,6 +551,19 @@ class SPSimulator:
         self._backward_w_offsets    = [[] for _ in range(self._pp_size)]
 
         self._devices = [[] for _ in range(self._device_size)]
+        self._fix_stages(stage_type="ZBV")
+
+    def _fix_stages(self, stage_type="ZBV"):
+        if stage_type == "ZBV":
+            for pid in range(self._pp_size):
+                if (pid // self._device_size) % 2 == 0:
+                    self._devices[pid % self._device_size].append(pid)
+                else:
+                    self._devices[self._device_size - 1 - pid % self._device_size].append(pid)
+        
+        if stage_type == "I1F1B":
+            for pid in range(self._pp_size):
+                self._devices[pid % self._device_size].append(pid)
 
     def _real_pipeline_modeling_constraint_strict(self):
         for mb in range(self._num_microbatches):
@@ -899,32 +653,34 @@ class SPSimulator:
                 self._solver.add(_actvaition_count <= self._max_activation_counts[pp])
 
     def _serial_computation_within_device_constraint(self):
-        for pp in range(self._device_size):
+        for did in range(self._device_size):
             # 加入对w的判断，同时修改_length的判断
-            shift = self._device_size
-            _pp_vars = self._forward_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
-            while shift + pp < self._pp_size:
-                _pp_vars += self._forward_offsets[shift + pp] + self._backward_b_offsets[shift + pp] + self._backward_w_offsets[shift + pp]
-                shift += self._device_size
+            stages_within_device = self._devices[did]
+            _pp_vars = []
+            for pp in stages_within_device:
+                _pp_vars += self._forward_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
             
             for i, _ in enumerate(_pp_vars):
-                for j in range(i + 1, len(_pp_vars)):
-                    _i_length = (
-                        self._forward_length[pp]
-                        if i // self._num_microbatches == 0 
-                        else(
-                            self._backward_b_length[pp] 
-                            if i // self._num_microbatches == 1 
-                            else self._backward_w_length[pp]
-                        )
+                group_size = self._num_microbatches * 3
+                i_pp = stages_within_device[i // group_size]
+                _i_length = (
+                    self._forward_length[i_pp]
+                    if (i % group_size) // self._num_microbatches == 0 
+                    else(
+                        self._backward_b_length[i_pp] 
+                        if (i % group_size) // self._num_microbatches == 1 
+                        else self._backward_w_length[i_pp]
                     )
+                )
+                for j in range(i + 1, len(_pp_vars)):
+                    j_pp = stages_within_device[i // group_size]
                     _j_length = (
-                        self._forward_length[pp]
-                        if j // self._num_microbatches == 0
+                        self._forward_length[j_pp]
+                        if (j % group_size) // self._num_microbatches == 0
                         else(
-                            self._backward_b_length[pp] 
-                            if j // self._num_microbatches == 1 
-                            else self._backward_w_length[pp]
+                            self._backward_b_length[j_pp] 
+                            if (j % group_size) // self._num_microbatches == 1 
+                            else self._backward_w_length[j_pp]
                         )
                     )
                     self._solver.add(
@@ -974,7 +730,7 @@ class SPSimulator:
         self._real_pipeline_modeling_constraint_strict()
 
         # constraint 2: no overlapping of forward and backward within each pipeline
-        self._serial_computation_within_pipeline_constraint()
+        self._serial_computation_within_device_constraint()
 
         # constraint 3: the accumulation count of activations does not exceed max_activation_counts
         # self._pipeline_activation_accumulation_constraint()
@@ -991,6 +747,8 @@ class SPSimulator:
 
     def _draw(self, results: dict) -> None:
         painter_conf = {
+            "device_size": self._device_size,
+            "devices": self._devices,
             "pp_size": self._pp_size,
             "pp_height": 50,
             "pp_align": 10,
@@ -1043,4 +801,3 @@ class SPSimulator:
             self._draw(resort_microbatch_index(self._num_microbatches ,results))
         else:
             print(f"Result: UNSAT, Cost: {end_time - start_time:.2f}")
-
