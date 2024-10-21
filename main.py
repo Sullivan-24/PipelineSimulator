@@ -7,12 +7,19 @@ from simulator.simulator import Simulator, SimulatorGurobipy
 
 def main():
     """main function"""
-    print("forward_execution_time:{}\nbackward_execution_i_time:{}\nbackward_execution_g_time:{}.".format(ft,bt,wt))
-    print("Pipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.".format(pp_size,model_size,nmb))
+    print("forward_execution_time:{}\nbackward_execution_i_time:{}\nbackward_execution_g_time:{}.".format(
+            ft, bt, wt
+        )
+    )
+    print("Device_size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.".format(
+            device_size, pp_size, model_size, nmb
+        )
+    )
     config = {
+        "device_size": int(device_size),
         "pp_size": int(pp_size),
         "model_size": int(model_size),
-        "virtual_stage": nvs, # times of the number of devices
+        "virtual_stage": nvs,               # times of the number of devices
         "num_microbatches": int(nmb),
         "forward_execution_time": [ft for _ in range(pp_size)],
         "backward_execution_i_time": [bt for _ in range(pp_size)],
@@ -24,8 +31,6 @@ def main():
 
     simulator = Simulator(config)
     simulator.run()
-    # simulator = SimulatorGurobipy(config)
-    # simulator.run()
 
 if __name__ == "__main__":
     main()
