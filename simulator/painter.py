@@ -39,6 +39,11 @@ class SchedulingPainter:
             self._highlight_state[item_id] = True
             canvas.itemconfig(item_id, fill="yellow")
 
+    def _pid2did(self, pid):
+        for did in range(len(self._devices)):
+            if pid in self._devices[did]:
+                return did
+
     def draw(self, data: dict) -> None:
         """draw with tkinter"""
 
@@ -49,8 +54,9 @@ class SchedulingPainter:
         _, max_key_pid, _ = parse_microbatch_key(max_key)
 
         canvas_width = data[max_key] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
-        canvas_height = (self._pp_height + self._pp_align) * self._pp_size
-        # canvas_height = (self._pp_height + self._pp_align) * self._device_size
+        # canvas_height = (self._pp_height + self._pp_align) * self._pp_size
+        # 按照 Device 画示意图
+        canvas_height = (self._pp_height + self._pp_align) * self._device_size
 
         # 0. Create label canvas
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
@@ -76,7 +82,9 @@ class SchedulingPainter:
         main_canvas.pack()
 
         # 2. Add timeline for each pipeline
-        for pid in range(self._pp_size):
+        # for pid in range(self._pp_size):
+        # 按照 Device 画示意图
+        for pid in range(self._device_size):
             x0 = self._pp_align
             y0 = (self._pp_height + self._pp_align) * pid + 5
             x1 = canvas_width - self._pp_align
@@ -88,11 +96,14 @@ class SchedulingPainter:
             k, pid, mid = parse_microbatch_key(microbatch_key)
 
             x0 = self._pp_align + offset
-            y0 = (self._pp_height + self._pp_align) * pid + 5
+            did = self._pid2did(pid=pid) # 获取对应的device id，把每个stage画在对应的device上
+            # y0 = (self._pp_height + self._pp_align) * pid + 5
+            y0 = (self._pp_height + self._pp_align) * did + 5
             #修改画图中每个block的宽度
             block_width = self._forward_length[pid] if k == 'f' else (self._backward_b_length[pid] if k == 'b' else self._backward_w_length[pid])
             x1 = x0 + block_width
-            y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
+            # y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
+            y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
 
             tag = f"p_{pid}_m_{mid}_{k}"
             if k == 'f':    #颜色设置，加上w的情况
