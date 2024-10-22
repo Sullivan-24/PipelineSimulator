@@ -673,7 +673,7 @@ class SPSimulator:
                     )
                 )
                 for j in range(i + 1, len(_pp_vars)):
-                    j_pp = stages_within_device[i // group_size]
+                    j_pp = stages_within_device[j // group_size]
                     _j_length = (
                         self._forward_length[j_pp]
                         if (j % group_size) // self._num_microbatches == 0
