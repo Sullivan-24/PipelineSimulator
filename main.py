@@ -3,7 +3,7 @@ main package
 """
 import sys
 from simulator.config import *
-from simulator.simulator import Simulator, SPSimulator
+from simulator.simulator import Simulator, SPSimulator, DSASimulator
 
 def main():
     """main function"""
@@ -11,7 +11,7 @@ def main():
             ft, bt, wt
         )
     )
-    print("Device_size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.".format(
+    print("Device size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.".format(
             device_size, pp_size, model_size, nmb
         )
     )
@@ -33,6 +33,8 @@ def main():
     # simulator.run()
     simulator = SPSimulator(config)
     simulator.run()
+    simulator = DSASimulator(config)
+    simulator.traverse_run()
 
 if __name__ == "__main__":
     main()

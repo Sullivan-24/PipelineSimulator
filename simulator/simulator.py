@@ -4,6 +4,7 @@ simulator package
 import itertools
 import time
 import z3
+import copy
 
 from .painter import SchedulingPainter
 from .utils import resort_microbatch_index
@@ -506,7 +507,7 @@ class Simulator:
 class SPSimulator:
     """Simulator"""
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict, device_stage_alignments=None) -> None:
         self._pp_size                   = config["pp_size"]
         self._device_size               = config["device_size"]
         self._model_size                = config["model_size"]
@@ -550,9 +551,22 @@ class SPSimulator:
         self._backward_b_offsets    = [[] for _ in range(self._pp_size)]
         self._backward_w_offsets    = [[] for _ in range(self._pp_size)]
 
-        self._devices = [[] for _ in range(self._device_size)]
-        self._fix_stages(stage_type="I1F1B")
+        if device_stage_alignments:
+            self._devices = device_stage_alignments
+        else:      
+            self._devices = [[] for _ in range(self._device_size)]
+            self._fix_stages(stage_type="I1F1B")
+
+        self.model_result = None
         # self._construct_stages()
+
+    def show_device_stage_mapping(self):
+        for did,ds in enumerate(self._devices):
+            print("Device {}: {}".format(did, ds))
+
+    def show_solution_detail(self):
+        for key in self.model_result:
+            print(str(key), self.model_result[key].as_long())
 
     def _construct_stages(self, stage_type=None):
         if stage_type == "ZBV":
@@ -687,10 +701,10 @@ class SPSimulator:
                 self._solver.add(_actvaition_count <= self._max_activation_counts[pp])
 
     def _serial_computation_within_device_constraint(self):
+        print("Stage alignment:{}".format(self._devices))
         for did in range(self._device_size):
             # 加入对w的判断，同时修改_length的判断
             stages_within_device = self._devices[did]
-            print("Stage alignment:{}".format(self._devices))
             _pp_vars = []
             for pp in stages_within_device:
                 _pp_vars += self._forward_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
@@ -796,7 +810,7 @@ class SPSimulator:
 
         SchedulingPainter(painter_conf).draw(results)
 
-    def run(self) -> None:
+    def run(self, draw=False) -> None:
         """run simulation"""
         # 1. builds the solver constraints.
         self._build_constraints()
@@ -813,26 +827,73 @@ class SPSimulator:
             print(f"Result: SAT, Cost: {end_time - start_time:.2f}")
             # tranforms the result to a dictionary.
             model = self._solver.model()
-
-            for k in model:
-                # print(type(k), k, '\t', model[k])
-                print(k, '\t', model[k])
+            self.model_result = model
+            # for k in model:
+            #     # print(type(k), k, '\t', model[k])
+            #     print(k, '\t', model[k])
 
             for i in range(self._pp_size):
                 number_of_layers = model[self._layers[i]].as_long()
                 recompute_rate = float(model[self._recomputing_rate[i]].as_fraction())
                 self._forward_length[i] = self._basic_forward_length[i] * number_of_layers
                 self._backward_b_length[i] = (self._basic_backward_b_length[i] + self._basic_forward_length[i] * recompute_rate) * number_of_layers 
-                # self._backward_b_length[i] = z3.substitute(
-                #     self._backward_b_length[i],
-                #     (self._layers[i], z3.IntVal(number_of_layers)),
-                #     (self._recomputing_rate[i], z3.RealVal(recompute_rate))
-                # )
                 self._backward_w_length[i] = self._basic_backward_w_length[i] * number_of_layers
-
-            results = {str(key) : model[key].as_long() for key in model if str(key)[0:2] in ["f_","b_","w_"]}
-            # results.pop("max_start_offset")
-            # 4. draws the result.
-            self._draw(resort_microbatch_index(self._num_microbatches ,results))
+            results = {str(key) : model[key] for key in model}
+            if draw:
+                # 4. draws the result.
+                results = {str(key) : model[key].as_long() for key in model if str(key)[0:2] in ["f_","b_","w_"]}
+                self._draw(resort_microbatch_index(self._num_microbatches ,results))
+            return results
         else:
             print(f"Result: UNSAT, Cost: {end_time - start_time:.2f}")
+            return {"max_start_offset": 999999999999}
+
+class DSASimulator:
+    def __init__(self, config) -> None:
+
+        self._pp_size                   = config["pp_size"]
+        self._device_size               = config["device_size"]
+        self.config                     = config
+        self._comm_length               = [[config["communication_time"] for _ in self._device_size] for _ in self._device_size]
+        self._device_stage_alignments   = []
+
+    def _prune_result(self, device_stage_alignment):
+        for dsa in device_stage_alignment:
+            # if len(dsa) != self._pp_size // self._device_size:
+            if len(dsa) == 0:
+                return False
+        return True
+
+    def _traverse_every_stage_alignment(self, sid, device_stage_alignment):
+        if sid == self._pp_size:
+            if self._prune_result(device_stage_alignment):
+                self._device_stage_alignments.append(copy.deepcopy(device_stage_alignment))
+        else:
+            for did in range(self._device_size):
+                device_stage_alignment[did].append(sid)
+                self._traverse_every_stage_alignment(sid + 1, device_stage_alignment)
+                device_stage_alignment[did].pop()
+
+    def traverse_run(self) -> None:
+        print("Traversing every stage alignment...")
+        device_stage_alignments = [[] for _ in range(self._device_size)]
+        self._traverse_every_stage_alignment(0, device_stage_alignment=device_stage_alignments)
+        print("Traversing over. {} situations found.".format(len(self._device_stage_alignments)))
+
+        best_result = None
+        minimal_time = 999999999999
+        simulators = []
+        for dsa in self._device_stage_alignments:
+            temp_simulator = SPSimulator(self.config, device_stage_alignments=dsa)
+            simulators.append(temp_simulator)
+            result = temp_simulator.run()
+            result_time = result["max_start_offset"].as_long()
+            if result_time < minimal_time:
+                minimal_time = result_time
+                best_result = temp_simulator
+
+        
+        result = {str(key) : best_result.model_result[key].as_long() for key in best_result.model_result if str(key)[0:2] in ["f_","b_","w_"]}
+        best_result.show_device_stage_mapping()
+        best_result.show_solution_detail()
+        best_result._draw(resort_microbatch_index(best_result._num_microbatches ,result))
