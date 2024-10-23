@@ -519,7 +519,6 @@ class SPSimulator:
         self._basic_backward_b_length   = config["backward_execution_i_time"]
         self._basic_backward_w_length   = config["backward_execution_g_time"]
         self._comm_length               = config["communication_time"] if not new_comm_length else new_comm_length
-        print(self._comm_length)
 
         self._sequential_order_constraint_strategy = config[
             "sequential_order_constraint_strategy"

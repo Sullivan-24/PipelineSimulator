@@ -32,9 +32,9 @@ def main():
     # simulator = Simulator(config)
     # simulator.run()
     simulator = SPSimulator(config)
-    simulator.run()
-    simulator = DSASimulator(config)
-    simulator.traverse_run()
+    simulator.run(draw=True)
+    # simulator = DSASimulator(config)
+    # simulator.traverse_run()
 
 if __name__ == "__main__":
     main()
