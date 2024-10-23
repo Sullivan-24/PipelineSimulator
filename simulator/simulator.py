@@ -551,7 +551,41 @@ class SPSimulator:
         self._backward_w_offsets    = [[] for _ in range(self._pp_size)]
 
         self._devices = [[] for _ in range(self._device_size)]
-        self._fix_stages(stage_type="ZBV")
+        self._fix_stages(stage_type="I1F1B")
+        # self._construct_stages()
+
+    def _construct_stages(self, stage_type=None):
+        if stage_type == "ZBV":
+            self._fix_stages(stage_type="ZBV")
+        elif stage_type == "I1F1B":
+            self._fix_stages(stage_type="I1F1B")
+        else:
+            ds = self._device_size
+            ss = self._pp_size
+            print("Modeling Stages Alignment...")
+            # 定义阶段变量
+            # stages[i] 是设备 i 分配的阶段集合
+            self._devices = [z3.Array(f'stage_{i}', z3.IntSort(), z3.IntSort()) for i in range(ds)]
+
+            # # 定义每个设备分配阶段的数量
+            # counts = [z3.Int(f'count_{i}') for i in range(ds)]
+
+            # # 添加约束条件
+            # # 每个设备的阶段数量必须大于 0
+            # for count in counts:
+            #     self._solver.add(count >= 1, count <= ss)
+
+            # # 计算总的阶段数量
+            # total_count = z3.Sum(counts)
+            # self._solver.add(total_count == ss)
+
+            # 每个设备的阶段编号在 1 到 s 之间
+            all_stages = []
+            for i in range(ds):
+                for j in range(ss // ds):
+                    self._solver.add(z3.And(self._devices[i][j] >= 1, self._devices[i][j] <= ss))
+                    all_stages.append(self._devices[i][j])
+            self._solver.add(z3.Distinct(all_stages))
 
     def _fix_stages(self, stage_type="ZBV"):
         if stage_type == "ZBV":
@@ -656,6 +690,7 @@ class SPSimulator:
         for did in range(self._device_size):
             # 加入对w的判断，同时修改_length的判断
             stages_within_device = self._devices[did]
+            print("Stage alignment:{}".format(self._devices))
             _pp_vars = []
             for pp in stages_within_device:
                 _pp_vars += self._forward_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
