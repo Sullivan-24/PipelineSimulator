@@ -9,7 +9,7 @@ ft_wt_rate = 0.90
 ft = 10                 # Forward pass time.
 bt = ft * ft_bt_rate    # Backpropagation time for compute the gradients of layer inputs.
 wt = ft * ft_wt_rate    # Backpropagation time for compute the gradients of layer parameters.
-comm = 0
+comm = 1
 
 def set_execution_time(time_value, 
                        stages_num = None, 

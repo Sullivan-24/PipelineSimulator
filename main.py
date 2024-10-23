@@ -24,7 +24,7 @@ def main():
         "forward_execution_time": [ft for _ in range(pp_size)],
         "backward_execution_i_time": [bt for _ in range(pp_size)],
         "backward_execution_g_time": [wt for _ in range(pp_size)],
-        "communication_time": [comm for _ in range(pp_size)],
+        "communication_time": [[comm if i != j else 0 for j in range(pp_size)] for i in range(pp_size)],
         "sequential_order_constraint_strategy": "strict",
         "max_activation_counts": [8 for _ in range(pp_size)],
     }

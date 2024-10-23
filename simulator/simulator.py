@@ -507,7 +507,7 @@ class Simulator:
 class SPSimulator:
     """Simulator"""
 
-    def __init__(self, config: dict, device_stage_alignments=None) -> None:
+    def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
         self._pp_size                   = config["pp_size"]
         self._device_size               = config["device_size"]
         self._model_size                = config["model_size"]
@@ -518,8 +518,9 @@ class SPSimulator:
         self._basic_forward_length      = config["forward_execution_time"]
         self._basic_backward_b_length   = config["backward_execution_i_time"]
         self._basic_backward_w_length   = config["backward_execution_g_time"]
-        self._comm_length               = config["communication_time"]
-        
+        self._comm_length               = config["communication_time"] if not new_comm_length else new_comm_length
+        print(self._comm_length)
+
         self._sequential_order_constraint_strategy = config[
             "sequential_order_constraint_strategy"
         ]
@@ -621,7 +622,7 @@ class SPSimulator:
                     self._forward_offsets[i][mb] 
                     >= self._forward_offsets[i - 1][mb] 
                     + self._forward_length[i-1] 
-                    + self._comm_length[i-1]
+                    + self._comm_length[i-1][i]
                 )
             
             # B stages sequential constraint
@@ -630,7 +631,7 @@ class SPSimulator:
                     self._backward_b_offsets[i - 1][mb]
                     >= self._backward_b_offsets[i][mb]
                     + self._backward_b_length[i]
-                    + self._comm_length[i]
+                    + self._comm_length[i][i-1]
                 )
                 
             # F-B connection sequential constraint
@@ -854,7 +855,7 @@ class DSASimulator:
         self._pp_size                   = config["pp_size"]
         self._device_size               = config["device_size"]
         self.config                     = config
-        self._comm_length               = [[config["communication_time"] for _ in self._device_size] for _ in self._device_size]
+        self._basic_comm_length         = config["communication_time"]
         self._device_stage_alignments   = []
 
     def _prune_result(self, device_stage_alignment):
@@ -863,6 +864,15 @@ class DSASimulator:
             if len(dsa) == 0:
                 return False
         return True
+
+    def _reset_comm_length(self, dsa):
+        new_comm_length = self._basic_comm_length
+        for d in dsa:
+            for i in range(len(d)):
+                for j in range(i + 1, len(d)):
+                    new_comm_length[i][j] = 0
+                    new_comm_length[j][i] = 0
+        return new_comm_length
 
     def _traverse_every_stage_alignment(self, sid, device_stage_alignment):
         if sid == self._pp_size:
@@ -884,7 +894,8 @@ class DSASimulator:
         minimal_time = 999999999999
         simulators = []
         for dsa in self._device_stage_alignments:
-            temp_simulator = SPSimulator(self.config, device_stage_alignments=dsa)
+            ncl = self._reset_comm_length(dsa=dsa)
+            temp_simulator = SPSimulator(self.config, device_stage_alignments=dsa, new_comm_length=ncl)
             simulators.append(temp_simulator)
             result = temp_simulator.run()
             result_time = result["max_start_offset"].as_long()
