@@ -555,7 +555,7 @@ class SPSimulator:
             self._devices = device_stage_alignments
         else:      
             self._devices = [[] for _ in range(self._device_size)]
-            self._fix_stages(stage_type="I1F1B")
+            self._fix_stages(stage_type="ZBV")
 
         self.model_result = None
         # self._construct_stages()
@@ -600,7 +600,7 @@ class SPSimulator:
                     self._solver.add(z3.And(self._devices[i][j] >= 1, self._devices[i][j] <= ss))
                     all_stages.append(self._devices[i][j])
             self._solver.add(z3.Distinct(all_stages))
-
+    
     def _fix_stages(self, stage_type="ZBV"):
         if stage_type == "ZBV":
             for pid in range(self._pp_size):
@@ -612,6 +612,7 @@ class SPSimulator:
         if stage_type == "I1F1B":
             for pid in range(self._pp_size):
                 self._devices[pid % self._device_size].append(pid)
+
 
     def _real_pipeline_modeling_constraint_strict(self):
         for mb in range(self._num_microbatches):
@@ -655,38 +656,7 @@ class SPSimulator:
                         >= self._backward_w_offsets[i][mb - 1]
                         + self._backward_w_length[i]
                     )
-
-    def _serial_computation_within_pipeline_constraint(self):
-        for pp in range(self._pp_size):
-            # 加入对w的判断，同时修改_length的判断
-            _pp_vars = self._forward_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
-            for i, _ in enumerate(_pp_vars):
-                for j in range(i + 1, len(_pp_vars)):
-                    _i_length = (
-                        self._forward_length[pp]
-                        if i // self._num_microbatches == 0 
-                        else(
-                            self._backward_b_length[pp] 
-                            if i // self._num_microbatches == 1 
-                            else self._backward_w_length[pp]
-                        )
-                    )
-                    _j_length = (
-                        self._forward_length[pp]
-                        if j // self._num_microbatches == 0
-                        else(
-                            self._backward_b_length[pp] 
-                            if j // self._num_microbatches == 1 
-                            else self._backward_w_length[pp]
-                        )
-                    )
-                    self._solver.add(
-                        z3.Or(
-                            _pp_vars[j] >= _pp_vars[i] + _i_length,
-                            _pp_vars[j] + _j_length <= _pp_vars[i],
-                        )
-                    )
-
+                    
     def _pipeline_activation_accumulation_constraint(self):
         for pp in range(self._pp_size):
             # calculate the maximum activation value for this pp
@@ -769,6 +739,15 @@ class SPSimulator:
         self._backward_b_length = [self._layers[i] * (self._basic_backward_b_length[i] + self._basic_forward_length[i] * self._recomputing_rate[i]) for i in range(self._pp_size)]
         self._backward_w_length = [self._layers[i] * self._basic_backward_w_length[i] for i in range(self._pp_size)]
     
+    def _reset_comm_length(self, dsa):
+        new_comm_length = self._comm_length
+        for d in dsa:
+            for i in range(len(d)):
+                for j in range(i+1, len(d)):
+                    new_comm_length[d[i]][d[j]] = 0
+                    new_comm_length[d[j]][d[i]] = 0
+        return new_comm_length
+    
     def _build_constraints(self) -> None:
         
         for i in range(self._pp_size):
@@ -784,6 +763,9 @@ class SPSimulator:
         self._build_layer_constraint()
         self._build_recomputing_rate_constraint()
         self._update_fbw_length()
+
+        self._comm_length = self._reset_comm_length(self._devices)
+        print(self._comm_length)
         self._real_pipeline_modeling_constraint_strict()
 
         # constraint 2: no overlapping of forward and backward within each pipeline
@@ -832,7 +814,7 @@ class SPSimulator:
 
         # 2. builds the solver optimize objectives.
         self._build_optimize_objectives()
-
+        
         # 3. runs the solver.
         start_time = time.time()
         print("Z3 Solver Solving...")
@@ -892,8 +874,8 @@ class DSASimulator:
         for d in dsa:
             for i in range(len(d)):
                 for j in range(i + 1, len(d)):
-                    new_comm_length[i][j] = 0
-                    new_comm_length[j][i] = 0
+                    new_comm_length[d[i]][d[j]] = 0
+                    new_comm_length[d[j]][d[i]] = 0
         return new_comm_length
 
     def _traverse_every_stage_alignment(self, sid, device_stage_alignment):

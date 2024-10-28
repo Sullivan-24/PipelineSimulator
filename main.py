@@ -4,6 +4,7 @@ main package
 import sys
 from simulator.config import *
 from simulator.simulator import Simulator, SPSimulator, DSASimulator
+import gurobipy as grb
 
 def main():
     """main function"""
