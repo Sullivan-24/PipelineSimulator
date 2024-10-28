@@ -62,18 +62,18 @@ class SchedulingPainter:
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
         y_label = (0 + 30) // 2 + 5
 
-        label_canvas.create_text(self._pp_align + 55, y_label, text="MinExecutionTime:")
+        label_canvas.create_text(self._pp_align + 40, y_label, text="MinExeTime:")
         label_canvas.create_text(
-            self._pp_align + 127,
+            self._pp_align + 100,
             y_label,
             text=f"{(data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base}",
         )
 
         label_canvas.create_text(
-            canvas_width - self._pp_align - 137, y_label, text="CurrentBlockCoords:"
+            canvas_width - self._pp_align - 120, y_label, text="BlockCoords:"
         )
         coords_label = label_canvas.create_text(
-            canvas_width - self._pp_align - 37, y_label, text="(start,end)"
+            canvas_width - self._pp_align - 40, y_label, text="(start,end)"
         )
         label_canvas.pack()
 
@@ -116,7 +116,7 @@ class SchedulingPainter:
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况
             
-            if mid >= self._num_real_microbatches:
+            if pid >= self._num_real_microbatches:
                 bold_font = font.Font(underline=1, weight=tk.font.BOLD)
                 text = main_canvas.create_text(
                     (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_real_microbatches}", font=bold_font

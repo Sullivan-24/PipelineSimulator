@@ -776,18 +776,26 @@ class SPSimulator:
     def _build_optimize_objectives(self) -> None:
         # 1. minimize the execution time of each microbatch
         max_var = z3.Int("max_start_offset")
-        # sum_time = z3.Int("total_start_offset")
+        # Add optimization objectives according to devices
+        # Reduce optimize objectives to O(d)
+        # for dsa in self._devices:
+        #     pp = dsa[0]
+        #     self._solver.add(max_var >= self._backward_w_offsets[pp][-1])
+
+        # Add optimization objectives according to stages
         for pp in range(self._pp_size):
-            # Change to optimize W instead of B
+            # Complexity of optimization objectives is O(s)
             # Need to ensure the W of each microbatch is in increasing order
             self._solver.add(max_var >= self._backward_w_offsets[pp][-1])
-
-            # To make every stage in the shortest time span
-            # sum_time += self._backward_w_offsets[pp][-1]
             
+            # Complexity of optimization objectives is O(s * microbatches)
             # This behavior will dramatically increase the searching complexity
             # for var in self._backward_w_offsets[pp]:
             #     self._solver.add(max_var >= var)
+        
+        # Reduce optimize objectives to O(1)
+        # self._solver.add(max_var >= z3.Sum([self._backward_w_offsets[i][-1] for i in range(self._pp_size - self._num_microbatches, self._pp_size)]))
+        
         self._solver.minimize(max_var)
 
     def _draw(self, results: dict) -> None:
@@ -863,7 +871,10 @@ class DSASimulator:
 
     def _prune_result(self, device_stage_alignment):
         for dsa in device_stage_alignment:
-            # if len(dsa) != self._pp_size // self._device_size:
+            if len(dsa) < self._pp_size // self._device_size - 1:
+                return False
+            if len(dsa) > self._pp_size // self._device_size + 1:
+                return False
             if len(dsa) == 0:
                 return False
         return True
