@@ -765,7 +765,6 @@ class SPSimulator:
         self._update_fbw_length()
 
         self._comm_length = self._reset_comm_length(self._devices)
-        print(self._comm_length)
         self._real_pipeline_modeling_constraint_strict()
 
         # constraint 2: no overlapping of forward and backward within each pipeline
@@ -798,7 +797,7 @@ class SPSimulator:
             "pp_size": self._pp_size,
             "pp_height": 50,
             "pp_align": 10,
-            "pixel_base": 4,
+            "pixel_base": 2,
             "num_real_microbatches": self._num_real_microbatches,
             "forward_length": self._forward_length,
             "backward_length": self._backward_b_length,
