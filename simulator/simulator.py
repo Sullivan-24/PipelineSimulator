@@ -566,7 +566,7 @@ class SPSimulator:
 
     def show_solution_detail(self):
         for key in self.model_result:
-            print(str(key), self.model_result[key].as_long())
+            print(str(key), self.model_result[key])
 
     def _construct_stages(self, stage_type=None):
         if stage_type == "ZBV":
@@ -647,6 +647,14 @@ class SPSimulator:
                     >= self._backward_b_offsets[i][mb]
                     + self._backward_b_length[i]
                 )
+            # Set W stage increasing order
+            for i in range(self._pp_size):
+                if mb > 0:
+                    self._solver.add(
+                        self._backward_w_offsets[i][mb]
+                        >= self._backward_w_offsets[i][mb - 1]
+                        + self._backward_w_length[i]
+                    )
 
     def _serial_computation_within_pipeline_constraint(self):
         for pp in range(self._pp_size):
@@ -787,11 +795,18 @@ class SPSimulator:
     def _build_optimize_objectives(self) -> None:
         # 1. minimize the execution time of each microbatch
         max_var = z3.Int("max_start_offset")
+        # sum_time = z3.Int("total_start_offset")
         for pp in range(self._pp_size):
             # Change to optimize W instead of B
-            for var in self._backward_w_offsets[pp]:
-                self._solver.add(max_var >= var)
-                # self._solver.add(max_var >= (var - self._forward_offsets[pp][0]))
+            # Need to ensure the W of each microbatch is in increasing order
+            self._solver.add(max_var >= self._backward_w_offsets[pp][-1])
+
+            # To make every stage in the shortest time span
+            # sum_time += self._backward_w_offsets[pp][-1]
+            
+            # This behavior will dramatically increase the searching complexity
+            # for var in self._backward_w_offsets[pp]:
+            #     self._solver.add(max_var >= var)
         self._solver.minimize(max_var)
 
     def _draw(self, results: dict) -> None:
@@ -828,10 +843,6 @@ class SPSimulator:
             # tranforms the result to a dictionary.
             model = self._solver.model()
             self.model_result = model
-            # for k in model:
-            #     # print(type(k), k, '\t', model[k])
-            #     print(k, '\t', model[k])
-
             for i in range(self._pp_size):
                 number_of_layers = model[self._layers[i]].as_long()
                 recompute_rate = float(model[self._recomputing_rate[i]].as_fraction())
@@ -857,6 +868,18 @@ class DSASimulator:
         self._basic_comm_length         = config["communication_time"]
         self._device_stage_alignments   = []
 
+    def _unique_result(self, device_stage_alignment):
+        for existing_result in self._device_stage_alignments:
+            acc = 0
+            for stage_alignment in device_stage_alignment:
+                if stage_alignment not in existing_result:
+                    break
+                else:
+                    acc += 1
+            if acc == self._device_size:
+                return False
+        return True
+
     def _prune_result(self, device_stage_alignment):
         for dsa in device_stage_alignment:
             # if len(dsa) != self._pp_size // self._device_size:
@@ -875,7 +898,7 @@ class DSASimulator:
 
     def _traverse_every_stage_alignment(self, sid, device_stage_alignment):
         if sid == self._pp_size:
-            if self._prune_result(device_stage_alignment):
+            if self._prune_result(device_stage_alignment) and self._unique_result(device_stage_alignment):
                 self._device_stage_alignments.append(copy.deepcopy(device_stage_alignment))
         else:
             for did in range(self._device_size):

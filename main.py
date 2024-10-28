@@ -31,10 +31,12 @@ def main():
 
     # simulator = Simulator(config)
     # simulator.run()
-    simulator = SPSimulator(config)
-    simulator.run(draw=True)
-    # simulator = DSASimulator(config)
-    # simulator.traverse_run()
+    if len(sys.argv) == 1:
+        simulator = DSASimulator(config)
+        simulator.traverse_run()
+    else:
+        simulator = SPSimulator(config)
+        simulator.run(draw=True)
 
 if __name__ == "__main__":
     main()
