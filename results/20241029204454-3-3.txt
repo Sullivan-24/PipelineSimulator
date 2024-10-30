@@ -1,0 +1,140 @@
+forward_execution_time:10
+backward_execution_i_time:15.0
+backward_execution_g_time:6.0.
+Device size:3
+Pipeline size:6
+Model size:6
+Number of microbatches size:3.
+Traversing every stage alignment...
+Traversing over. 15 situations found.
+Stage alignment:[[0, 1], [2, 3], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 4.61
+MinExeTime:266
+Stage alignment:[[0, 1], [2, 4], [3, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 8.34
+MinExeTime:270
+Stage alignment:[[0, 1], [2, 5], [3, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 4.72
+MinExeTime:260
+Stage alignment:[[0, 2], [1, 3], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 1.14
+MinExeTime:264
+Stage alignment:[[0, 2], [1, 4], [3, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 6.47
+MinExeTime:262
+Stage alignment:[[0, 2], [1, 5], [3, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 5.76
+MinExeTime:259
+Stage alignment:[[0, 3], [1, 2], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 1.82
+MinExeTime:262
+Stage alignment:[[0, 4], [1, 2], [3, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 2.16
+MinExeTime:262
+Stage alignment:[[0, 5], [1, 2], [3, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 0.58
+MinExeTime:239
+Stage alignment:[[0, 3], [1, 4], [2, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 0.39
+MinExeTime:231
+Stage alignment:[[0, 3], [1, 5], [2, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 0.48
+MinExeTime:236
+Stage alignment:[[0, 4], [1, 3], [2, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 0.57
+MinExeTime:242
+Stage alignment:[[0, 5], [1, 3], [2, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 0.23
+MinExeTime:227
+Stage alignment:[[0, 4], [1, 5], [2, 3]]
+Z3 Solver Solving...
+Result: SAT, Cost: 0.26
+MinExeTime:224
+Stage alignment:[[0, 5], [1, 4], [2, 3]]
+Z3 Solver Solving...
+Result: SAT, Cost: 0.29
+MinExeTime:226
+Device 0: [0, 4]
+Device 1: [1, 5]
+Device 2: [2, 3]
+w_0_4 124
+l_4 1
+w_1_4 149
+f_2_5 108
+f_2_4 97
+b_1_1 157
+b_1_0 176
+f_1_2 42
+f_1_3 52
+f_0_4 43
+r_3 0
+r_0 0
+w_0_5 133
+b_1_3 126
+b_0_1 139
+w_1_2 192
+b_2_4 134
+b_2_2 171
+r_1 0
+f_2_0 20
+w_1_1 208
+r_5 0
+l_5 1
+f_0_3 32
+f_0_5 54
+f_2_2 62
+w_2_3 216
+b_0_3 96
+b_2_3 156
+l_2 1
+f_1_4 63
+b_0_0 155
+w_2_5 202
+w_2_2 198
+f_2_3 86
+b_0_5 64
+f_0_1 11
+r_2 0
+r_4 0
+b_2_5 118
+w_2_4 170
+f_2_1 31
+w_2_0 218
+max_start_offset 224
+MinExeTime:224
+b_1_5 93
+l_3 1
+w_0_3 204
+w_1_5 178
+f_1_5 79
+b_2_0 203
+b_1_4 109
+f_1_1 21
+f_0_2 22
+b_2_1 187
+b_0_2 111
+w_0_0 191
+b_1_2 141
+b_0_4 80
+w_0_2 186
+w_1_0 197
+w_0_1 172
+w_1_3 210
+l_1 1
+w_2_1 214
+f_1_0 10
+l_0 1
+f_0_0 0

@@ -1,10 +1,13 @@
 """
 main package
 """
+import os
 import sys
 from simulator.config import *
-from simulator.simulator import Simulator, SPSimulator, DSASimulator
+from simulator.simulator import SPSimulator, GSPSimulator, DSASimulator
 import gurobipy as grb
+from datetime import datetime
+import contextlib
 
 def main():
     """main function"""
@@ -40,4 +43,12 @@ def main():
         simulator.run(draw=True)
 
 if __name__ == "__main__":
-    main()
+    current_time = datetime.now()
+    timestamp = current_time.strftime("%Y%m%d%H%M%S")
+    filename = f"{timestamp}-{device_size}-{nmb}.txt"
+
+    print(f"Begin solving procedure...")
+    with open(os.path.join("results", filename), "w", encoding="utf-8") as file:
+        with contextlib.redirect_stdout(file):
+            main()
+    print(f"Finish writing to {filename}")

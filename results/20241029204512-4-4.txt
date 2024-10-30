@@ -1,0 +1,547 @@
+forward_execution_time:10
+backward_execution_i_time:15.0
+backward_execution_g_time:6.0.
+Device size:4
+Pipeline size:8
+Model size:8
+Number of microbatches size:4.
+Traversing every stage alignment...
+Traversing over. 105 situations found.
+Stage alignment:[[0, 1], [2, 3], [4, 5], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 108.10
+MinExeTime:368
+Stage alignment:[[0, 1], [2, 3], [4, 6], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 232.97
+MinExeTime:372
+Stage alignment:[[0, 1], [2, 3], [4, 7], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 504.17
+MinExeTime:361
+Stage alignment:[[0, 1], [2, 4], [3, 5], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 222.65
+MinExeTime:372
+Stage alignment:[[0, 1], [2, 4], [3, 6], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 783.75
+MinExeTime:382
+Stage alignment:[[0, 1], [2, 4], [3, 7], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 611.55
+MinExeTime:374
+Stage alignment:[[0, 1], [2, 5], [3, 4], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 721.65
+MinExeTime:380
+Stage alignment:[[0, 1], [2, 6], [3, 4], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 431.82
+MinExeTime:372
+Stage alignment:[[0, 1], [2, 7], [3, 4], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 191.18
+MinExeTime:356
+Stage alignment:[[0, 1], [2, 5], [3, 6], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 373.28
+MinExeTime:360
+Stage alignment:[[0, 1], [2, 5], [3, 7], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 4457.40
+MinExeTime:374
+Stage alignment:[[0, 1], [2, 6], [3, 5], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 3127.56
+MinExeTime:379
+Stage alignment:[[0, 1], [2, 7], [3, 5], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 2916.35
+MinExeTime:368
+Stage alignment:[[0, 1], [2, 6], [3, 7], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 957.79
+MinExeTime:363
+Stage alignment:[[0, 1], [2, 7], [3, 6], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 682.57
+MinExeTime:356
+Stage alignment:[[0, 2], [1, 3], [4, 5], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 79.28
+MinExeTime:366
+Stage alignment:[[0, 2], [1, 3], [4, 6], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 193.03
+MinExeTime:359
+Stage alignment:[[0, 2], [1, 3], [4, 7], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 212.16
+MinExeTime:358
+Stage alignment:[[0, 2], [1, 4], [3, 5], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 340.25
+MinExeTime:378
+Stage alignment:[[0, 2], [1, 4], [3, 6], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 176.28
+MinExeTime:359
+Stage alignment:[[0, 2], [1, 4], [3, 7], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 365.73
+MinExeTime:362
+Stage alignment:[[0, 2], [1, 5], [3, 4], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 48.89
+MinExeTime:366
+Stage alignment:[[0, 2], [1, 6], [3, 4], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 327.15
+MinExeTime:369
+Stage alignment:[[0, 2], [1, 7], [3, 4], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 50.42
+MinExeTime:350
+Stage alignment:[[0, 2], [1, 5], [3, 6], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 826.61
+MinExeTime:359
+Stage alignment:[[0, 2], [1, 5], [3, 7], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 828.00
+MinExeTime:362
+Stage alignment:[[0, 2], [1, 6], [3, 5], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 2052.25
+MinExeTime:365
+Stage alignment:[[0, 2], [1, 7], [3, 5], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 206.42
+MinExeTime:350
+Stage alignment:[[0, 2], [1, 6], [3, 7], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 407.55
+MinExeTime:351
+Stage alignment:[[0, 2], [1, 7], [3, 6], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 442.49
+MinExeTime:350
+Stage alignment:[[0, 3], [1, 2], [4, 5], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 109.77
+MinExeTime:364
+Stage alignment:[[0, 3], [1, 2], [4, 6], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 107.12
+MinExeTime:366
+Stage alignment:[[0, 3], [1, 2], [4, 7], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 113.35
+MinExeTime:350
+Stage alignment:[[0, 4], [1, 2], [3, 5], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 71.78
+MinExeTime:366
+Stage alignment:[[0, 4], [1, 2], [3, 6], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 106.07
+MinExeTime:366
+Stage alignment:[[0, 4], [1, 2], [3, 7], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 60.54
+MinExeTime:349
+Stage alignment:[[0, 5], [1, 2], [3, 4], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 49.74
+MinExeTime:364
+Stage alignment:[[0, 6], [1, 2], [3, 4], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 82.96
+MinExeTime:364
+Stage alignment:[[0, 7], [1, 2], [3, 4], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 18.65
+MinExeTime:339
+Stage alignment:[[0, 5], [1, 2], [3, 6], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 121.78
+MinExeTime:345
+Stage alignment:[[0, 5], [1, 2], [3, 7], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 149.52
+MinExeTime:353
+Stage alignment:[[0, 6], [1, 2], [3, 5], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 244.96
+MinExeTime:365
+Stage alignment:[[0, 7], [1, 2], [3, 5], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 387.42
+MinExeTime:352
+Stage alignment:[[0, 6], [1, 2], [3, 7], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 71.77
+MinExeTime:347
+Stage alignment:[[0, 7], [1, 2], [3, 6], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 32.77
+MinExeTime:335
+Stage alignment:[[0, 3], [1, 4], [2, 5], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 212.69
+MinExeTime:368
+Stage alignment:[[0, 3], [1, 4], [2, 6], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 140.70
+MinExeTime:353
+Stage alignment:[[0, 3], [1, 4], [2, 7], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 87.15
+MinExeTime:347
+Stage alignment:[[0, 3], [1, 5], [2, 4], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 204.80
+MinExeTime:368
+Stage alignment:[[0, 3], [1, 6], [2, 4], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 86.94
+MinExeTime:358
+Stage alignment:[[0, 3], [1, 7], [2, 4], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 53.59
+MinExeTime:351
+Stage alignment:[[0, 3], [1, 5], [2, 6], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 73.83
+MinExeTime:341
+Stage alignment:[[0, 3], [1, 5], [2, 7], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 376.32
+MinExeTime:349
+Stage alignment:[[0, 3], [1, 6], [2, 5], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 49.50
+MinExeTime:340
+Stage alignment:[[0, 3], [1, 7], [2, 5], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 75.57
+MinExeTime:340
+Stage alignment:[[0, 3], [1, 6], [2, 7], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 36.54
+MinExeTime:332
+Stage alignment:[[0, 3], [1, 7], [2, 6], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 28.17
+MinExeTime:332
+Stage alignment:[[0, 4], [1, 3], [2, 5], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 248.10
+MinExeTime:372
+Stage alignment:[[0, 4], [1, 3], [2, 6], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 38.56
+MinExeTime:353
+Stage alignment:[[0, 4], [1, 3], [2, 7], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 84.75
+MinExeTime:346
+Stage alignment:[[0, 5], [1, 3], [2, 4], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 58.68
+MinExeTime:368
+Stage alignment:[[0, 6], [1, 3], [2, 4], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 31.07
+MinExeTime:349
+Stage alignment:[[0, 7], [1, 3], [2, 4], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 38.97
+MinExeTime:345
+Stage alignment:[[0, 5], [1, 3], [2, 6], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 50.43
+MinExeTime:349
+Stage alignment:[[0, 5], [1, 3], [2, 7], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 94.96
+MinExeTime:340
+Stage alignment:[[0, 6], [1, 3], [2, 5], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 42.18
+MinExeTime:347
+Stage alignment:[[0, 7], [1, 3], [2, 5], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 41.42
+MinExeTime:344
+Stage alignment:[[0, 6], [1, 3], [2, 7], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 55.86
+MinExeTime:334
+Stage alignment:[[0, 7], [1, 3], [2, 6], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 37.73
+MinExeTime:332
+Stage alignment:[[0, 4], [1, 5], [2, 3], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 41.12
+MinExeTime:366
+Stage alignment:[[0, 4], [1, 6], [2, 3], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 85.73
+MinExeTime:364
+Stage alignment:[[0, 4], [1, 7], [2, 3], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 22.72
+MinExeTime:339
+Stage alignment:[[0, 5], [1, 4], [2, 3], [6, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 43.52
+MinExeTime:366
+Stage alignment:[[0, 6], [1, 4], [2, 3], [5, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 50.81
+MinExeTime:364
+Stage alignment:[[0, 7], [1, 4], [2, 3], [5, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 12.26
+MinExeTime:339
+Stage alignment:[[0, 5], [1, 6], [2, 3], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 7.19
+MinExeTime:343
+Stage alignment:[[0, 5], [1, 7], [2, 3], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 11.33
+MinExeTime:339
+Stage alignment:[[0, 6], [1, 5], [2, 3], [4, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 15.27
+MinExeTime:343
+Stage alignment:[[0, 7], [1, 5], [2, 3], [4, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 11.13
+MinExeTime:339
+Stage alignment:[[0, 6], [1, 7], [2, 3], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 4.60
+MinExeTime:318
+Stage alignment:[[0, 7], [1, 6], [2, 3], [4, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 6.21
+MinExeTime:318
+Stage alignment:[[0, 4], [1, 5], [2, 6], [3, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 10.59
+MinExeTime:312
+Stage alignment:[[0, 4], [1, 5], [2, 7], [3, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 10.25
+MinExeTime:320
+Stage alignment:[[0, 4], [1, 6], [2, 5], [3, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 14.56
+MinExeTime:332
+Stage alignment:[[0, 4], [1, 7], [2, 5], [3, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 15.16
+MinExeTime:320
+Stage alignment:[[0, 4], [1, 6], [2, 7], [3, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 5.39
+MinExeTime:316
+Stage alignment:[[0, 4], [1, 7], [2, 6], [3, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 4.98
+MinExeTime:316
+Stage alignment:[[0, 5], [1, 4], [2, 6], [3, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 10.32
+MinExeTime:325
+Stage alignment:[[0, 5], [1, 4], [2, 7], [3, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 6.97
+MinExeTime:311
+Stage alignment:[[0, 6], [1, 4], [2, 5], [3, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 9.05
+MinExeTime:325
+Stage alignment:[[0, 7], [1, 4], [2, 5], [3, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 7.21
+MinExeTime:311
+Stage alignment:[[0, 6], [1, 4], [2, 7], [3, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 3.37
+MinExeTime:316
+Stage alignment:[[0, 7], [1, 4], [2, 6], [3, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 6.73
+MinExeTime:318
+Stage alignment:[[0, 5], [1, 6], [2, 4], [3, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 6.43
+MinExeTime:322
+Stage alignment:[[0, 5], [1, 7], [2, 4], [3, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 5.00
+MinExeTime:322
+Stage alignment:[[0, 6], [1, 5], [2, 4], [3, 7]]
+Z3 Solver Solving...
+Result: SAT, Cost: 4.55
+MinExeTime:322
+Stage alignment:[[0, 7], [1, 5], [2, 4], [3, 6]]
+Z3 Solver Solving...
+Result: SAT, Cost: 4.24
+MinExeTime:322
+Stage alignment:[[0, 6], [1, 7], [2, 4], [3, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 2.77
+MinExeTime:309
+Stage alignment:[[0, 7], [1, 6], [2, 4], [3, 5]]
+Z3 Solver Solving...
+Result: SAT, Cost: 2.48
+MinExeTime:309
+Stage alignment:[[0, 5], [1, 6], [2, 7], [3, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 1.89
+MinExeTime:308
+Stage alignment:[[0, 5], [1, 7], [2, 6], [3, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 2.29
+MinExeTime:308
+Stage alignment:[[0, 6], [1, 5], [2, 7], [3, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 3.18
+MinExeTime:311
+Stage alignment:[[0, 7], [1, 5], [2, 6], [3, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 3.47
+MinExeTime:308
+Stage alignment:[[0, 6], [1, 7], [2, 5], [3, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 3.52
+MinExeTime:310
+Stage alignment:[[0, 7], [1, 6], [2, 5], [3, 4]]
+Z3 Solver Solving...
+Result: SAT, Cost: 1.78
+MinExeTime:310
+Device 0: [0, 5]
+Device 1: [1, 6]
+Device 2: [2, 7]
+Device 3: [3, 4]
+b_2_0 260
+f_2_2 56
+w_3_1 302
+w_1_4 284
+f_1_1 35
+r_3 0
+w_0_5 185
+w_1_2 216
+b_1_3 179
+b_3_2 255
+l_5 1
+r_0 0
+b_1_7 113
+f_2_7 128
+b_3_7 165
+l_6 1
+w_1_1 238
+w_3_3 278
+f_0_3 33
+f_0_5 54
+w_1_6 259
+f_1_4 70
+r_7 0
+l_1 1
+w_2_5 248
+b_3_5 197
+w_3_5 254
+f_3_1 55
+f_2_3 80
+b_0_5 118
+f_0_1 11
+r_2 0
+r_4 0
+max_start_offset 308
+MinExeTime:308
+w_3_4 296
+l_3 1
+f_3_2 66
+b_3_0 287
+w_0_6 226
+w_1_7 282
+b_1_0 227
+f_1_5 81
+w_3_2 288
+f_3_5 133
+f_2_6 117
+b_3_6 181
+b_1_1 211
+f_0_2 22
+l_2 1
+f_0_6 65
+f_1_6 92
+f_3_6 144
+b_0_4 134
+b_1_2 195
+w_1_0 275
+w_2_1 296
+w_1_3 266
+w_3_7 300
+w_3_0 302
+f_3_7 155
+w_0_4 254
+f_1_7 103
+f_1_0 10
+w_3_6 286
+f_2_4 90
+w_2_2 270
+w_1_5 191
+b_0_1 196
+b_2_7 138
+b_3_3 239
+b_3_1 271
+f_3_4 122
+f_3_3 112
+b_0_3 149
+b_1_6 129
+f_2_5 101
+w_2_4 290
+b_2_3 209
+w_0_0 242
+b_2_6 154
+w_2_7 294
+b_1_4 164
+f_2_0 20
+f_1_2 46
+f_0_4 43
+f_1_3 60
+b_0_6 102
+b_2_4 194
+b_2_2 225
+w_2_6 265
+r_1 0
+w_2_3 272
+r_5 0
+w_0_1 232
+f_3_0 30
+b_3_4 224
+b_0_0 212
+b_0_7 86
+r_6 0
+l_4 1
+w_0_2 210
+f_0_7 76
+f_2_1 45
+w_0_7 276
+b_2_5 170
+w_2_0 281
+b_0_2 180
+b_1_5 148
+b_2_1 244
+w_0_3 260
+l_7 1
+l_0 1
+f_0_0 0

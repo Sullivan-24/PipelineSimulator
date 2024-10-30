@@ -51,7 +51,7 @@ def resort_microbatch_index(num_microbatches: int, model_res: Dict[str, int]) ->
         pair[0]: new_idx for new_idx, pair in enumerate(sorted_forward_starts)
     }
 
-    print(sorted_indexes)
+    # print(sorted_indexes)
 
     res = {
         _replace_mid_in_key(key, sorted_indexes[parse_microbatch_key(key)[2]]): value
