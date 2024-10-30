@@ -10,15 +10,6 @@ from datetime import datetime
 import contextlib
 
 def main():
-    """main function"""
-    print("forward_execution_time:{}\nbackward_execution_i_time:{}\nbackward_execution_g_time:{}.".format(
-            ft, bt, wt
-        )
-    )
-    print("Device size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.".format(
-            device_size, pp_size, model_size, nmb
-        )
-    )
     config = {
         "device_size": int(device_size),
         "pp_size": int(pp_size),
@@ -36,8 +27,10 @@ def main():
     # simulator = Simulator(config)
     # simulator.run()
     if len(sys.argv) == 1:
-        simulator = DSASimulator(config)
-        simulator.traverse_run()
+        with open(os.path.join("results", filename), "w", encoding="utf-8") as file:
+            with contextlib.redirect_stdout(file):
+                simulator = DSASimulator(config)
+                simulator.traverse_run()
     else:
         simulator = SPSimulator(config)
         simulator.run(draw=True)
@@ -48,7 +41,5 @@ if __name__ == "__main__":
     filename = f"{timestamp}-{device_size}-{nmb}.txt"
 
     print(f"Begin solving procedure...")
-    with open(os.path.join("results", filename), "w", encoding="utf-8") as file:
-        with contextlib.redirect_stdout(file):
-            main()
-    print(f"Finish writing to {filename}")
+    main()
+    print(f"Finish.")

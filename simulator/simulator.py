@@ -5,7 +5,7 @@ import itertools
 import time
 import z3
 import copy
-from .config import comm
+from .config import *
 from .painter import SchedulingPainter
 from .utils import resort_microbatch_index
 from gurobipy import Model, GRB, quicksum
@@ -265,6 +265,14 @@ class SPSimulator:
     """Simulator"""
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
+        print("forward_execution_time:{}\nbackward_execution_i_time:{}\nbackward_execution_g_time:{}.".format(
+                ft, bt, wt
+            )
+        )
+        print("Device size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.".format(
+                device_size, pp_size, model_size, nmb
+            )
+        )
         self._pp_size                   = config["pp_size"]
         self._device_size               = config["device_size"]
         self._model_size                = config["model_size"]
@@ -375,6 +383,7 @@ class SPSimulator:
     def _real_pipeline_modeling_constraint_strict(self):
         for mb in range(self._num_microbatches):
             # F stages sequential constraint
+            # 不同stage间的约束关系
             for i in range(1, self._pp_size):
                 self._solver.add(
                     self._forward_offsets[i][mb] 
@@ -384,6 +393,7 @@ class SPSimulator:
                 )
             
             # B stages sequential constraint
+            # 不同stage间的约束关系
             for i in range(self._pp_size - 1, 0, -1):
                 self._solver.add(
                     self._backward_b_offsets[i - 1][mb]
@@ -393,6 +403,7 @@ class SPSimulator:
                 )
                 
             # F-B connection sequential constraint
+            # # # #相同stage间的约束关系，每个mb的F与B不重叠
             self._solver.add(
                 self._backward_b_offsets[self._pp_size - 1][mb]
                 >= self._forward_offsets[self._pp_size - 1][mb] 
@@ -400,6 +411,7 @@ class SPSimulator:
             )
 
             # W stage sequential constraint
+            # # # #相同stage间的约束关系，每个mb的B和W不重叠
             for i in range(self._pp_size):
                 self._solver.add(
                     self._backward_w_offsets[i][mb]
@@ -408,6 +420,7 @@ class SPSimulator:
                 )
 
             # Set increasing order within stage, leading to faster solving
+            # # # #相同stage间的约束关系，每个mb的F之间、B之间、W之间不重叠
             if mb > 0:
                 for i in range(self._pp_size):
                     self._solver.add(
@@ -464,6 +477,8 @@ class SPSimulator:
 
     def _serial_computation_within_device_constraint(self):
         print("Stage alignment:{}".format(self._devices))
+        total_constraints = 0
+        same_mb_redundant_constraints = 0
         for did in range(self._device_size):
             # 加入对w的判断，同时修改_length的判断
             stages_within_device = self._devices[did]
@@ -471,8 +486,8 @@ class SPSimulator:
             for pp in stages_within_device:
                 _pp_vars += self._forward_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
             
+            group_size = self._num_microbatches * 3
             for i, _ in enumerate(_pp_vars):
-                group_size = self._num_microbatches * 3
                 i_pp = stages_within_device[i // group_size]
                 _i_length = (
                     self._forward_length[i_pp]
@@ -484,6 +499,13 @@ class SPSimulator:
                     )
                 )
                 for j in range(i + 1, len(_pp_vars)):
+                    total_constraints += 1
+                    # 根据_real_pipeline_modeling_constraint_strict中对重叠关系的分析，同一mb之间不存在重叠。
+                    # 只有不同mb之间会存在重叠情况，剔除多余的约束条件后，测试d=5 mb=5时，时间变化为35s→25s，但发现d=4 mb=4时，时间基本不变化
+                    if j // (self._num_microbatches * 3) == i // (self._num_microbatches * 3):
+                        if j % self._num_microbatches == i % self._num_microbatches:
+                            same_mb_redundant_constraints += 1
+                            continue
                     j_pp = stages_within_device[j // group_size]
                     _j_length = (
                         self._forward_length[j_pp]
@@ -500,6 +522,24 @@ class SPSimulator:
                             _pp_vars[j] + _j_length <= _pp_vars[i],
                         )
                     )
+                    # 替换成Not and后不等价
+                    # self._solver.add(
+                    #     z3.Not(z3.And(
+                    #         _pp_vars[i] + _i_length >= _pp_vars[j],
+                    #         _pp_vars[j] + _j_length >= _pp_vars[i],
+                    #     ))
+                    # )
+                    # 类似图形学中判断两直线是否重叠，避免使用OR语句
+                    # 改写后却变慢：
+                    # a1 = _pp_vars[i]
+                    # b1 = _pp_vars[i] + _i_length
+                    # a2 = _pp_vars[j]
+                    # b2 = _pp_vars[j] + _j_length
+                    # self._solver.add(
+                    #     (b2 - a1)*(a2 - b1) >= 0
+                    # )
+                    
+        print("Total Constraints within Device:{}, Redundant Constraints:{}".format(total_constraints, same_mb_redundant_constraints))
 
     def _build_layer_constraint(self):
         for i in range(self._pp_size):
@@ -700,7 +740,7 @@ class DSASimulator:
                 device_stage_alignment[did].pop()
 
     def traverse_run(self) -> None:
-        
+
         print("Traversing every stage alignment...")
         device_stage_alignments = [[] for _ in range(self._device_size)]
         self._traverse_every_stage_alignment(0, device_stage_alignment=device_stage_alignments)
