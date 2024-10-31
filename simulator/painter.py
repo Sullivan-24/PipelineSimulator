@@ -3,7 +3,7 @@ painter package
 """
 import tkinter as tk
 from tkinter import font
-from .utils import parse_microbatch_key
+from .utils import parse_microbatch_key, print_to_file
 
 
 class SchedulingPainter:
@@ -16,6 +16,7 @@ class SchedulingPainter:
         self._pp_height     = config["pp_height"]
         self._pp_align      = config["pp_align"]
         self._pixel_base    = config["pixel_base"]
+        self._file_path     = config["file_path"]
         
         self._num_real_microbatches = config["num_real_microbatches"]
 

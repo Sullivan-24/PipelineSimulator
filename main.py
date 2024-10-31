@@ -8,6 +8,7 @@ from simulator.simulator import SPSimulator, GSPSimulator, DSASimulator
 import gurobipy as grb
 from datetime import datetime
 import contextlib
+import time
 
 def main():
     config = {
@@ -22,15 +23,23 @@ def main():
         "communication_time": [[comm if i != j else 0 for j in range(pp_size)] for i in range(pp_size)],
         "sequential_order_constraint_strategy": "strict",
         "max_activation_counts": [8 for _ in range(pp_size)],
+        "file_path": None,
     }
 
     # simulator = Simulator(config)
     # simulator.run()
     if len(sys.argv) == 1:
-        with open(os.path.join("results", filename), "w", encoding="utf-8") as file:
-            with contextlib.redirect_stdout(file):
-                simulator = DSASimulator(config)
-                simulator.traverse_run()
+        config["file_path"] = os.path.join("results", filename)
+        s_time = time.time()
+        simulator = DSASimulator(config)
+        e_time = simulator.traverse_run()
+        print(f"Traverse Run Total time: {e_time - s_time}")
+        # with open(os.path.join("results", filename), "w", encoding="utf-8") as file:
+        #     with contextlib.redirect_stdout(file):
+        #         s_time = time.time()
+        #         simulator = DSASimulator(config)
+        #         e_time = simulator.traverse_run()
+        #         print(f"Traverse Run Total time: {e_time - s_time}")
     else:
         simulator = SPSimulator(config)
         simulator.run(draw=True)

@@ -7,7 +7,7 @@ import z3
 import copy
 from .config import *
 from .painter import SchedulingPainter
-from .utils import resort_microbatch_index
+from .utils import resort_microbatch_index, print_to_file
 from gurobipy import Model, GRB, quicksum
 
 class GSPSimulator:
@@ -265,11 +265,12 @@ class SPSimulator:
     """Simulator"""
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
-        print("forward_execution_time:{}\nbackward_execution_i_time:{}\nbackward_execution_g_time:{}.".format(
+        self._file_path = config["file_path"]
+        print_to_file(self._file_path, "forward_execution_time:{}\nbackward_execution_i_time:{}\nbackward_execution_g_time:{}.\n".format(
                 ft, bt, wt
             )
         )
-        print("Device size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.".format(
+        print_to_file(self._file_path, "Device size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.\n".format(
                 device_size, pp_size, model_size, nmb
             )
         )
@@ -327,13 +328,13 @@ class SPSimulator:
 
     def show_device_stage_mapping(self):
         for did,ds in enumerate(self._devices):
-            print("Device {}: {}".format(did, ds))
+            print_to_file(self._file_path, "Device {}: {}.\n".format(did, ds))
 
     def show_solution_detail(self):
         for key in self.model_result:
-            print(str(key), self.model_result[key])
+            print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
             if str(key) == "max_start_offset":
-                print("MinExeTime:{}".format(self.model_result[key]))
+                print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
 
     def _construct_stages(self, stage_type=None):
         if stage_type == "ZBV":
@@ -343,7 +344,7 @@ class SPSimulator:
         else:
             ds = self._device_size
             ss = self._pp_size
-            print("Modeling Stages Alignment...")
+            print_to_file(self._file_path, "Modeling Stages Alignment...\n")
             # 定义阶段变量
             # stages[i] 是设备 i 分配的阶段集合
             self._devices = [z3.Array(f'stage_{i}', z3.IntSort(), z3.IntSort()) for i in range(ds)]
@@ -442,7 +443,7 @@ class SPSimulator:
             else:
                 self._solver.add(
                         self._forward_offsets[0][0] == 0
-                    )
+                )
                 
         # Set W stage increasing order within the same device
         # for dsa in self._devices:
@@ -476,7 +477,7 @@ class SPSimulator:
                 self._solver.add(_actvaition_count <= self._max_activation_counts[pp])
 
     def _serial_computation_within_device_constraint(self):
-        print("Stage alignment:{}".format(self._devices))
+        print_to_file(self._file_path, "Stage alignment:{}.\n".format(self._devices))
         total_constraints = 0
         same_mb_redundant_constraints = 0
         for did in range(self._device_size):
@@ -539,7 +540,7 @@ class SPSimulator:
                     #     (b2 - a1)*(a2 - b1) >= 0
                     # )
                     
-        print("Total Constraints within Device:{}, Redundant Constraints:{}".format(total_constraints, same_mb_redundant_constraints))
+        print_to_file(self._file_path, "Total Constraints within Device:{}, Redundant Constraints:{}.\n".format(total_constraints, same_mb_redundant_constraints))
 
     def _build_layer_constraint(self):
         for i in range(self._pp_size):
@@ -648,6 +649,7 @@ class SPSimulator:
             "forward_length": self._forward_length,
             "backward_length": self._backward_b_length,
             "backward_length2": self._backward_w_length,
+            "file_path": self._file_path,
         }
 
         SchedulingPainter(painter_conf).draw(results)
@@ -662,16 +664,16 @@ class SPSimulator:
         
         # 3. runs the solver.
         start_time = time.time()
-        print("Z3 Solver Solving...")
+        print_to_file(self._file_path, "Z3 Solver Solving...\n")
         check = self._solver.check()
         end_time = time.time()
         if  check == z3.sat:
-            print(f"Result: SAT, Cost: {end_time - start_time:.2f}")
+            print_to_file(self._file_path, f"Result: SAT, Cost: {end_time - start_time:.2f}.\n")
             # tranforms the result to a dictionary.
             model = self._solver.model()
             self.model_result = model
             results = {str(key) : model[key] for key in model}
-            print("MinExeTime:{}".format(results["max_start_offset"].as_long()))
+            print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"].as_long()))
             for i in range(self._pp_size):
                 number_of_layers = model[self._layers[i]].as_long()
                 recompute_rate = float(model[self._recomputing_rate[i]].as_fraction())
@@ -684,7 +686,7 @@ class SPSimulator:
                 self._draw(resort_microbatch_index(self._num_microbatches ,results))
             return results
         else:
-            print(f"Result: UNSAT, Cost: {end_time - start_time:.2f}")
+            print_to_file(self._file_path, f"Result: UNSAT, Cost: {end_time - start_time:.2f}.\n")
             return {"max_start_offset": 999999999999}
 
 class DSASimulator:
@@ -695,7 +697,7 @@ class DSASimulator:
         self.config                     = config
         self._basic_comm_length         = config["communication_time"]
         self._device_stage_alignments   = []
-
+        self._file_path                 = config["file_path"]
     def _unique_result(self, device_stage_alignment):
         for existing_result in self._device_stage_alignments:
             acc = 0
@@ -741,10 +743,10 @@ class DSASimulator:
 
     def traverse_run(self) -> None:
 
-        print("Traversing every stage alignment...")
+        print_to_file(self._file_path, "Traversing every stage alignment...\n")
         device_stage_alignments = [[] for _ in range(self._device_size)]
         self._traverse_every_stage_alignment(0, device_stage_alignment=device_stage_alignments)
-        print("Traversing over. {} situations found.".format(len(self._device_stage_alignments)))
+        print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._device_stage_alignments)))
 
         best_result = None
         minimal_time = 999999999999
@@ -760,6 +762,9 @@ class DSASimulator:
 
         
         result = {str(key) : best_result.model_result[key].as_long() for key in best_result.model_result if str(key)[0:2] in ["f_","b_","w_"]}
+        end_time = time.time()
         best_result.show_device_stage_mapping()
         best_result.show_solution_detail()
         best_result._draw(resort_microbatch_index(best_result._num_microbatches ,result))
+
+        return end_time

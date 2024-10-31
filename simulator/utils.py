@@ -3,7 +3,7 @@ utils package
 """
 from typing import Dict, Tuple
 from z3 import If
-
+from .config import *
 # def parse_microbatch_key(key: str) -> Tuple[bool, int, int]:
 #     "parse microbatch key"
 #     is_forward = key.startswith("f")
@@ -44,21 +44,21 @@ def resort_microbatch_index(num_microbatches: int, model_res: Dict[str, int]) ->
         if only_forward_starts[mid] > value:
             only_forward_starts[mid] = value
 
-    # print(only_forward_starts)
-
     sorted_forward_starts = sorted(only_forward_starts.items(), key=lambda x: x[1])
     sorted_indexes = {
         pair[0]: new_idx for new_idx, pair in enumerate(sorted_forward_starts)
     }
-
-    # print(sorted_indexes)
 
     res = {
         _replace_mid_in_key(key, sorted_indexes[parse_microbatch_key(key)[2]]): value
         for key, value in model_res.items()
     }
 
-    # print(res)
-    # print(model_res)
-
     return res
+
+def print_to_file(filename: str, content: str) -> None:
+    if filename:
+        with open(filename, "a") as f:
+            f.write(content)
+            f.flush()
+    print(content, end="")
