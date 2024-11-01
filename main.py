@@ -4,7 +4,8 @@ main package
 import os
 import sys
 from simulator.config import *
-from simulator.simulator import SPSimulator, GSPSimulator, DSASimulator
+from simulator.simulator import SPSimulator, DSASimulator
+from simulator.GSimulator import GSimulator
 import gurobipy as grb
 from datetime import datetime
 import contextlib
@@ -41,7 +42,8 @@ def main():
         #         e_time = simulator.traverse_run()
         #         print(f"Traverse Run Total time: {e_time - s_time}")
     else:
-        simulator = SPSimulator(config)
+        # simulator = SPSimulator(config)
+        simulator = GSimulator(config)
         simulator.run(draw=True)
 
 if __name__ == "__main__":

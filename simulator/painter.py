@@ -4,8 +4,7 @@ painter package
 import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
-
-
+from .config import comm
 class SchedulingPainter:
     """Scheduling Painter"""
 
@@ -19,6 +18,11 @@ class SchedulingPainter:
         self._file_path     = config["file_path"]
         
         self._num_real_microbatches = config["num_real_microbatches"]
+
+        self._basic_forward_length = [_len for _len in config["forward_length"]]
+        self._basic_backward_b_length = [_len for _len in config["backward_length"]]
+        self._basic_backward_w_length = [_len for _len in config["backward_length2"]]
+        self._comm_length = [_len for _len in config["comm_length"]]
 
         self._forward_length = [_len * config["pixel_base"] for _len in config["forward_length"]]
         self._backward_b_length = [_len * config["pixel_base"] for _len in config["backward_length"]]
@@ -63,11 +67,13 @@ class SchedulingPainter:
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
         y_label = (0 + 30) // 2 + 5
 
-        label_canvas.create_text(self._pp_align + 40, y_label, text="MinExeTime:")
-        label_canvas.create_text(
-            self._pp_align + 100,
-            y_label,
-            text=f"{(data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base}",
+        label_canvas.create_text(self._pp_align + 140, y_label, text="MinExeTime:{}, F:{}, B:{}, W:{}, C:{}".format(
+                (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
+                self._basic_forward_length[max_key_pid], 
+                self._basic_backward_b_length[max_key_pid], 
+                self._basic_backward_w_length[max_key_pid], 
+                comm
+            ),
         )
 
         label_canvas.create_text(

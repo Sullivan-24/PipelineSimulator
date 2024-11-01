@@ -1,0 +1,24 @@
+Traversing every stage alignment...
+Traversing over. 15 situations found.
+forward_execution_time:10
+backward_execution_i_time:15.0
+backward_execution_g_time:8.0.
+Device size:3
+Pipeline size:6
+Model size:6
+Number of microbatches size:5.
+Stage alignment:[[0, 1], [2, 3], [4, 5]].
+Total Constraints within Device:1305, Redundant Constraints:90.
+Z3 Solver Solving...
+Result: SAT, Cost: 7943.10.
+MinExeTime:372.
+forward_execution_time:10
+backward_execution_i_time:15.0
+backward_execution_g_time:8.0.
+Device size:3
+Pipeline size:6
+Model size:6
+Number of microbatches size:5.
+Stage alignment:[[0, 1], [2, 4], [3, 5]].
+Total Constraints within Device:1305, Redundant Constraints:90.
+Z3 Solver Solving...
