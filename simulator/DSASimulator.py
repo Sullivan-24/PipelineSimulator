@@ -1,0 +1,99 @@
+import time
+import copy
+from .config import *
+from .utils import resort_microbatch_index, print_to_file
+from .GSimulator import GSimulator
+from .SPSimulator import SPSimulator
+
+class DSASimulator:
+    def __init__(self, config, solver_type="gurobi") -> None:
+
+        self._pp_size                   = config["pp_size"]
+        self._device_size               = config["device_size"]
+        self.config                     = config
+        self._basic_comm_length         = config["communication_time"]
+        self._device_stage_alignments   = []
+        self._file_path                 = config["file_path"]
+        self._solver_type               = solver_type
+    def _unique_result(self, device_stage_alignment):
+        for existing_result in self._device_stage_alignments:
+            acc = 0
+            for stage_alignment in device_stage_alignment:
+                if stage_alignment not in existing_result:
+                    break
+                else:
+                    acc += 1
+            if acc == self._device_size:
+                return False
+        return True
+
+    def _prune_result(self, device_stage_alignment):
+        for dsa in device_stage_alignment:
+            if len(dsa) != self._pp_size // self._device_size:
+                return False
+            if len(dsa) < self._pp_size // self._device_size - 1:
+                return False
+            if len(dsa) > self._pp_size // self._device_size + 1:
+                return False
+            if len(dsa) == 0:
+                return False
+        return True
+
+    def _reset_comm_length(self, dsa):
+        new_comm_length = self._basic_comm_length
+        for d in dsa:
+            for i in range(len(d)):
+                for j in range(i + 1, len(d)):
+                    new_comm_length[d[i]][d[j]] = 0
+                    new_comm_length[d[j]][d[i]] = 0
+        return new_comm_length
+
+    def _traverse_every_stage_alignment(self, sid, device_stage_alignment):
+        if sid == self._pp_size:
+            if self._prune_result(device_stage_alignment) and self._unique_result(device_stage_alignment):
+                self._device_stage_alignments.append(copy.deepcopy(device_stage_alignment))
+        else:
+            for did in range(self._device_size):
+                device_stage_alignment[did].append(sid)
+                self._traverse_every_stage_alignment(sid + 1, device_stage_alignment)
+                device_stage_alignment[did].pop()
+
+    def traverse_run(self) -> None:
+
+        print_to_file(self._file_path, "Traversing every stage alignment...\n")
+        device_stage_alignments = [[] for _ in range(self._device_size)]
+        self._traverse_every_stage_alignment(0, device_stage_alignment=device_stage_alignments)
+        print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._device_stage_alignments)))
+
+        best_result = None
+        minimal_time = 999999999999
+        simulators = []
+        for dsa in self._device_stage_alignments:
+            if self._solver_type == "z3":
+                temp_simulator = SPSimulator(self.config, device_stage_alignments=dsa)
+            else:
+                temp_simulator = GSimulator(self.config, device_stage_alignments=dsa)
+            simulators.append(temp_simulator)
+            result = temp_simulator.run()
+
+            if self._solver_type == "z3":
+                result_time = result["max_start_offset"].as_long()
+            else:
+                result_time = result["max_start_offset"]
+
+            if result_time < minimal_time:
+                minimal_time = result_time
+                best_result = temp_simulator
+        
+        if self._solver_type == "z3":
+            # z3 way
+            result = {str(key) : best_result.model_result[key].as_long() for key in best_result.model_result if str(key)[0:2] in ["f_","b_","w_"]}
+        else:
+            # gurobi way
+            result = {str(key) : best_result.model_result[key] for key in best_result.model_result if str(key)[0:2] in ["f_","b_","w_"]}
+        end_time = time.time()
+        best_result.show_device_stage_mapping()
+        best_result.show_solution_detail()
+        best_result._draw(resort_microbatch_index(best_result._num_microbatches ,result))
+
+        return end_time

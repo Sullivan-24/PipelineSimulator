@@ -1,9 +1,8 @@
-from gurobipy import Model, GRB, quicksum, or_
+import time
+from gurobipy import Model, GRB, quicksum
 from .config import *
 from .painter import SchedulingPainter
 from .utils import resort_microbatch_index, print_to_file
-import time
-import copy
 class GSimulator:
     """Simulator"""
 
@@ -155,6 +154,7 @@ class GSimulator:
                 )
                 for j in range(i + 1, len(_pp_vars)):
                     total_constraints += 1
+                    # Device-size = 2, gurobi solver get error answer but z3 not.
                     if j // (self._num_microbatches * 3) == i // (self._num_microbatches * 3):
                         if j % self._num_microbatches == i % self._num_microbatches:
                             same_mb_redundant_constraints += 1
@@ -214,7 +214,7 @@ class GSimulator:
         self.model.optimize()
 
         start_time = time.time()
-        print_to_file(self._file_path, "Z3 Solver Solving...\n")
+        print_to_file(self._file_path, "Gurobi Solver Solving...\n")
         self.model.optimize()
         end_time = time.time()
         if self.model.status == GRB.OPTIMAL:

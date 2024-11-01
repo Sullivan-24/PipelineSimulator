@@ -4,11 +4,10 @@ main package
 import os
 import sys
 from simulator.config import *
-from simulator.simulator import SPSimulator, DSASimulator
+from simulator.DSASimulator import DSASimulator
 from simulator.GSimulator import GSimulator
-import gurobipy as grb
+from simulator.SPSimulator import SPSimulator
 from datetime import datetime
-import contextlib
 import time
 
 def main():
@@ -35,12 +34,6 @@ def main():
         simulator = DSASimulator(config)
         e_time = simulator.traverse_run()
         print(f"Traverse Run Total time: {e_time - s_time}")
-        # with open(os.path.join("results", filename), "w", encoding="utf-8") as file:
-        #     with contextlib.redirect_stdout(file):
-        #         s_time = time.time()
-        #         simulator = DSASimulator(config)
-        #         e_time = simulator.traverse_run()
-        #         print(f"Traverse Run Total time: {e_time - s_time}")
     else:
         # simulator = SPSimulator(config)
         simulator = GSimulator(config)
