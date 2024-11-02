@@ -36,7 +36,14 @@ def main():
         print(f"Traverse Run Total time: {e_time - s_time}")
     else:
         # simulator = SPSimulator(config)
-        simulator = GSimulator(config)
+        simulator = GSimulator(config, 
+            # device_stage_alignments=[
+            #     [0, 4],
+            #     [1, 5],
+            #     [2, 6],
+            #     [3, 7],
+            #     ]
+        )
         simulator.run(draw=True)
 
 if __name__ == "__main__":

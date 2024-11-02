@@ -154,7 +154,6 @@ class GSimulator:
                 )
                 for j in range(i + 1, len(_pp_vars)):
                     total_constraints += 1
-                    # Device-size = 2, gurobi solver get error answer but z3 not.
                     if j // (self._num_microbatches * 3) == i // (self._num_microbatches * 3):
                         if j % self._num_microbatches == i % self._num_microbatches:
                             same_mb_redundant_constraints += 1
@@ -180,9 +179,10 @@ class GSimulator:
                     # self.model.addConstr(
                     #     (_pp_vars[j] + _j_length - _pp_vars[i]) * (_pp_vars[j] - _pp_vars[i] - _i_length) >= 0
                     # )
-                    y = self.model.addVar(vtype=GRB.BINARY, name="Do{}_{}_{}".format(did, i, j))
-                    self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * 1000000) 
-                    self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * 1000000)
+                    y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{did}_{i}_{j}")
+                    M = 1e4
+                    self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M) 
+                    self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M)
                     
         print_to_file(self._file_path, "Total Constraints within Device:{}, Redundant Constraints:{}.\n".format(total_constraints, same_mb_redundant_constraints))
 
