@@ -14,10 +14,13 @@ class DSASimulator:
         self.config                     = config
         self._basic_comm_length         = config["communication_time"]
         self._device_stage_alignments   = []
+        self._dsa_hash                  = set()
         self._file_path                 = config["file_path"]
         self._solver_type               = solver_type
 
-    def _unique_result(self, device_stage_alignment):
+    # very slow down up to 30x
+    # device = 6, 518400 → 720 cases
+    def _unique_result(self, device_stage_alignment):    
         for existing_result in self._device_stage_alignments:
             acc = 0
             for stage_alignment in device_stage_alignment:
@@ -61,20 +64,31 @@ class DSASimulator:
                 device_stage_alignment[did].pop()
 
     def _transpose(self, matrix):
-        return [list(row) for row in zip(*matrix)]
+        return [row for row in zip(*matrix)]
 
     def _traverse_limited_stage_alignment(self):
         segment_size = self._pp_size // self._device_size
+        # Slow
         segments = [[] for _ in range(segment_size)]
         for i in range(segment_size):
             lb = self._device_size * i
             ub = self._device_size * (i + 1)
-            segments[i] = [list(l) for l in list(itertools.permutations(range(lb, ub)))]
-
+            segments[i] = [l for l in list(itertools.permutations(range(lb, ub)))]        
+        # Slightly Faster
+        # segments = [[list(l) for l in list(itertools.permutations(range(self._device_size * i, self._device_size * (i + 1))))] for i in range(segment_size)]
+        
+        t1 = time.time()
         for combination in itertools.product(*segments):
-            dsa = self._transpose(list(combination))
-            if self._unique_result(dsa):
+            dsa = self._transpose(combination)
+            set_dsa = set(dsa)
+            # Do not use _unique_result for reducing duplication results
+            # device size = 6, speedup from 31s → 0.71s
+            # device size = 7, speedup from inf → 38.3s
+            if set_dsa not in self._dsa_hash:
                 self._device_stage_alignments.append(dsa)
+                self._dsa_hash.add(frozenset(set_dsa))
+        t2 = time.time()
+        input("Continue??{},{}".format(t2-t1, len(self._device_stage_alignments)))
 
     def traverse_run(self) -> None:
 
