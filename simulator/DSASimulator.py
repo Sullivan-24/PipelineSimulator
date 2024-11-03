@@ -4,6 +4,7 @@ from .config import *
 from .utils import resort_microbatch_index, print_to_file
 from .GSimulator import GSimulator
 from .SPSimulator import SPSimulator
+import itertools
 
 class DSASimulator:
     def __init__(self, config, solver_type="gurobi") -> None:
@@ -15,6 +16,7 @@ class DSASimulator:
         self._device_stage_alignments   = []
         self._file_path                 = config["file_path"]
         self._solver_type               = solver_type
+
     def _unique_result(self, device_stage_alignment):
         for existing_result in self._device_stage_alignments:
             acc = 0
@@ -26,17 +28,17 @@ class DSASimulator:
             if acc == self._device_size:
                 return False
         return True
-
+    
     def _prune_result(self, device_stage_alignment):
         for dsa in device_stage_alignment:
             if len(dsa) != self._pp_size // self._device_size:
                 return False
-            if len(dsa) < self._pp_size // self._device_size - 1:
-                return False
-            if len(dsa) > self._pp_size // self._device_size + 1:
-                return False
             if len(dsa) == 0:
                 return False
+            # if len(dsa) < self._pp_size // self._device_size - 1:
+            #     return False
+            # if len(dsa) > self._pp_size // self._device_size + 1:
+            #     return False
         return True
 
     def _reset_comm_length(self, dsa):
@@ -58,11 +60,28 @@ class DSASimulator:
                 self._traverse_every_stage_alignment(sid + 1, device_stage_alignment)
                 device_stage_alignment[did].pop()
 
+    def _transpose(self, matrix):
+        return [list(row) for row in zip(*matrix)]
+
+    def _traverse_limited_stage_alignment(self):
+        segment_size = self._pp_size // self._device_size
+        segments = [[] for _ in range(segment_size)]
+        for i in range(segment_size):
+            lb = self._device_size * i
+            ub = self._device_size * (i + 1)
+            segments[i] = [list(l) for l in list(itertools.permutations(range(lb, ub)))]
+
+        for combination in itertools.product(*segments):
+            dsa = self._transpose(list(combination))
+            if self._unique_result(dsa):
+                self._device_stage_alignments.append(dsa)
+
     def traverse_run(self) -> None:
 
         print_to_file(self._file_path, "Traversing every stage alignment...\n")
-        device_stage_alignments = [[] for _ in range(self._device_size)]
-        self._traverse_every_stage_alignment(0, device_stage_alignment=device_stage_alignments)
+        # device_stage_alignments = [[] for _ in range(self._device_size)]
+        # self._traverse_every_stage_alignment(0, device_stage_alignment=device_stage_alignments)
+        self._traverse_limited_stage_alignment()
         print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._device_stage_alignments)))
 
         best_result = None

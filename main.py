@@ -38,10 +38,11 @@ def main():
         # simulator = SPSimulator(config)
         simulator = GSimulator(config, 
             # device_stage_alignments=[
-            #     [0, 4],
-            #     [1, 5],
-            #     [2, 6],
-            #     [3, 7],
+            #     [0, 9],
+            #     [1, 8],
+            #     [2, 7],
+            #     [3, 6],
+            #     [4, 5],
             #     ]
         )
         simulator.run(draw=True)
@@ -49,7 +50,7 @@ def main():
 if __name__ == "__main__":
     current_time = datetime.now()
     timestamp = current_time.strftime("%Y%m%d%H%M%S")
-    filename = f"{timestamp}-{device_size}-{nmb}.txt"
+    filename = f"{timestamp}-{device_size}-{nmb}-{int(ft)}-{int(bt)}-{int(wt)}.txt"
 
     print(f"Begin solving procedure...")
     main()

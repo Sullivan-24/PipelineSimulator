@@ -122,16 +122,23 @@ class SchedulingPainter:
 
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况
-            
-            if pid + 1 >= self._num_real_microbatches:
-                bold_font = font.Font(underline=1, weight=tk.font.BOLD)
-                text = main_canvas.create_text(
-                    (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_real_microbatches}", font=bold_font
-                )
-            else:
-                text = main_canvas.create_text(
-                    (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid}"
-                )
+            bold_font = font.Font(
+                # family="Calibri Light", 
+                underline= pid // self._device_size % 2,
+                weight= tk.font.NORMAL if pid // self._device_size % 2 else tk.font.BOLD
+            )
+            text = main_canvas.create_text(
+                (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_real_microbatches}", font=bold_font
+            )
+            # if pid + 1 >= self._num_real_microbatches:
+            #     bold_font = font.Font(size= pid // (self._pp_size // self._device_size), weight=tk.font.BOLD)
+            #     text = main_canvas.create_text(
+            #         (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_real_microbatches}", font=bold_font
+            #     )
+            # else:
+            #     text = main_canvas.create_text(
+            #         (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid}"
+            #     )
             # print(f"block {tag}: {x0}, {y0}, {x1}, {y1}", flush=True)
 
             self._highlight_state[block] = False

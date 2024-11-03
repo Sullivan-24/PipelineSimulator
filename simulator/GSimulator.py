@@ -210,7 +210,7 @@ class GSimulator:
         self._build_constraints()
         self._build_optimize_objectives()
 
-        self.model.setParam('TimeLimit', 60)
+        self.model.setParam('TimeLimit', 30)
         self.model.optimize()
 
         start_time = time.time()
