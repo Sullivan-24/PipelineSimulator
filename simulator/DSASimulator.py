@@ -18,20 +18,6 @@ class DSASimulator:
         self._file_path                 = config["file_path"]
         self._solver_type               = solver_type
 
-    # very slow down up to 30x
-    # device = 6, 518400 → 720 cases
-    def _unique_result(self, device_stage_alignment):    
-        for existing_result in self._device_stage_alignments:
-            acc = 0
-            for stage_alignment in device_stage_alignment:
-                if stage_alignment not in existing_result:
-                    break
-                else:
-                    acc += 1
-            if acc == self._device_size:
-                return False
-        return True
-    
     def _prune_result(self, device_stage_alignment):
         for dsa in device_stage_alignment:
             if len(dsa) != self._pp_size // self._device_size:
@@ -53,16 +39,6 @@ class DSASimulator:
                     new_comm_length[d[j]][d[i]] = 0
         return new_comm_length
 
-    def _traverse_every_stage_alignment(self, sid, device_stage_alignment):
-        if sid == self._pp_size:
-            if self._prune_result(device_stage_alignment) and self._unique_result(device_stage_alignment):
-                self._device_stage_alignments.append(copy.deepcopy(device_stage_alignment))
-        else:
-            for did in range(self._device_size):
-                device_stage_alignment[did].append(sid)
-                self._traverse_every_stage_alignment(sid + 1, device_stage_alignment)
-                device_stage_alignment[did].pop()
-
     def _transpose(self, matrix):
         return [row for row in zip(*matrix)]
 
@@ -77,7 +53,7 @@ class DSASimulator:
         # Slightly Faster
         # segments = [[list(l) for l in list(itertools.permutations(range(self._device_size * i, self._device_size * (i + 1))))] for i in range(segment_size)]
         
-        t1 = time.time()
+        # t1 = time.time()
         for combination in itertools.product(*segments):
             dsa = self._transpose(combination)
             set_dsa = set(dsa)
@@ -87,8 +63,8 @@ class DSASimulator:
             if set_dsa not in self._dsa_hash:
                 self._device_stage_alignments.append(dsa)
                 self._dsa_hash.add(frozenset(set_dsa))
-        t2 = time.time()
-        input("Continue??{},{}".format(t2-t1, len(self._device_stage_alignments)))
+        # t2 = time.time()
+        # input("Continue??{},{}".format(t2-t1, len(self._device_stage_alignments)))
 
     def traverse_run(self) -> None:
 
@@ -130,3 +106,28 @@ class DSASimulator:
         best_result._draw(resort_microbatch_index(best_result._num_microbatches ,result))
 
         return end_time
+    
+    # very slow down up to 30x
+    # device = 6, 518400 → 720 cases
+    def _unique_result(self, device_stage_alignment):    
+        for existing_result in self._device_stage_alignments:
+            acc = 0
+            for stage_alignment in device_stage_alignment:
+                if stage_alignment not in existing_result:
+                    break
+                else:
+                    acc += 1
+            if acc == self._device_size:
+                return False
+        return True
+    
+    def _traverse_every_stage_alignment(self, sid, device_stage_alignment):
+        if sid == self._pp_size:
+            if self._prune_result(device_stage_alignment) and self._unique_result(device_stage_alignment):
+                self._device_stage_alignments.append(copy.deepcopy(device_stage_alignment))
+        else:
+            for did in range(self._device_size):
+                device_stage_alignment[did].append(sid)
+                self._traverse_every_stage_alignment(sid + 1, device_stage_alignment)
+                device_stage_alignment[did].pop()
+                
