@@ -1,0 +1,11 @@
+Traversing every stage alignment...
+Traversing over. 120 situations found.
+Stage alignment:[(3, 8), (0, 9), (4, 5), (1, 7), (2, 6)].
+Total Constraints within Device:8850, Redundant Constraints:300.
+Gurobi Solver Solving...
+Result Found Cost: 2.41.
+MinExeTime:791.0.
+Stage alignment:[(4, 9), (3, 7), (1, 6), (0, 8), (2, 5)].
+Total Constraints within Device:8850, Redundant Constraints:300.
+Gurobi Solver Solving...
+Result Found Cost: 2.78.

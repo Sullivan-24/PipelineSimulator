@@ -53,7 +53,7 @@ class DSASimulator:
         # Slightly Faster
         # segments = [[list(l) for l in list(itertools.permutations(range(self._device_size * i, self._device_size * (i + 1))))] for i in range(segment_size)]
         
-        # t1 = time.time()
+        t1 = time.time()
         for combination in itertools.product(*segments):
             dsa = self._transpose(combination)
             # set_dsa = set(dsa)
@@ -63,9 +63,12 @@ class DSASimulator:
             # if set_dsa not in self._dsa_hash:
             #     self._device_stage_alignments.append(dsa)
             #     self._dsa_hash.add(frozenset(set_dsa))
+
+            # device size = 6, speedup from 0.71s → 0.57s
+            # device size = 7, speedup from 38.3 → 30.2s
             self._dsa_hash.add(frozenset(dsa))
-        # t2 = time.time()
-        # input("Continue??{},{}".format(t2-t1, len(self._device_stage_alignments)))
+        t2 = time.time()
+        print_to_file(self._file_path, "DSA search cost:{}, number of results:{}".format(t2-t1, len(self._device_stage_alignments)))
 
     def traverse_run(self) -> None:
 
