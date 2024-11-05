@@ -56,13 +56,14 @@ class DSASimulator:
         # t1 = time.time()
         for combination in itertools.product(*segments):
             dsa = self._transpose(combination)
-            set_dsa = set(dsa)
+            # set_dsa = set(dsa)
             # Do not use _unique_result for reducing duplication results
             # device size = 6, speedup from 31s → 0.71s
             # device size = 7, speedup from inf → 38.3s
-            if set_dsa not in self._dsa_hash:
-                self._device_stage_alignments.append(dsa)
-                self._dsa_hash.add(frozenset(set_dsa))
+            # if set_dsa not in self._dsa_hash:
+            #     self._device_stage_alignments.append(dsa)
+            #     self._dsa_hash.add(frozenset(set_dsa))
+            self._dsa_hash.add(frozenset(dsa))
         # t2 = time.time()
         # input("Continue??{},{}".format(t2-t1, len(self._device_stage_alignments)))
 
@@ -72,12 +73,15 @@ class DSASimulator:
         # device_stage_alignments = [[] for _ in range(self._device_size)]
         # self._traverse_every_stage_alignment(0, device_stage_alignment=device_stage_alignments)
         self._traverse_limited_stage_alignment()
-        print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._device_stage_alignments)))
+        # print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._device_stage_alignments)))
+        print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._dsa_hash)))
 
         best_result = None
         minimal_time = 999999999999
         simulators = []
-        for dsa in self._device_stage_alignments:
+        # for dsa in self._device_stage_alignments:
+        for dsa in self._dsa_hash:
+            dsa = list(dsa)
             if self._solver_type == "z3":
                 temp_simulator = SPSimulator(self.config, device_stage_alignments=dsa)
             else:
