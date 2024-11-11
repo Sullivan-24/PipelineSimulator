@@ -8,6 +8,7 @@ class GSimulator:
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
         self._file_path = config["file_path"]
+        self._time_limit = config["time_limit"]
         self._pp_size = config["pp_size"]
         self._device_size = config["device_size"]
         self._model_size = config["model_size"]
@@ -180,7 +181,7 @@ class GSimulator:
                     #     (_pp_vars[j] + _j_length - _pp_vars[i]) * (_pp_vars[j] - _pp_vars[i] - _i_length) >= 0
                     # )
                     y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{did}_{i}_{j}")
-                    M = 1e4
+                    M = 1e6
                     self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M) 
                     self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M)
                     
@@ -210,7 +211,8 @@ class GSimulator:
         self._build_constraints()
         self._build_optimize_objectives()
 
-        self.model.setParam('TimeLimit', 30)
+        # self.model.setParam('TimeLimit', self._time_limit)
+        self.model.setParam('MIPGap', 0.01)
         self.model.optimize()
 
         start_time = time.time()

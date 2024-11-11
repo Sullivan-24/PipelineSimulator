@@ -1,8 +1,9 @@
-device_size = 7             # Size of devices.
+device_size = 8             # Size of devices.
 pp_size = device_size * 2   # Size of pipeline.
 model_size = pp_size + 0    # Model layers, should be equal or larger than pipeline size.
 nvs = (1,)                  # Number of virtual stages / number of stages.
-nmb = device_size + 5       # Number of microbatch.
+nmb = device_size + 8       # Number of microbatch.
+time_limit = 60
 
 ft_bt_rate = 1.80
 ft_wt_rate = 0.80      

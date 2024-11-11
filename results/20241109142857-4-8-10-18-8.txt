@@ -1,0 +1,18 @@
+Traversing every stage alignment...
+DSA search cost:0.0, number of results:0Traversing over. 24 situations found.
+Stage alignment:[(0, 7), (1, 6), (2, 5), (3, 4)].
+Total Constraints within Device:4512, Redundant Constraints:192.
+Gurobi Solver Solving...
+Result Found Cost: 30.07.
+MinExeTime:609.0.
+Stage alignment:[(1, 7), (2, 4), (3, 5), (0, 6)].
+Total Constraints within Device:4512, Redundant Constraints:192.
+Gurobi Solver Solving...
+Result Found Cost: 30.10.
+MinExeTime:611.0.
+Stage alignment:[(0, 4), (3, 6), (2, 7), (1, 5)].
+Total Constraints within Device:4512, Redundant Constraints:192.
+Gurobi Solver Solving...
+Result Found Cost: 0.11.
+MinExeTime:634.0.
+Stage alignment:[(3, 7), (1, 5), (2, 4), (0, 6)].

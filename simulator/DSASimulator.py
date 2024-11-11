@@ -1,5 +1,6 @@
 import time
 import copy
+import os
 from .config import *
 from .utils import resort_microbatch_index, print_to_file
 from .GSimulator import GSimulator
@@ -68,28 +69,40 @@ class DSASimulator:
             # device size = 7, speedup from 38.3 → 30.2s
             self._dsa_hash.add(frozenset(dsa))
         t2 = time.time()
-        print_to_file(self._file_path, "DSA search cost:{}, number of results:{}".format(t2-t1, len(self._device_stage_alignments)))
+        print_to_file(self._file_path, "DSA search cost:{}\n".format(t2-t1))
+
+    def _generate_dsa_results(self, file_path):
+        if os.path.exists(file_path):
+            print_to_file(self._file_path, "DSA results exists.\n")
+            with open(file_path, 'r') as file:
+                self._dsa_hash = eval(file.read())
+        else:
+            print_to_file(self._file_path, "Searching DSA results.\n")
+            self._traverse_limited_stage_alignment()
+            with open(file_path, 'w') as file:
+                file.write(str(self._dsa_hash))
 
     def traverse_run(self) -> None:
 
         print_to_file(self._file_path, "Traversing every stage alignment...\n")
         # device_stage_alignments = [[] for _ in range(self._device_size)]
         # self._traverse_every_stage_alignment(0, device_stage_alignment=device_stage_alignments)
-        self._traverse_limited_stage_alignment()
-        # print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._device_stage_alignments)))
+        dsa_file_name = './dsa/{}-{}.txt'.format(self._device_size, self._pp_size)
+        self._generate_dsa_results(dsa_file_name)
+
+        # self._traverse_limited_stage_alignment()
         print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._dsa_hash)))
 
         best_result = None
         minimal_time = 999999999999
-        simulators = []
-        # for dsa in self._device_stage_alignments:
+        # simulators = []
         for dsa in self._dsa_hash:
             dsa = list(dsa)
             if self._solver_type == "z3":
                 temp_simulator = SPSimulator(self.config, device_stage_alignments=dsa)
             else:
                 temp_simulator = GSimulator(self.config, device_stage_alignments=dsa)
-            simulators.append(temp_simulator)
+            # simulators.append(temp_simulator)
             result = temp_simulator.run()
 
             if self._solver_type == "z3":

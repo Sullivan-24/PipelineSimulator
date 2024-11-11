@@ -13,6 +13,7 @@ import time
 def main():
     config = {
         "device_size": int(device_size),
+        "time_limit": int(time_limit),
         "pp_size": int(pp_size),
         "model_size": int(model_size),
         "virtual_stage": nvs,               # times of the number of devices
