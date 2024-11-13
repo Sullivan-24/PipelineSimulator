@@ -1,149 +1,106 @@
 Traversing every stage alignment...
-Traversing over. 15 situations found.
-Stage alignment:[[0, 1], [2, 3], [4, 5]].
+DSA results exists.
+Traversing over. 6 situations found.
+D=3,S=6,M=6,F=20,B=36.0,W=12.0,C=[[0, 1, 1, 1, 1, 1], [1, 0, 1, 1, 1, 1], [1, 1, 0, 1, 1, 1], [1, 1, 1, 0, 1, 1], [1, 1, 1, 1, 0, 1], [1, 1, 1, 1, 1, 0]].
+Stage alignment:[(2, 4), (1, 3), (0, 5)].
 Total Constraints within Device:459, Redundant Constraints:54.
 Gurobi Solver Solving...
 Optimal Result Cost: 0.00.
-MinExeTime:270.0.
-Stage alignment:[[0, 1], [2, 4], [3, 5]].
+MinExeTime:252.0.
+Stage alignment:[(2, 3), (1, 4), (0, 5)].
 Total Constraints within Device:459, Redundant Constraints:54.
 Gurobi Solver Solving...
 Optimal Result Cost: 0.00.
-MinExeTime:262.0.
-Stage alignment:[[0, 1], [2, 5], [3, 4]].
+MinExeTime:254.0.
+Stage alignment:[(0, 3), (2, 5), (1, 4)].
 Total Constraints within Device:459, Redundant Constraints:54.
 Gurobi Solver Solving...
 Optimal Result Cost: 0.00.
-MinExeTime:268.0.
-Stage alignment:[[0, 2], [1, 3], [4, 5]].
+MinExeTime:255.0.
+Stage alignment:[(2, 3), (0, 4), (1, 5)].
 Total Constraints within Device:459, Redundant Constraints:54.
 Gurobi Solver Solving...
 Optimal Result Cost: 0.00.
-MinExeTime:266.0.
-Stage alignment:[[0, 2], [1, 4], [3, 5]].
+MinExeTime:254.0.
+Stage alignment:[(2, 5), (1, 3), (0, 4)].
 Total Constraints within Device:459, Redundant Constraints:54.
 Gurobi Solver Solving...
 Optimal Result Cost: 0.00.
-MinExeTime:264.0.
-Stage alignment:[[0, 2], [1, 5], [3, 4]].
+MinExeTime:269.0.
+Stage alignment:[(2, 4), (0, 3), (1, 5)].
 Total Constraints within Device:459, Redundant Constraints:54.
 Gurobi Solver Solving...
 Optimal Result Cost: 0.00.
 MinExeTime:263.0.
-Stage alignment:[[0, 3], [1, 2], [4, 5]].
-Total Constraints within Device:459, Redundant Constraints:54.
-Gurobi Solver Solving...
-Optimal Result Cost: 0.00.
-MinExeTime:264.0.
-Stage alignment:[[0, 4], [1, 2], [3, 5]].
-Total Constraints within Device:459, Redundant Constraints:54.
-Gurobi Solver Solving...
-Optimal Result Cost: 0.00.
-MinExeTime:266.0.
-Stage alignment:[[0, 5], [1, 2], [3, 4]].
-Total Constraints within Device:459, Redundant Constraints:54.
-Gurobi Solver Solving...
-Optimal Result Cost: 0.00.
-MinExeTime:251.0.
-Stage alignment:[[0, 3], [1, 4], [2, 5]].
-Total Constraints within Device:459, Redundant Constraints:54.
-Gurobi Solver Solving...
-Optimal Result Cost: 0.00.
-MinExeTime:239.0.
-Stage alignment:[[0, 3], [1, 5], [2, 4]].
-Total Constraints within Device:459, Redundant Constraints:54.
-Gurobi Solver Solving...
-Optimal Result Cost: 0.00.
-MinExeTime:244.0.
-Stage alignment:[[0, 4], [1, 3], [2, 5]].
-Total Constraints within Device:459, Redundant Constraints:54.
-Gurobi Solver Solving...
-Optimal Result Cost: 0.00.
-MinExeTime:246.0.
-Stage alignment:[[0, 5], [1, 3], [2, 4]].
-Total Constraints within Device:459, Redundant Constraints:54.
-Gurobi Solver Solving...
-Optimal Result Cost: 0.00.
-MinExeTime:237.0.
-Stage alignment:[[0, 4], [1, 5], [2, 3]].
-Total Constraints within Device:459, Redundant Constraints:54.
-Gurobi Solver Solving...
-Optimal Result Cost: 0.00.
-MinExeTime:234.0.
-Stage alignment:[[0, 5], [1, 4], [2, 3]].
-Total Constraints within Device:459, Redundant Constraints:54.
-Gurobi Solver Solving...
-Optimal Result Cost: 0.00.
-MinExeTime:234.0.
-Device 0: [0, 4].
-Device 1: [1, 5].
-Device 2: [2, 3].
+Device 0: (2, 4).
+Device 1: (1, 3).
+Device 2: (0, 5).
 l_0,1.0.
 r_0,0.0.
 f_0_0,0.0.
-b_0_0,155.0.
-w_0_0,170.0.
+b_0_0,168.0.
+w_0_0,186.0.
 f_1_0,10.0.
-b_1_0,178.0.
-w_1_0,201.0.
+b_1_0,204.0.
+w_1_0,222.0.
 f_2_0,20.0.
-b_2_0,211.0.
-w_2_0,226.0.
+b_2_0,228.0.
+w_2_0,246.0.
 l_1,1.0.
 r_1,0.0.
 f_0_1,11.0.
-b_0_1,131.0.
-w_0_1,154.0.
+b_0_1,149.0.
+w_0_1,227.0.
 f_1_1,21.0.
-b_1_1,162.0.
-w_1_1,185.0.
-f_2_1,31.0.
-b_2_1,195.0.
-w_2_1,218.0.
+b_1_1,185.0.
+w_1_1,233.0.
+f_2_1,43.0.
+b_2_1,209.0.
+w_2_1,245.0.
 l_2,1.0.
 r_2,0.0.
 f_0_2,22.0.
-b_0_2,111.0.
-w_0_2,171.0.
-f_1_2,42.0.
-b_1_2,141.0.
-w_1_2,210.0.
-f_2_2,74.0.
-b_2_2,179.0.
+b_0_2,130.0.
+w_0_2,184.0.
+f_1_2,32.0.
+b_1_2,166.0.
+w_1_2,214.0.
+f_2_2,54.0.
+b_2_2,190.0.
 w_2_2,226.0.
 l_3,1.0.
 r_3,0.0.
-f_0_3,32.0.
-b_0_3,96.0.
-w_0_3,194.0.
-f_1_3,52.0.
-b_1_3,126.0.
-w_1_3,202.0.
-f_2_3,84.0.
-b_2_3,156.0.
-w_2_3,218.0.
+f_0_3,33.0.
+b_0_3,105.0.
+w_0_3,125.0.
+f_1_3,53.0.
+b_1_3,131.0.
+w_1_3,203.0.
+f_2_3,65.0.
+b_2_3,167.0.
+w_2_3,239.0.
 l_4,1.0.
 r_4,0.0.
-f_0_4,43.0.
-b_0_4,80.0.
-w_0_4,124.0.
-f_1_4,63.0.
-b_1_4,109.0.
-w_1_4,147.0.
-f_2_4,95.0.
-b_2_4,132.0.
-w_2_4,193.0.
+f_0_4,44.0.
+b_0_4,86.0.
+w_0_4,106.0.
+f_1_4,64.0.
+b_1_4,112.0.
+w_1_4,208.0.
+f_2_4,76.0.
+b_2_4,148.0.
+w_2_4,220.0.
 l_5,1.0.
 r_5,0.0.
-f_0_5,54.0.
-b_0_5,64.0.
-w_0_5,146.0.
-f_1_5,81.0.
-b_1_5,91.0.
-w_1_5,177.0.
-f_2_5,106.0.
-b_2_5,116.0.
-w_2_5,210.0.
+f_0_5,55.0.
+b_0_5,65.0.
+w_0_5,111.0.
+f_1_5,83.0.
+b_1_5,93.0.
+w_1_5,147.0.
+f_2_5,117.0.
+b_2_5,129.0.
+w_2_5,162.0.
 Do0_0_1,1.0.
 Do0_0_2,1.0.
 Do0_0_4,1.0.
@@ -177,7 +134,7 @@ Do0_2_3,1.0.
 Do0_2_4,1.0.
 Do0_2_6,1.0.
 Do0_2_7,1.0.
-Do0_2_9,1.0.
+Do0_2_9,0.0.
 Do0_2_10,1.0.
 Do0_2_11,1.0.
 Do0_2_12,1.0.
@@ -195,12 +152,12 @@ Do0_3_10,0.0.
 Do0_3_11,0.0.
 Do0_3_12,0.0.
 Do0_3_13,0.0.
-Do0_3_14,0.0.
+Do0_3_14,1.0.
 Do0_3_15,0.0.
-Do0_3_16,0.0.
+Do0_3_16,1.0.
 Do0_3_17,1.0.
 Do0_4_5,1.0.
-Do0_4_6,0.0.
+Do0_4_6,1.0.
 Do0_4_8,1.0.
 Do0_4_9,0.0.
 Do0_4_10,0.0.
@@ -209,10 +166,10 @@ Do0_4_12,0.0.
 Do0_4_13,0.0.
 Do0_4_14,0.0.
 Do0_4_15,0.0.
-Do0_4_16,0.0.
+Do0_4_16,1.0.
 Do0_4_17,1.0.
 Do0_5_6,0.0.
-Do0_5_7,0.0.
+Do0_5_7,1.0.
 Do0_5_9,0.0.
 Do0_5_10,0.0.
 Do0_5_11,0.0.
@@ -220,8 +177,8 @@ Do0_5_12,0.0.
 Do0_5_13,0.0.
 Do0_5_14,0.0.
 Do0_5_15,0.0.
-Do0_5_16,0.0.
-Do0_5_17,0.0.
+Do0_5_16,1.0.
+Do0_5_17,1.0.
 Do0_6_7,1.0.
 Do0_6_8,1.0.
 Do0_6_9,0.0.
@@ -231,7 +188,7 @@ Do0_6_12,0.0.
 Do0_6_13,0.0.
 Do0_6_14,0.0.
 Do0_6_15,0.0.
-Do0_6_16,0.0.
+Do0_6_16,1.0.
 Do0_6_17,1.0.
 Do0_7_8,1.0.
 Do0_7_9,0.0.
@@ -242,7 +199,7 @@ Do0_7_13,0.0.
 Do0_7_14,0.0.
 Do0_7_15,0.0.
 Do0_7_16,0.0.
-Do0_7_17,0.0.
+Do0_7_17,1.0.
 Do0_8_9,0.0.
 Do0_8_10,0.0.
 Do0_8_11,0.0.
@@ -263,7 +220,7 @@ Do0_10_12,1.0.
 Do0_10_14,1.0.
 Do0_10_15,1.0.
 Do0_10_17,1.0.
-Do0_11_12,0.0.
+Do0_11_12,1.0.
 Do0_11_13,1.0.
 Do0_11_15,1.0.
 Do0_11_16,1.0.
@@ -272,7 +229,7 @@ Do0_12_14,1.0.
 Do0_12_16,1.0.
 Do0_12_17,1.0.
 Do0_13_14,1.0.
-Do0_13_15,1.0.
+Do0_13_15,0.0.
 Do0_13_17,1.0.
 Do0_14_15,0.0.
 Do0_14_16,1.0.
@@ -312,7 +269,7 @@ Do1_2_3,1.0.
 Do1_2_4,1.0.
 Do1_2_6,1.0.
 Do1_2_7,1.0.
-Do1_2_9,1.0.
+Do1_2_9,0.0.
 Do1_2_10,1.0.
 Do1_2_11,1.0.
 Do1_2_12,1.0.
@@ -330,12 +287,12 @@ Do1_3_10,0.0.
 Do1_3_11,0.0.
 Do1_3_12,0.0.
 Do1_3_13,0.0.
-Do1_3_14,0.0.
-Do1_3_15,1.0.
+Do1_3_14,1.0.
+Do1_3_15,0.0.
 Do1_3_16,1.0.
 Do1_3_17,1.0.
 Do1_4_5,1.0.
-Do1_4_6,0.0.
+Do1_4_6,1.0.
 Do1_4_8,1.0.
 Do1_4_9,0.0.
 Do1_4_10,0.0.
@@ -346,8 +303,8 @@ Do1_4_14,0.0.
 Do1_4_15,0.0.
 Do1_4_16,1.0.
 Do1_4_17,1.0.
-Do1_5_6,0.0.
-Do1_5_7,0.0.
+Do1_5_6,1.0.
+Do1_5_7,1.0.
 Do1_5_9,0.0.
 Do1_5_10,0.0.
 Do1_5_11,0.0.
@@ -366,7 +323,7 @@ Do1_6_12,0.0.
 Do1_6_13,0.0.
 Do1_6_14,0.0.
 Do1_6_15,0.0.
-Do1_6_16,1.0.
+Do1_6_16,0.0.
 Do1_6_17,1.0.
 Do1_7_8,1.0.
 Do1_7_9,0.0.
@@ -394,12 +351,12 @@ Do1_9_14,1.0.
 Do1_9_16,1.0.
 Do1_9_17,1.0.
 Do1_10_11,1.0.
-Do1_10_12,0.0.
+Do1_10_12,1.0.
 Do1_10_14,1.0.
 Do1_10_15,1.0.
 Do1_10_17,1.0.
-Do1_11_12,0.0.
-Do1_11_13,0.0.
+Do1_11_12,1.0.
+Do1_11_13,1.0.
 Do1_11_15,1.0.
 Do1_11_16,1.0.
 Do1_12_13,1.0.
@@ -407,9 +364,9 @@ Do1_12_14,1.0.
 Do1_12_16,1.0.
 Do1_12_17,1.0.
 Do1_13_14,1.0.
-Do1_13_15,1.0.
+Do1_13_15,0.0.
 Do1_13_17,1.0.
-Do1_14_15,1.0.
+Do1_14_15,0.0.
 Do1_14_16,1.0.
 Do1_15_16,1.0.
 Do1_15_17,1.0.
@@ -434,7 +391,7 @@ Do2_1_3,1.0.
 Do2_1_5,1.0.
 Do2_1_6,1.0.
 Do2_1_8,1.0.
-Do2_1_9,0.0.
+Do2_1_9,1.0.
 Do2_1_10,1.0.
 Do2_1_11,1.0.
 Do2_1_12,1.0.
@@ -447,8 +404,8 @@ Do2_2_3,1.0.
 Do2_2_4,1.0.
 Do2_2_6,1.0.
 Do2_2_7,1.0.
-Do2_2_9,0.0.
-Do2_2_10,0.0.
+Do2_2_9,1.0.
+Do2_2_10,1.0.
 Do2_2_11,1.0.
 Do2_2_12,1.0.
 Do2_2_13,1.0.
@@ -464,34 +421,34 @@ Do2_3_9,0.0.
 Do2_3_10,0.0.
 Do2_3_11,0.0.
 Do2_3_12,0.0.
-Do2_3_13,1.0.
-Do2_3_14,1.0.
-Do2_3_15,1.0.
-Do2_3_16,1.0.
-Do2_3_17,1.0.
+Do2_3_13,0.0.
+Do2_3_14,0.0.
+Do2_3_15,0.0.
+Do2_3_16,0.0.
+Do2_3_17,0.0.
 Do2_4_5,1.0.
-Do2_4_6,1.0.
+Do2_4_6,0.0.
 Do2_4_8,1.0.
 Do2_4_9,0.0.
 Do2_4_10,0.0.
 Do2_4_11,0.0.
 Do2_4_12,0.0.
 Do2_4_13,0.0.
-Do2_4_14,1.0.
-Do2_4_15,1.0.
-Do2_4_16,1.0.
-Do2_4_17,1.0.
+Do2_4_14,0.0.
+Do2_4_15,0.0.
+Do2_4_16,0.0.
+Do2_4_17,0.0.
 Do2_5_6,0.0.
-Do2_5_7,1.0.
+Do2_5_7,0.0.
 Do2_5_9,0.0.
 Do2_5_10,0.0.
 Do2_5_11,0.0.
 Do2_5_12,0.0.
 Do2_5_13,0.0.
 Do2_5_14,0.0.
-Do2_5_15,1.0.
-Do2_5_16,1.0.
-Do2_5_17,1.0.
+Do2_5_15,0.0.
+Do2_5_16,0.0.
+Do2_5_17,0.0.
 Do2_6_7,1.0.
 Do2_6_8,1.0.
 Do2_6_9,0.0.
@@ -500,9 +457,9 @@ Do2_6_11,0.0.
 Do2_6_12,0.0.
 Do2_6_13,0.0.
 Do2_6_14,0.0.
-Do2_6_15,1.0.
-Do2_6_16,1.0.
-Do2_6_17,1.0.
+Do2_6_15,0.0.
+Do2_6_16,0.0.
+Do2_6_17,0.0.
 Do2_7_8,1.0.
 Do2_7_9,0.0.
 Do2_7_10,0.0.
@@ -512,7 +469,7 @@ Do2_7_13,0.0.
 Do2_7_14,0.0.
 Do2_7_15,0.0.
 Do2_7_16,0.0.
-Do2_7_17,1.0.
+Do2_7_17,0.0.
 Do2_8_9,0.0.
 Do2_8_10,0.0.
 Do2_8_11,0.0.
@@ -529,13 +486,13 @@ Do2_9_14,1.0.
 Do2_9_16,1.0.
 Do2_9_17,1.0.
 Do2_10_11,1.0.
-Do2_10_12,1.0.
+Do2_10_12,0.0.
 Do2_10_14,1.0.
 Do2_10_15,1.0.
 Do2_10_17,1.0.
-Do2_11_12,1.0.
-Do2_11_13,1.0.
-Do2_11_15,1.0.
+Do2_11_12,0.0.
+Do2_11_13,0.0.
+Do2_11_15,0.0.
 Do2_11_16,1.0.
 Do2_12_13,1.0.
 Do2_12_14,1.0.
@@ -544,10 +501,10 @@ Do2_12_17,1.0.
 Do2_13_14,1.0.
 Do2_13_15,1.0.
 Do2_13_17,1.0.
-Do2_14_15,1.0.
+Do2_14_15,0.0.
 Do2_14_16,1.0.
 Do2_15_16,1.0.
 Do2_15_17,1.0.
 Do2_16_17,1.0.
-max_start_offset,234.0.
-MinExeTime:234.0.
+max_start_offset,252.0.
+MinExeTime:252.0.

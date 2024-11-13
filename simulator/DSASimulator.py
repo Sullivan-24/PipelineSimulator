@@ -18,7 +18,7 @@ class DSASimulator:
         self._dsa_hash                  = set()
         self._file_path                 = config["file_path"]
         self._solver_type               = solver_type
-
+        self._stage_order_search        = config["stage_order_search"]
     def _prune_result(self, device_stage_alignment):
         for dsa in device_stage_alignment:
             if len(dsa) != self._pp_size // self._device_size:
@@ -42,29 +42,41 @@ class DSASimulator:
 
     def _transpose(self, matrix):
         return [row for row in zip(*matrix)]
-
+    
+    # def _traverse_01_limited_stage_alignment(self):
+    #     segment_size = self._pp_size // self._device_size
+    #     segments = [[] for _ in range(segment_size)]
+    #     for i in range(segment_size):
+    #         lb = self._device_size * i
+    #         ub = self._device_size * (i + 1)
+    #         increasing_stage = tuple(range(lb, ub))
+    #         decreasing_stage = tuple(reversed(increasing_stage))
+    #         segments[i] = [increasing_stage, decreasing_stage]    
+    #     for combination in itertools.product(*segments):
+    #         dsa = self._transpose(combination)
+    #         self._dsa_hash.add(frozenset(dsa))
+    
+    def _generate_stage_constraint(self, lb, ub):
+        if self._stage_order_search == "01":
+            increasing_stage = tuple(range(lb, ub))
+            decreasing_stage = tuple(reversed(increasing_stage))
+            return [increasing_stage, decreasing_stage]
+        else:
+            return [l for l in list(itertools.permutations(range(lb, ub)))]
     def _traverse_limited_stage_alignment(self):
         segment_size = self._pp_size // self._device_size
-        # Slow
         segments = [[] for _ in range(segment_size)]
         for i in range(segment_size):
             lb = self._device_size * i
             ub = self._device_size * (i + 1)
-            segments[i] = [l for l in list(itertools.permutations(range(lb, ub)))]        
+            # segments[i] = [l for l in list(itertools.permutations(range(lb, ub)))]        
+            segments[i] = self._generate_stage_constraint(lb, ub)
         # Slightly Faster
         # segments = [[list(l) for l in list(itertools.permutations(range(self._device_size * i, self._device_size * (i + 1))))] for i in range(segment_size)]
         
         t1 = time.time()
         for combination in itertools.product(*segments):
             dsa = self._transpose(combination)
-            # set_dsa = set(dsa)
-            # Do not use _unique_result for reducing duplication results
-            # device size = 6, speedup from 31s → 0.71s
-            # device size = 7, speedup from inf → 38.3s
-            # if set_dsa not in self._dsa_hash:
-            #     self._device_stage_alignments.append(dsa)
-            #     self._dsa_hash.add(frozenset(set_dsa))
-
             # device size = 6, speedup from 0.71s → 0.57s
             # device size = 7, speedup from 38.3 → 30.2s
             self._dsa_hash.add(frozenset(dsa))
@@ -87,12 +99,18 @@ class DSASimulator:
         print_to_file(self._file_path, "Traversing every stage alignment...\n")
         # device_stage_alignments = [[] for _ in range(self._device_size)]
         # self._traverse_every_stage_alignment(0, device_stage_alignment=device_stage_alignments)
-        dsa_file_name = './dsa/{}-{}.txt'.format(self._device_size, self._pp_size)
+        dsa_file_name = './dsa/{}-{}-{}.txt'.format(self._device_size, self._pp_size, self._stage_order_search.name)
         self._generate_dsa_results(dsa_file_name)
 
         # self._traverse_limited_stage_alignment()
         print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._dsa_hash)))
-
+        print_to_file(self._file_path, "D={},S={},M={},F={},B={},W={},C={},SOS={}.\n".format(
+            self._device_size, self._pp_size, model_size, 
+            ft, bt, 
+            wt, self._basic_comm_length,
+            self._stage_order_search,
+        ))
+        
         best_result = None
         minimal_time = 999999999999
         # simulators = []

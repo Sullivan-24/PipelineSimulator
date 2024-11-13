@@ -251,7 +251,7 @@ class GSimulator:
             "pp_size": self._pp_size,
             "pp_height": 50,
             "pp_align": 10,
-            "pixel_base": 1,
+            "pixel_base": 2,
             "num_real_microbatches": self._num_real_microbatches,
             "forward_length": self._forward_length,
             "backward_length": self._backward_b_length,
