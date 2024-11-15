@@ -38,9 +38,9 @@ class PipelineScheduler:
             mid = workload.microbatch_id
             sid = workload.stage_id
             k = '{}_{}_{}'.format(wlt,mid,sid)
-            self.results[k] = GET_TIME()
+            self.results[k] = workload.start_time
 
-    def run_pipeline_parallelism(self, time_limit = 100):
+    def run_pipeline_parallelism(self, time_limit = 1000):
         while GET_TIME() <= time_limit:
             UPDATE_TIME_FLAG = True
             for device in self.devices:
@@ -49,6 +49,7 @@ class PipelineScheduler:
                 if completed_workload:
                     self.update_constraints(constraint=completed_workload)
                     UPDATE_TIME_FLAG = False
+                    break
             if UPDATE_TIME_FLAG:
                 UPDATE_TIME()
 

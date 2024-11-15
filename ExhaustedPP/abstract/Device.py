@@ -25,13 +25,14 @@ class Device:
     def execute_workload(self) -> None:
         proc_info = [None, None]
         if self.state == Device.BUSY:
-            if self._check_status():
+            if self._finish_proc_workload():
                 self.proc_workload.complete()
                 self.update_memory_usage()
-                self.state = Device.IDLE
                 proc_info[0] = self.proc_workload
+                self.state = Device.IDLE
 
-        if self.state == Device.IDLE:
+        elif self.state == Device.IDLE:
+            # for mid in range(MICRO_BATCH_NUM):
             for workload_type in WorkloadType:
                 for mid in range(MICRO_BATCH_NUM):
                     for sid in self.stages:
@@ -41,9 +42,13 @@ class Device:
                             self.proc_workload = proc_workload
                             self.state = Device.BUSY
                             return proc_info
+                        
+        else:
+            print("Wrong Device Status.")
+
         return proc_info
 
-    def _check_status(self):
+    def _finish_proc_workload(self) -> bool: 
         if GET_TIME() >= self.proc_workload.end_time:
             return True
         return False
