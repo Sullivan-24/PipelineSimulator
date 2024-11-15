@@ -6,10 +6,11 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, stage_id: int, memory_usage: int, activation_memory: int):
-        self.stage_id: int = stage_id  # 阶段编号
-        self.memory_usage: int = memory_usage  # 阶段内存开销
-        self.activation_memory: int = activation_memory  # 激活内存开销
+    def __init__(self, stage_id: int, memory_usage: int, activation_memory_increment: int):
+        self.stage_id: int = stage_id
+        self.memory_usage: int = memory_usage
+        self.model_mem: int = memory_usage
+        self.activation_memory_increment: int = activation_memory_increment
         self.workloads: dict[int, {WorkloadType, Workload}] = {}  
         self._add_workload()
 
@@ -45,12 +46,16 @@ class Stage:
                 self.workloads[mid][wlt].update_constraints(
                     (constraint.stage_id, constraint.microbatch_id, constraint.workload_type)
                 ) 
+    def update_memory_usage(self, workload:Workload):
+        if workload.workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+            self.memory_usage += self.activation_memory_increment
+        elif workload.workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
+            self.memory_usage -= self.activation_memory_increment
 
     def execute_workload(self, mid=None, workload_type=None):
         if mid is not None and workload_type is not None:
             w = self.workloads[mid][workload_type]
             if w.execute():
-                self.memory_usage += self.activation_memory
                 return copy.deepcopy(w)
         else:
             print("Lack of workload info.")
@@ -59,4 +64,4 @@ class Stage:
     def __repr__(self) -> str:
         return (f"StageClass(stage_id={self.stage_id}, "
                 f"memory_usage={self.memory_usage}, "
-                f"activation_memory={self.activation_memory})")
+                f"activation_memory={self.activation_memory_increment})")

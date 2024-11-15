@@ -9,13 +9,15 @@ class Device:
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
         self.proc_workload: Workload = None
+        self.current_mem_usage: int = 0
+        self.mem_usage_record: dict[int, int] = {}
     
     def show_stages(self):
         for sid in self.stages:
             print("Stage {} on Device {}".format(sid, self.device_id))
 
     def add_stage(self, stage_id: int) -> None:
-        stage = Stage(stage_id=stage_id, memory_usage=0, activation_memory=1)
+        stage = Stage(stage_id=stage_id, memory_usage=0, activation_memory_increment=1)
         self.stages[stage.stage_id] = stage
 
     def update_constraints(self, constraint):
@@ -32,7 +34,6 @@ class Device:
                 self.state = Device.IDLE
 
         elif self.state == Device.IDLE:
-            # for mid in range(MICRO_BATCH_NUM):
             for workload_type in WorkloadType:
                 for mid in range(MICRO_BATCH_NUM):
                     for sid in self.stages:
@@ -40,6 +41,7 @@ class Device:
                         if proc_workload:
                             proc_info[1] = proc_workload
                             self.proc_workload = proc_workload
+                            self.update_memory_usage()
                             self.state = Device.BUSY
                             return proc_info
                         
@@ -54,8 +56,16 @@ class Device:
         return False
 
     def update_memory_usage(self) -> int:
-        """计算设备中所有阶段的总内存开销"""
-        return sum(stage.memory_usage for stage in self.stages.values())
+        if self.proc_workload.state == Workload.IN_PROGRESS and self.proc_workload.workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+            self.stages[self.proc_workload.stage_id].update_memory_usage(workload=self.proc_workload)
+        elif self.proc_workload.state == Workload.COMPLETED and self.proc_workload.workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
+            self.stages[self.proc_workload.stage_id].update_memory_usage(workload=self.proc_workload)
+            
+        self.current_mem_usage = sum(stage.memory_usage for stage in self.stages.values())
+        self.mem_usage_record[GET_TIME()] = self.current_mem_usage
+    
+    def get_memory_usage(self) -> int:
+        return self.current_mem_usage
 
     def __repr__(self) -> str:
         return f"DeviceClass(stages={self.stages.keys()}, current_stage={self.current_stage_id}, current_microbatch={self.current_microbatch_id})"

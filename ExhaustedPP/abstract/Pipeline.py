@@ -9,7 +9,7 @@ import Simulator.PipelineSimulator.simulator.painter as SP
 class PipelineScheduler:
     def __init__(self) -> None:
         self.results = {}
-        self.devices = []
+        self.devices: list[Device] = []
         self.dsa = []
         self._init_stage()
 
@@ -52,6 +52,12 @@ class PipelineScheduler:
                     break
             if UPDATE_TIME_FLAG:
                 UPDATE_TIME()
+
+    def show_mem_usage(self):
+        for device in self.devices:
+            print("Device {} mem usage:".format(device.device_id))
+            for t, mem_record in device.mem_usage_record.items():
+                print("Time {}, mem = {}.".format(t, mem_record))
 
     def draw(self) -> None:
         # 绘制结果的逻辑
