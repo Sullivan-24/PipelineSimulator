@@ -1,11 +1,8 @@
-from abstract.Device import Device
-from abstract.mutils import *
-devices = []
-for did in range(DEVICE_NUM):
-    device = Device(device_id = did)
-    devices.append(device)
+from abstract.Pipeline import PipelineScheduler
 
-while GLOBAL_TIME <= 10:
-    for device in devices:
-        device.execute_workload()
-    GLOBAL_TIME+=1
+if __name__ == "__main__":
+    pp = PipelineScheduler()
+    pp.run_pipeline_parallelism(time_limit=2000)
+    pp.draw()
+    pass
+

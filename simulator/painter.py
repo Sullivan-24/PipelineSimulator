@@ -15,7 +15,6 @@ class SchedulingPainter:
         self._pp_height     = config["pp_height"]
         self._pp_align      = config["pp_align"]
         self._pixel_base    = config["pixel_base"]
-        self._file_path     = config["file_path"]
         
         self._num_real_microbatches = config["num_real_microbatches"]
 
