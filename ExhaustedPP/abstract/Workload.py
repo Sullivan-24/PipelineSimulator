@@ -45,7 +45,7 @@ class Workload:
         elif self.workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
             self.constraints.add((self.stage_id, self.microbatch_id, WorkloadType.INPUT_GRADIENT_WORKLOAD))
 
-    def update_constraints(self, constraint: tuple):
+    def update_constraints(self, constraint):
         self.constraints.discard(constraint)
 
     def execute(self) -> bool:

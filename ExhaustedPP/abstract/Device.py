@@ -8,9 +8,7 @@ class Device:
         self.device_id = device_id
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
-        self.proc_sid: int = -1
-        self.proc_mid: int = -1
-        self.proc_wlt: int = -1
+        self.proc_workload: Workload = None
     
     def show_stages(self):
         for sid in self.stages:
@@ -21,7 +19,6 @@ class Device:
         self.stages[stage.stage_id] = stage
 
     def update_constraints(self, constraint):
-        # constraint = (self.proc_sid, self.proc_mid, self.proc_wlt)
         for sid in self.stages:
             self.stages[sid].update_constraints(constraint=constraint)
 
@@ -29,25 +26,25 @@ class Device:
         proc_info = [None, None]
         if self.state == Device.BUSY:
             if self._check_status():
-                self.stages[self.proc_sid].workloads[self.proc_mid][self.proc_wlt].complete()
-                self.state = Device.IDLE
+                self.proc_workload.complete()
                 self.update_memory_usage()
-                proc_info[0] = (self.proc_sid, self.proc_mid, self.proc_wlt)
+                self.state = Device.IDLE
+                proc_info[0] = self.proc_workload
 
         if self.state == Device.IDLE:
             for workload_type in WorkloadType:
                 for mid in range(MICRO_BATCH_NUM):
                     for sid in self.stages:
-                        workload_info = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
-                        if workload_info:
-                            (self.proc_sid, self.proc_mid, self.proc_wlt) = workload_info
-                            proc_info[1] = workload_info
+                        proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                        if proc_workload:
+                            proc_info[1] = proc_workload
+                            self.proc_workload = proc_workload
                             self.state = Device.BUSY
                             return proc_info
         return proc_info
 
     def _check_status(self):
-        if GET_TIME() >= self.stages[self.proc_sid].workloads[self.proc_mid][self.proc_wlt].end_time:
+        if GET_TIME() >= self.proc_workload.end_time:
             return True
         return False
 

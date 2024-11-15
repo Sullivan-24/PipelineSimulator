@@ -1,4 +1,5 @@
 from abstract.Device import Device
+from abstract.Workload import Workload
 from abstract.mutils import *
 import os
 import sys
@@ -31,9 +32,12 @@ class PipelineScheduler:
         for device in self.devices:
             device.update_constraints(constraint=constraint)
 
-    def record_workload(self, workload):
+    def record_workload(self, workload: Workload):
         if workload:
-            k = '{}_{}_{}'.format(workload[-1].value.lower(),workload[-2],workload[-3])
+            wlt = workload.workload_type.value.lower()
+            mid = workload.microbatch_id
+            sid = workload.stage_id
+            k = '{}_{}_{}'.format(wlt,mid,sid)
             self.results[k] = GET_TIME()
 
     def run_pipeline_parallelism(self, time_limit = 100):

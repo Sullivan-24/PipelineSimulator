@@ -1,4 +1,5 @@
 from .Workload import *
+import copy
 class Stage:
     
     INTERLEAVED = 1
@@ -41,29 +42,18 @@ class Stage:
     def update_constraints(self, constraint):
         for mid in self.workloads:
             for wlt in self.workloads[mid]:
-                self.workloads[mid][wlt].update_constraints(constraint) 
+                self.workloads[mid][wlt].update_constraints(
+                    (constraint.stage_id, constraint.microbatch_id, constraint.workload_type)
+                ) 
 
-    def execute_workload(self, mid=None, workload_type=None) -> tuple:
+    def execute_workload(self, mid=None, workload_type=None):
         if mid is not None and workload_type is not None:
             w = self.workloads[mid][workload_type]
             if w.execute():
                 self.memory_usage += self.activation_memory
-                return (self.stage_id, w.microbatch_id, w.workload_type)
-        elif mid is not None:
-            mwl = self.workloads[mid]
-            for wlt in mwl:
-                w = mwl[wlt]
-                if w.execute():
-                    self.memory_usage += self.activation_memory
-                    return (self.stage_id, w.microbatch_id, w.workload_type)
+                return copy.deepcopy(w)
         else:
-            for mid in self.workloads:
-                mwl = self.workloads[mid]
-                for wlt in mwl:
-                    w = mwl[wlt]
-                    if w.execute():
-                        self.memory_usage += self.activation_memory
-                        return (self.stage_id, w.microbatch_id, w.workload_type)
+            print("Lack of workload info.")
         return None
 
     def __repr__(self) -> str:
