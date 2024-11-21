@@ -6,7 +6,8 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, stage_id: int, memory_usage: int, activation_memory_increment: int):
+    def __init__(self, device_id:int, stage_id: int, memory_usage: int, activation_memory_increment: int):
+        self.device_id: int = device_id
         self.stage_id: int = stage_id
         self.memory_usage: int = memory_usage
         self.model_mem: int = memory_usage
@@ -17,18 +18,21 @@ class Stage:
     def _add_workload(self) -> None:
         for mid in range(MICRO_BATCH_NUM):
             fpw = Workload(
+                device_id=self.device_id,
                 stage_id=self.stage_id,
                 microbatch_id=mid,
                 workload_type=WorkloadType.FORWARD_PASS_WORKLOAD,
                 duration=FPW_TIME,    
             )
             igw = Workload(
+                device_id=self.device_id,
                 stage_id=self.stage_id,
                 microbatch_id=mid,
                 workload_type=WorkloadType.INPUT_GRADIENT_WORKLOAD,
                 duration=IGW_TIME,    
             )
             pgw = Workload(
+                device_id=self.device_id,
                 stage_id=self.stage_id,
                 microbatch_id=mid,
                 workload_type=WorkloadType.PARAMETER_GRADIENT_WORKLOAD,
@@ -40,12 +44,18 @@ class Stage:
                 WorkloadType.PARAMETER_GRADIENT_WORKLOAD: pgw
             }
 
-    def update_constraints(self, constraint):
+    def update_constraints(self, constraint: Workload):
         for mid in self.workloads:
             for wlt in self.workloads[mid]:
                 self.workloads[mid][wlt].update_constraints(
-                    (constraint.stage_id, constraint.microbatch_id, constraint.workload_type)
+                    WorkloadConstraint(
+                        device_id=constraint.device_id,
+                        stage_id=constraint.stage_id, 
+                        microbatch_id=constraint.microbatch_id, 
+                        workload_type=constraint.workload_type
+                    )
                 ) 
+
     def update_memory_usage(self, workload:Workload):
         if workload.workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
             self.memory_usage += self.activation_memory_increment

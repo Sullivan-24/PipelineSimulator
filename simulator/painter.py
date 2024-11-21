@@ -4,7 +4,6 @@ painter package
 import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
-from .config import comm
 class SchedulingPainter:
     """Scheduling Painter"""
 
@@ -71,7 +70,7 @@ class SchedulingPainter:
                 self._basic_forward_length[max_key_pid], 
                 self._basic_backward_b_length[max_key_pid], 
                 self._basic_backward_w_length[max_key_pid], 
-                comm
+                int(sum(self._comm_length) / len(self._comm_length))
             ),
         )
 

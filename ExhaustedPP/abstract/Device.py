@@ -17,7 +17,12 @@ class Device:
             print("Stage {} on Device {}".format(sid, self.device_id))
 
     def add_stage(self, stage_id: int) -> None:
-        stage = Stage(stage_id=stage_id, memory_usage=0, activation_memory_increment=1)
+        stage = Stage(
+                device_id=self.device_id, 
+                stage_id=stage_id, 
+                memory_usage=0, 
+                activation_memory_increment=1
+            )
         self.stages[stage.stage_id] = stage
 
     def update_constraints(self, constraint):
