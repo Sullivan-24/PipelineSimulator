@@ -1,4 +1,5 @@
 from abstract.Device import Device
+from abstract.Stage import Stage
 from abstract.Workload import Workload
 from abstract.mutils import *
 import os
@@ -7,23 +8,40 @@ sys.path.append("/home/PJLAB/guojihu/下载/PPSimulator")
 import Simulator.PipelineSimulator.simulator.painter as SP
 
 class PipelineScheduler:
+
+
     def __init__(self) -> None:
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = []
         self._init_stage()
 
-    def _init_stage(self):
+    def _init_stage(self, stage_type=Stage.VSHAPE):
         for did in range(DEVICE_NUM):
             device = Device(device_id = did)
-            device.add_stage(did)
-            device.add_stage(STAGE_NUM - 1 - did)
             self.devices.append(device)
-            device.show_stages()
+
+        if stage_type == Stage.VSHAPE:
+            for pid in range(STAGE_NUM):
+                if (pid // DEVICE_NUM) % 2 == 0:
+                    self.devices[pid % DEVICE_NUM].add_stage(pid)
+                else:
+                    self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid)
+        elif stage_type == Stage.INTERLEAVED:
+            for pid in range(STAGE_NUM):
+                self.devices[pid % DEVICE_NUM].add_stage(pid)
+
+        # for did in range(DEVICE_NUM):
+        #     device = Device(device_id = did)
+        #     device.add_stage(did)
+        #     device.add_stage(STAGE_NUM - 1 - did)
+        #     self.devices.append(device)
+        #     device.show_stages()
 
         for did in range(DEVICE_NUM):
+            device.show_stages()
             self.dsa.append(self.devices[did].stages.keys())
-    
+
     def show_record(self):
         for k in self.results:
             print(k, self.results[k])
@@ -69,9 +87,9 @@ class PipelineScheduler:
             "pp_align": 10,
             "pixel_base": 2,
             "num_real_microbatches": MICRO_BATCH_NUM,
-            "forward_length": [FPW_TIME for _ in range(STAGE_NUM)],
-            "backward_length": [IGW_TIME for _ in range(STAGE_NUM)],
-            "backward_length2": [PGW_TIME for _ in range(STAGE_NUM)],
+            "forward_length": [FPW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
+            "backward_length": [IGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
+            "backward_length2": [PGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
             "comm_length": [COMM_TIME for _ in range(STAGE_NUM)],
         }
 

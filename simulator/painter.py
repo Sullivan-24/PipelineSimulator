@@ -65,8 +65,9 @@ class SchedulingPainter:
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
         y_label = (0 + 30) // 2 + 5
 
-        label_canvas.create_text(self._pp_align + 140, y_label, text="MinExeTime:{}, F:{}, B:{}, W:{}, C:{}".format(
+        label_canvas.create_text(self._pp_align + 160, y_label, text="MinExeTime:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
                 (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
+                self._pp_size // self._device_size,
                 self._basic_forward_length[max_key_pid], 
                 self._basic_backward_b_length[max_key_pid], 
                 self._basic_backward_w_length[max_key_pid], 

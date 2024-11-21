@@ -22,21 +22,21 @@ class Stage:
                 stage_id=self.stage_id,
                 microbatch_id=mid,
                 workload_type=WorkloadType.FORWARD_PASS_WORKLOAD,
-                duration=FPW_TIME,    
+                duration=FPW_TIME // CHUNK_NUM,    
             )
             igw = Workload(
                 device_id=self.device_id,
                 stage_id=self.stage_id,
                 microbatch_id=mid,
                 workload_type=WorkloadType.INPUT_GRADIENT_WORKLOAD,
-                duration=IGW_TIME,    
+                duration=IGW_TIME // CHUNK_NUM,    
             )
             pgw = Workload(
                 device_id=self.device_id,
                 stage_id=self.stage_id,
                 microbatch_id=mid,
                 workload_type=WorkloadType.PARAMETER_GRADIENT_WORKLOAD,
-                duration=PGW_TIME,    
+                duration=PGW_TIME // CHUNK_NUM,    
             )
             self.workloads[mid]={
                 WorkloadType.FORWARD_PASS_WORKLOAD: fpw,
