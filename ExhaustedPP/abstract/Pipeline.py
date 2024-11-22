@@ -58,18 +58,37 @@ class PipelineScheduler:
             k = '{}_{}_{}'.format(wlt,mid,sid)
             self.results[k] = workload.start_time
 
+    def check_workload_status(self):
+        for device in self.devices:
+            if device._finish_proc_workload():
+                device.proc_workload.complete()
+                self.update_constraints(constraint=device.proc_workload)
+                device.update_memory_usage()
+                device.state = Device.IDLE
+
+    def execute_workload(self):
+        for device in self.devices:
+            processing_workload = device.execute_workload()
+            self.record_workload(processing_workload)
+
+    # def run_pipeline_parallelism(self, time_limit = 1000):
+    #     while GET_TIME() <= time_limit:
+    #         UPDATE_TIME_FLAG = True
+    #         for device in self.devices:
+    #             (completed_workload, processing_workload) = device.execute_workload()
+    #             self.record_workload(processing_workload)
+    #             if completed_workload:
+    #                 self.update_constraints(constraint=completed_workload)
+    #                 UPDATE_TIME_FLAG = False
+    #                 break
+    #         if UPDATE_TIME_FLAG:
+    #             UPDATE_TIME()
+            
     def run_pipeline_parallelism(self, time_limit = 1000):
         while GET_TIME() <= time_limit:
-            UPDATE_TIME_FLAG = True
-            for device in self.devices:
-                (completed_workload, processing_workload) = device.execute_workload()
-                self.record_workload(processing_workload)
-                if completed_workload:
-                    self.update_constraints(constraint=completed_workload)
-                    UPDATE_TIME_FLAG = False
-                    break
-            if UPDATE_TIME_FLAG:
-                UPDATE_TIME()
+            self.check_workload_status()
+            self.execute_workload()
+            UPDATE_TIME()
 
     def show_mem_usage(self):
         for device in self.devices:
