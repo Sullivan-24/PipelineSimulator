@@ -1,11 +1,11 @@
+import os
 import time
 import copy
-import os
-from .config import *
-from .utils import resort_microbatch_index, print_to_file
+import itertools
 from .GSimulator import GSimulator
 from .SPSimulator import SPSimulator
-import itertools
+from .utils import resort_microbatch_index, print_to_file
+from .abstract.mutils import FPW_TIME, PGW_TIME, IGW_TIME, MODEL_LAYER_NUM
 
 class DSASimulator:
     def __init__(self, config, solver_type="gurobi") -> None:
@@ -105,9 +105,9 @@ class DSASimulator:
         # self._traverse_limited_stage_alignment()
         print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._dsa_hash)))
         print_to_file(self._file_path, "D={},S={},M={},F={},B={},W={},C={},SOS={}.\n".format(
-            self._device_size, self._pp_size, model_size, 
-            ft, bt, 
-            wt, self._basic_comm_length,
+            self._device_size, self._pp_size, MODEL_LAYER_NUM, 
+            FPW_TIME, IGW_TIME, 
+            PGW_TIME, self._basic_comm_length,
             self._stage_order_search,
         ))
         

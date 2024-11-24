@@ -1,10 +1,10 @@
 import time
 from gurobipy import Model, GRB, quicksum
-from .config import *
 from .painter import SchedulingPainter
+from .abstract.mutils import COMM_TIME
 from .utils import resort_microbatch_index, print_to_file
+from .abstract import Pipeline
 class GSimulator:
-    """Simulator"""
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
         self._file_path = config["file_path"]
@@ -12,9 +12,7 @@ class GSimulator:
         self._pp_size = config["pp_size"]
         self._device_size = config["device_size"]
         self._model_size = config["model_size"]
-        self.virtual_stage = config["virtual_stage"]
-        self._num_real_microbatches = config["num_microbatches"]
-        self._num_microbatches = config["num_microbatches"] * self.virtual_stage[0]
+        self._num_microbatches = config["num_microbatches"]
         self._max_activation_counts = config["max_activation_counts"]
         self._basic_forward_length = config["forward_execution_time"]
         self._basic_backward_b_length = config["backward_execution_i_time"]
@@ -48,6 +46,9 @@ class GSimulator:
             self._devices = [[] for _ in range(self._device_size)]
             self._fix_stages(stage_type="ZBV")
 
+        # baseline solution
+        self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
+        self.pipeline_scheduler.run_pipeline_parallelism()
         self.model_result = None
 
     def show_device_stage_mapping(self):
@@ -72,7 +73,7 @@ class GSimulator:
                 self._devices[pid % self._device_size].append(pid)
 
     def _reset_comm_length(self, dsa):
-        new_comm_length = [[comm if i != j else 0 for j in range(self._pp_size)] for i in range(self._pp_size)]
+        new_comm_length = [[COMM_TIME if i != j else 0 for j in range(self._pp_size)] for i in range(self._pp_size)]
         for d in dsa:
             for i in range(len(d)):
                 for j in range(i+1, len(d)):
@@ -206,14 +207,22 @@ class GSimulator:
             self.model.addConstr(max_var >= self._backward_w_offsets[pp][-1] + self._basic_backward_w_length[pp])
         self.model.setObjective(max_var, GRB.MINIMIZE)
 
-    def run(self, draw=False) -> None:
+    def set_baseline_solution(self):
+        self.model.update()
+        for var in self.model.getVars():
+            if var.VarName in self.pipeline_scheduler.results.keys():
+                var.Start = self.pipeline_scheduler.results[var.VarName]
+
+    def run(self, base_solution=False, draw=False) -> None:
         """run simulation"""
         self._build_constraints()
         self._build_optimize_objectives()
 
-        # self.model.setParam('TimeLimit', self._time_limit)
-        self.model.setParam('MIPGap', 0.01)
-        self.model.optimize()
+        self.model.setParam('TimeLimit', self._time_limit)
+        # self.model.setParam('MIPGap', 0.00)
+
+        if base_solution:
+            self.set_baseline_solution()
 
         start_time = time.time()
         print_to_file(self._file_path, "Gurobi Solver Solving...\n")
@@ -252,7 +261,7 @@ class GSimulator:
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": 2,
-            "num_real_microbatches": self._num_real_microbatches,
+            "num_microbatches": self._num_microbatches,
             "forward_length": self._forward_length,
             "backward_length": self._backward_b_length,
             "backward_length2": self._backward_w_length,

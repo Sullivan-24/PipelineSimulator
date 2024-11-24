@@ -1,29 +1,27 @@
 import time
 import z3
 import copy
-from .config import *
 from .painter import SchedulingPainter
 from .utils import resort_microbatch_index, print_to_file
+from .abstract.mutils import *
 
 class SPSimulator:
     """Simulator"""
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
         self._file_path = config["file_path"]
-        print_to_file(self._file_path, "forward_execution_time:{}\nbackward_execution_i_time:{}\nbackward_execution_g_time:{}.\n".format(
-                ft, bt, wt
-            )
-        )
-        print_to_file(self._file_path, "Device size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.\n".format(
-                device_size, pp_size, model_size, nmb
-            )
-        )
+        # print_to_file(self._file_path, "forward_execution_time:{}\nbackward_execution_i_time:{}\nbackward_execution_g_time:{}.\n".format(
+        #         ft, bt, wt
+        #     )
+        # )
+        # print_to_file(self._file_path, "Device size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.\n".format(
+        #         device_size, pp_size, model_size, nmb
+        #     )
+        # )
         self._pp_size                   = config["pp_size"]
         self._device_size               = config["device_size"]
         self._model_size                = config["model_size"]
-        self.virtual_stage              = config["virtual_stage"]
-        self._num_real_microbatches     = config["num_microbatches"]
-        self._num_microbatches          = config["num_microbatches"] * self.virtual_stage[0]
+        self._num_microbatches          = config["num_microbatches"]
         self._max_activation_counts     = config["max_activation_counts"]
         self._basic_forward_length      = config["forward_execution_time"]
         self._basic_backward_b_length   = config["backward_execution_i_time"]
@@ -389,7 +387,7 @@ class SPSimulator:
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": 2,
-            "num_real_microbatches": self._num_real_microbatches,
+            "num_microbatches": self._num_microbatches,
             "forward_length": self._forward_length,
             "backward_length": self._backward_b_length,
             "backward_length2": self._backward_w_length,
@@ -399,7 +397,7 @@ class SPSimulator:
 
         SchedulingPainter(painter_conf).draw(results)
 
-    def run(self, draw=False) -> None:
+    def run(self, base_solution=False, draw=False) -> None:
         """run simulation"""
         # 1. builds the solver constraints.
         self._build_constraints()

@@ -4,6 +4,7 @@ painter package
 import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
+from .abstract.mutils import COMM_TIME
 class SchedulingPainter:
     """Scheduling Painter"""
 
@@ -15,7 +16,7 @@ class SchedulingPainter:
         self._pp_align      = config["pp_align"]
         self._pixel_base    = config["pixel_base"]
         
-        self._num_real_microbatches = config["num_real_microbatches"]
+        self._num_microbatches = config["num_microbatches"]
 
         self._basic_forward_length = [_len for _len in config["forward_length"]]
         self._basic_backward_b_length = [_len for _len in config["backward_length"]]
@@ -71,7 +72,8 @@ class SchedulingPainter:
                 self._basic_forward_length[max_key_pid], 
                 self._basic_backward_b_length[max_key_pid], 
                 self._basic_backward_w_length[max_key_pid], 
-                int(sum(self._comm_length) / len(self._comm_length))
+                # int(sum(self._comm_length) / len(self._comm_length))
+                COMM_TIME
             ),
         )
 
@@ -127,12 +129,12 @@ class SchedulingPainter:
                 weight= tk.font.NORMAL if pid // self._device_size % 2 else tk.font.BOLD
             )
             text = main_canvas.create_text(
-                (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_real_microbatches}", font=bold_font
+                (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
             )
-            # if pid + 1 >= self._num_real_microbatches:
+            # if pid + 1 >= self._num_microbatches:
             #     bold_font = font.Font(size= pid // (self._pp_size // self._device_size), weight=tk.font.BOLD)
             #     text = main_canvas.create_text(
-            #         (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_real_microbatches}", font=bold_font
+            #         (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
             #     )
             # else:
             #     text = main_canvas.create_text(
