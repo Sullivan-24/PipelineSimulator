@@ -101,7 +101,7 @@ class PipelineScheduler:
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": 2,
-            "num_real_microbatches": MICRO_BATCH_NUM,
+            "num_microbatches": MICRO_BATCH_NUM,
             "forward_length": [FPW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
             "backward_length": [IGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
             "backward_length2": [PGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],

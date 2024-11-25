@@ -49,6 +49,8 @@ class GSimulator:
         # baseline solution
         self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
         self.pipeline_scheduler.run_pipeline_parallelism()
+        self.pipeline_scheduler.draw()
+        input()
         self.model_result = None
 
     def show_device_stage_mapping(self):
@@ -182,7 +184,7 @@ class GSimulator:
                     #     (_pp_vars[j] + _j_length - _pp_vars[i]) * (_pp_vars[j] - _pp_vars[i] - _i_length) >= 0
                     # )
                     y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{did}_{i}_{j}")
-                    M = 1e6
+                    M = 1e4
                     self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M) 
                     self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M)
                     
