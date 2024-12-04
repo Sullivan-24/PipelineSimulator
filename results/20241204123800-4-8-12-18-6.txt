@@ -1,0 +1,7 @@
+Traversing every stage alignment...
+DSA results exists.
+Traversing over. 24 situations found.
+D=4,S=8,M=8,F=12,B=18,W=6,C=[[0, 1, 1, 1, 1, 1, 1, 1], [1, 0, 1, 1, 1, 1, 1, 1], [1, 1, 0, 1, 1, 1, 1, 1], [1, 1, 1, 0, 1, 1, 1, 1], [1, 1, 1, 1, 0, 1, 1, 1], [1, 1, 1, 1, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 0, 1], [1, 1, 1, 1, 1, 1, 1, 0]],SOS=StageSearchOrder.Random.
+Stage alignment:[(0, 7), (1, 6), (2, 5), (3, 4)].
+Total Constraints within Device:4512, Redundant Constraints:192.
+Gurobi Solver Solving...

@@ -34,7 +34,7 @@ class PipelineScheduler:
                     self.devices[pid % DEVICE_NUM].add_stage(pid)
 
         for did in range(DEVICE_NUM):
-            device.show_stages()
+            self.devices[did].show_stages()
             if len(self.dsa) < DEVICE_NUM:
                 self.dsa.append(self.devices[did].stages.keys())
 

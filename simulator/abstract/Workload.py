@@ -114,12 +114,12 @@ class Workload:
                 # ))
             # Add comm overhead
             elif self.ready_time <= GET_TIME(): 
-                print("T={},\tS={},\tMB={}-{} is in progress...".format(
-                    GET_TIME(),
-                    self.stage_id,
-                    self.microbatch_id,
-                    self.workload_type.value
-                ))
+                # print("T={},\tS={},\tMB={}-{} is in progress...".format(
+                #     GET_TIME(),
+                #     self.stage_id,
+                #     self.microbatch_id,
+                #     self.workload_type.value
+                # ))
                 self.state = Workload.IN_PROGRESS
                 self.start_time = GET_TIME()
                 self.end_time = self.start_time + self.duration
@@ -129,12 +129,12 @@ class Workload:
     def complete(self) -> None:
         """完成任务并更新状态"""
         if self.state == Workload.IN_PROGRESS and self.end_time <= GET_TIME():
-            print("T={},\tS={},\tMB={}-{} is completed.".format(
-                GET_TIME(),
-                self.stage_id,
-                self.microbatch_id,
-                self.workload_type.value,
-            ))
+            # print("T={},\tS={},\tMB={}-{} is completed.".format(
+            #     GET_TIME(),
+            #     self.stage_id,
+            #     self.microbatch_id,
+            #     self.workload_type.value,
+            # ))
             self.state = Workload.COMPLETED
 
     def __repr__(self) -> str:

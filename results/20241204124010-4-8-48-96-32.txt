@@ -1,0 +1,4 @@
+Traversing every stage alignment...
+DSA results exists.
+Traversing over. 24 situations found.
+D=4,S=8,M=8,F=48,B=96,W=32,C=[[0, 1, 1, 1, 1, 1, 1, 1], [1, 0, 1, 1, 1, 1, 1, 1], [1, 1, 0, 1, 1, 1, 1, 1], [1, 1, 1, 0, 1, 1, 1, 1], [1, 1, 1, 1, 0, 1, 1, 1], [1, 1, 1, 1, 1, 0, 1, 1], [1, 1, 1, 1, 1, 1, 0, 1], [1, 1, 1, 1, 1, 1, 1, 0]],SOS=StageSearchOrder.Random.
