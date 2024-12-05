@@ -1,10 +1,15 @@
 from enum import Enum
+
+
 GLOBAL_TIME = 0
-CHUNK_NUM = 8
-DEVICE_NUM = 4
+CHUNK_NUM = 2
+DEVICE_NUM = 2
 STAGE_NUM = DEVICE_NUM * CHUNK_NUM + 0
-MICRO_BATCH_NUM = DEVICE_NUM * 3 + 0
+MICRO_BATCH_NUM = DEVICE_NUM * 1 + 0
 MODEL_LAYER_NUM = STAGE_NUM
+
+MAX_ACTIVATION_COUNTS = 2
+OFFLOAD_TIME = 4
 
 FPW_TIME = 24
 FPW_IGW_RATE = 1.25
@@ -38,7 +43,11 @@ class StageSearchOrder(Enum):
     Random = "Random"
     IncDec = "IncDec"
 
+class RunMode(Enum):
+    SEARCH_SCHEDULE = "search_schedule"
+    Z3_SOLVE = "z3"
+    GUROBI_SOLVE = "gurobi"
 
-
+RUN_MODE = RunMode.GUROBI_SOLVE
 SOLVING_TIME_LIMIT = 30
 STAGE_SEARCH_METHOD = StageSearchOrder.Random

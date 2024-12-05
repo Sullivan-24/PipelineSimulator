@@ -10,14 +10,6 @@ class SPSimulator:
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
         self._file_path = config["file_path"]
-        # print_to_file(self._file_path, "forward_execution_time:{}\nbackward_execution_i_time:{}\nbackward_execution_g_time:{}.\n".format(
-        #         ft, bt, wt
-        #     )
-        # )
-        # print_to_file(self._file_path, "Device size:{}\nPipeline size:{}\nModel size:{}\nNumber of microbatches size:{}.\n".format(
-        #         device_size, pp_size, model_size, nmb
-        #     )
-        # )
         self._pp_size                   = config["pp_size"]
         self._device_size               = config["device_size"]
         self._model_size                = config["model_size"]
@@ -339,7 +331,7 @@ class SPSimulator:
         self._serial_computation_within_device_constraint()
 
         # constraint 3: the accumulation count of activations does not exceed max_activation_counts
-        # self._pipeline_activation_accumulation_constraint()
+        self._pipeline_activation_accumulation_constraint()
 
     def _build_optimize_objectives(self) -> None:
         # 1. minimize the execution time of each microbatch

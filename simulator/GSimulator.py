@@ -1,12 +1,12 @@
 import time
 from gurobipy import Model, GRB, quicksum
 from .painter import SchedulingPainter
-from .abstract.mutils import COMM_TIME
+from .abstract.mutils import COMM_TIME, CHUNK_NUM
 from .utils import resort_microbatch_index, print_to_file
 from .abstract import Pipeline
 class GSimulator:
 
-    def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
+    def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None, draw_baseline=False) -> None:
         self._file_path = config["file_path"]
         self._time_limit = config["time_limit"]
         self._pp_size = config["pp_size"]
@@ -14,18 +14,19 @@ class GSimulator:
         self._model_size = config["model_size"]
         self._num_microbatches = config["num_microbatches"]
         self._max_activation_counts = config["max_activation_counts"]
-        self._basic_forward_length = config["forward_execution_time"]
+        self._basic_forward_f_length = config["forward_execution_time"]
         self._basic_backward_b_length = config["backward_execution_i_time"]
         self._basic_backward_w_length = config["backward_execution_g_time"]
         self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
         self._sequential_order_constraint_strategy = config["sequential_order_constraint_strategy"]
 
-        self._forward_length            = self._basic_forward_length
+        self._forward_f_length            = self._basic_forward_f_length
         self._backward_b_length         = self._basic_backward_b_length
         self._backward_w_length         = self._basic_backward_w_length
         
+        self._activations               = {}
         # 检查输入参数
-        assert isinstance(self._basic_forward_length, (list, tuple))
+        assert isinstance(self._basic_forward_f_length, (list, tuple))
         assert isinstance(self._basic_backward_b_length, (list, tuple))
         assert isinstance(self._basic_backward_w_length, (list, tuple))
         assert self._sequential_order_constraint_strategy in ("strict", "double_interleaving", "full_interleaving")
@@ -36,7 +37,7 @@ class GSimulator:
         # 变量初始化
         self._recomputing_rate = []
         self._layers = []
-        self._forward_offsets = [[] for _ in range(self._pp_size)]
+        self._forward_f_offsets = [[] for _ in range(self._pp_size)]
         self._backward_b_offsets = [[] for _ in range(self._pp_size)]
         self._backward_w_offsets = [[] for _ in range(self._pp_size)]
 
@@ -49,8 +50,8 @@ class GSimulator:
         # baseline solution
         self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
         self.pipeline_scheduler.run_pipeline_parallelism()
-        self.pipeline_scheduler.draw()
-        input()
+        if draw_baseline:
+            self.pipeline_scheduler.draw()
         self.model_result = None
 
     def show_device_stage_mapping(self):
@@ -82,6 +83,7 @@ class GSimulator:
                     new_comm_length[d[i]][d[j]] = 0
                     new_comm_length[d[j]][d[i]] = 0
         return new_comm_length
+    
     def _build_constraints(self) -> None:
         for i in range(self._pp_size):
             layer_var = self.model.addVar(vtype=GRB.INTEGER, name=f"l_{i}", lb=1, ub=self._model_size)
@@ -93,9 +95,11 @@ class GSimulator:
                 f_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mb}_{i}", lb=0)
                 b_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mb}_{i}", lb=0)
                 w_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mb}_{i}", lb=0)
-                self._forward_offsets[i].append(f_offset)
+                self._forward_f_offsets[i].append(f_offset)
                 self._backward_b_offsets[i].append(b_offset)
                 self._backward_w_offsets[i].append(w_offset)
+
+        self._get_device_stage_microbatch_alignment()
 
         # 添加约束
         self.model.addConstr(quicksum(self._layers) == self._model_size)
@@ -103,20 +107,20 @@ class GSimulator:
 
         self._real_pipeline_modeling_constraint_strict()
         self._serial_computation_within_device_constraint()
-        # self._pipeline_activation_accumulation_constraint()
+        self._pipeline_activation_accumulation_constraint()
 
     def _real_pipeline_modeling_constraint_strict(self):
         for mb in range(self._num_microbatches):
             for i in range(1, self._pp_size):
-                self.model.addConstr(self._forward_offsets[i][mb] >= self._forward_offsets[i - 1][mb] +
-                                     self._basic_forward_length[i - 1] + self._comm_length[i - 1][i])
+                self.model.addConstr(self._forward_f_offsets[i][mb] >= self._forward_f_offsets[i - 1][mb] +
+                                     self._basic_forward_f_length[i - 1] + self._comm_length[i - 1][i])
 
             for i in range(self._pp_size - 1, 0, -1):
                 self.model.addConstr(self._backward_b_offsets[i - 1][mb] >= self._backward_b_offsets[i][mb] +
                                      self._basic_backward_b_length[i] + self._comm_length[i][i - 1])
 
-            self.model.addConstr(self._backward_b_offsets[self._pp_size - 1][mb] >= self._forward_offsets[self._pp_size - 1][mb] +
-                                 self._basic_forward_length[self._pp_size - 1])
+            self.model.addConstr(self._backward_b_offsets[self._pp_size - 1][mb] >= self._forward_f_offsets[self._pp_size - 1][mb] +
+                                 self._basic_forward_f_length[self._pp_size - 1])
 
             for i in range(self._pp_size):
                 self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_b_offsets[i][mb] +
@@ -124,14 +128,14 @@ class GSimulator:
 
             if mb > 0:
                 for i in range(self._pp_size):
-                    self.model.addConstr(self._forward_offsets[i][mb] >= self._forward_offsets[i][mb - 1] +
-                                         self._basic_forward_length[i])
+                    self.model.addConstr(self._forward_f_offsets[i][mb] >= self._forward_f_offsets[i][mb - 1] +
+                                         self._basic_forward_f_length[i])
                     self.model.addConstr(self._backward_b_offsets[i][mb] >= self._backward_b_offsets[i][mb - 1] +
                                          self._basic_backward_b_length[i])
                     self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_w_offsets[i][mb - 1] +
                                          self._basic_backward_w_length[i])
             else:
-                self.model.addConstr(self._forward_offsets[0][0] == 0)
+                self.model.addConstr(self._forward_f_offsets[0][0] == 0)
 
     def _serial_computation_within_device_constraint(self):
         print_to_file(self._file_path, "Stage alignment:{}.\n".format(self._devices))
@@ -142,13 +146,13 @@ class GSimulator:
             stages_within_device = self._devices[did]
             _pp_vars = []
             for pp in stages_within_device:
-                _pp_vars += self._forward_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
+                _pp_vars += self._forward_f_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
             
             group_size = self._num_microbatches * 3
             for i, _ in enumerate(_pp_vars):
                 i_pp = stages_within_device[i // group_size]
                 _i_length = (
-                    self._forward_length[i_pp]
+                    self._forward_f_length[i_pp]
                     if (i % group_size) // self._num_microbatches == 0 
                     else(
                         self._backward_b_length[i_pp] 
@@ -164,7 +168,7 @@ class GSimulator:
                             continue
                     j_pp = stages_within_device[j // group_size]
                     _j_length = (
-                        self._forward_length[j_pp]
+                        self._forward_f_length[j_pp]
                         if (j % group_size) // self._num_microbatches == 0
                         else(
                             self._backward_b_length[j_pp] 
@@ -184,24 +188,63 @@ class GSimulator:
                     #     (_pp_vars[j] + _j_length - _pp_vars[i]) * (_pp_vars[j] - _pp_vars[i] - _i_length) >= 0
                     # )
                     y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{did}_{i}_{j}")
+                    # when time increses, M also increases to ensure right answer
                     M = 1e4
                     self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M) 
                     self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M)
                     
         print_to_file(self._file_path, "Total Constraints within Device:{}, Redundant Constraints:{}.\n".format(total_constraints, same_mb_redundant_constraints))
 
+    def _get_device_stage_microbatch_alignment(self):
+        _de_vars = {}
+        for did in range(self._device_size):
+            stages_within_device = self._devices[did]
+            _pp_vars = {}
+            for sid in stages_within_device:
+                _mt_vars = {'f':[],'b':[],'w':[],'pf':[],'pb':[],'pw':[]}
+                for mid in range(self._num_microbatches):
+                    _mt_vars['f'].append(self._forward_f_offsets[sid][mid])
+                    _mt_vars['b'].append(self._backward_b_offsets[sid][mid])
+                    _mt_vars['w'].append(self._backward_w_offsets[sid][mid])
+                    
+                    _mt_vars['pf'].append([self.model.addVar(name=f'act_f_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
+                    _mt_vars['pb'].append([self.model.addVar(name=f'act_b_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
+                    _mt_vars['pw'].append([self.model.addVar(name=f'act_w_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
+
+                _pp_vars[sid] = _mt_vars
+            _de_vars[did] = _pp_vars
+        self._de_st_mb = _de_vars
+
     def _pipeline_activation_accumulation_constraint(self):
-        for pp in range(self._pp_size):
-            for mb in range(self._num_microbatches):
-                _backward_var = self._backward_b_offsets[pp][mb]
-                activation_count = 1
+        mt = 'w' #对每个Device上的所有W Microbatch进行检查：保证当前Device上的activation积累不超过上限 MAX_ACTIVATION_COUNTS * CHUNK_NUM
+        for did in self._de_st_mb:
+            for sid in self._de_st_mb[did]:
+                for mid in range(self._num_microbatches):
+                    pivot = self._de_st_mb[did][sid][mt][mid]
+                    for o_mid in range(self._num_microbatches):
+                        for idx, o_sid in enumerate(self._de_st_mb[did]):
+                            binary_f = self.model.addVar(vtype=GRB.BINARY, name=f'binary_f_{sid}_{mid}_{o_sid}_{o_mid}')
+                            binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'binary_w_{sid}_{mid}_{o_sid}_{o_mid}')
 
-                for other_mb in range(self._num_microbatches):
-                    if other_mb == mb:
-                        continue
-                    activation_count += self.model.addVar(vtype=GRB.CONTINUOUS, name=f"activation_{mb}_{other_mb}_{pp}", lb=0)
+                            eps = 0.001
+                            M = 100000 # 大数限制
+                            self.model.addConstr(pivot >= self._de_st_mb[did][o_sid]['f'][o_mid] + eps - M * (1 - binary_f) )
+                            self.model.addConstr(pivot <= self._de_st_mb[did][o_sid]['f'][o_mid] + M * binary_f)
 
-                self.model.addConstr(activation_count <= self._max_activation_counts[pp])
+                            self.model.addConstr(pivot >= self._de_st_mb[did][o_sid]['w'][o_mid] + eps - M * (1 - binary_w) )
+                            self.model.addConstr(pivot <= self._de_st_mb[did][o_sid]['w'][o_mid] + M * binary_w)
+
+                            self.model.addConstr((binary_f == 1) >> (self._de_st_mb[did][sid]['pf'][mid][o_mid + idx * self._num_microbatches] == 1))
+                            self.model.addConstr((binary_f == 0) >> (self._de_st_mb[did][sid]['pf'][mid][o_mid + idx * self._num_microbatches] == 0))
+                            
+                            self.model.addConstr((binary_w == 1) >> (self._de_st_mb[did][sid]['pw'][mid][o_mid + idx * self._num_microbatches] == 1))
+                            self.model.addConstr((binary_w == 0) >> (self._de_st_mb[did][sid]['pw'][mid][o_mid + idx * self._num_microbatches] == 0))
+
+                    self.model.addConstr(
+                        (quicksum(self._de_st_mb[did][sid]['pf'][mid]) - quicksum(self._de_st_mb[did][sid]['pw'][mid])) 
+                        <= 
+                        self._max_activation_counts[sid]
+                    )
 
     def _build_optimize_objectives(self) -> None:
         max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
@@ -217,7 +260,7 @@ class GSimulator:
 
     def run(self, base_solution=False, draw=False) -> None:
         """run simulation"""
-        self._build_constraints()
+        self._build_constraints()        
         self._build_optimize_objectives()
 
         self.model.setParam('TimeLimit', self._time_limit)
@@ -245,13 +288,16 @@ class GSimulator:
         for i in range(self._pp_size):
             number_of_layers = self.model_result[self._layers[i].varName]
             recompute_rate = float(self.model_result[self._recomputing_rate[i].varName])
-            self._forward_length[i] = self._basic_forward_length[i] * number_of_layers
-            self._backward_b_length[i] = (self._basic_backward_b_length[i] + self._basic_forward_length[i] * recompute_rate) * number_of_layers 
+            self._forward_f_length[i] = self._basic_forward_f_length[i] * number_of_layers
+            self._backward_b_length[i] = (self._basic_backward_b_length[i] + self._basic_forward_f_length[i] * recompute_rate) * number_of_layers 
             self._backward_w_length[i] = self._basic_backward_w_length[i] * number_of_layers
         if draw:
             # 4. draws the result.
             results = {str(key) : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}
             self._draw(resort_microbatch_index(self._num_microbatches ,results))
+
+        # for s in self._de_st_mb.keys():
+        #     print(self._de_st_mb[s])
         return results
 
     def _draw(self, results: dict) -> None:
@@ -264,7 +310,7 @@ class GSimulator:
             "pp_align": 10,
             "pixel_base": 2,
             "num_microbatches": self._num_microbatches,
-            "forward_length": self._forward_length,
+            "forward_length": self._forward_f_length,
             "backward_length": self._backward_b_length,
             "backward_length2": self._backward_w_length,
             "comm_length": self._comm_length,

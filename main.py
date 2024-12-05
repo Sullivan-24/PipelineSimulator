@@ -9,6 +9,7 @@ from simulator.abstract.mutils import *
 
 def main():
     config = {
+        "run_mode": RUN_MODE,
         "device_size": int(DEVICE_NUM),
         "time_limit": int(SOLVING_TIME_LIMIT),
         "stage_order_search": STAGE_SEARCH_METHOD,
@@ -20,20 +21,17 @@ def main():
         "backward_execution_g_time": [PGW_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "communication_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
         "sequential_order_constraint_strategy": "strict",
-        "max_activation_counts": [8 for _ in range(STAGE_NUM)],
+        "max_activation_counts": [MAX_ACTIVATION_COUNTS * CHUNK_NUM for _ in range(STAGE_NUM)],
         "file_path": None,
     }
 
-    # simulator = Simulator(config)
-    # simulator.run()
-    if len(sys.argv) == 1:
+    if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
         config["file_path"] = os.path.join("results", filename)
         s_time = time.time()
         simulator = DSASimulator(config)
         e_time = simulator.traverse_run()
         print(f"Traverse Run Total time: {e_time - s_time}")
-    else:
-        # simulator = SPSimulator(config,
+    elif config["run_mode"] == RunMode.GUROBI_SOLVE:
         simulator = GSimulator(config, 
             # device_stage_alignments=[
             #     [0, 9],
@@ -44,6 +42,20 @@ def main():
             #     ]
         )
         simulator.run(base_solution=True, draw=True)
+        simulator.show_solution_detail()
+    elif config["run_mode"] == RunMode.Z3_SOLVE:
+        simulator = SPSimulator(config,
+            # device_stage_alignments=[
+            #     [0, 9],
+            #     [1, 8],
+            #     [2, 7],
+            #     [3, 6],
+            #     [4, 5],
+            #     ]
+        )
+        simulator.run(base_solution=True, draw=True)
+    else:
+        print("Unknown run mode.")
 
 if __name__ == "__main__":
     current_time = datetime.now()
