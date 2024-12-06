@@ -54,6 +54,7 @@ def main():
             #     ]
         )
         simulator.run(base_solution=True, draw=True)
+        simulator.show_solution_detail()
     else:
         print("Unknown run mode.")
 

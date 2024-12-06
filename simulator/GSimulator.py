@@ -1,7 +1,7 @@
 import time
 from gurobipy import Model, GRB, quicksum
 from .painter import SchedulingPainter
-from .abstract.mutils import COMM_TIME, CHUNK_NUM
+from .abstract.mutils import *
 from .utils import resort_microbatch_index, print_to_file
 from .abstract import Pipeline
 class GSimulator:
@@ -92,12 +92,16 @@ class GSimulator:
             self._recomputing_rate.append(recompute_var)
 
             for mb in range(self._num_microbatches):
+                
                 f_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mb}_{i}", lb=0)
-                b_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mb}_{i}", lb=0)
-                w_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mb}_{i}", lb=0)
                 self._forward_f_offsets[i].append(f_offset)
+
+                b_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mb}_{i}", lb=0)
                 self._backward_b_offsets[i].append(b_offset)
-                self._backward_w_offsets[i].append(w_offset)
+
+                if SPLIT_BACKPROP:
+                    w_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mb}_{i}", lb=0)
+                    self._backward_w_offsets[i].append(w_offset)
 
         self._get_device_stage_microbatch_alignment()
 
@@ -122,9 +126,10 @@ class GSimulator:
             self.model.addConstr(self._backward_b_offsets[self._pp_size - 1][mb] >= self._forward_f_offsets[self._pp_size - 1][mb] +
                                  self._basic_forward_f_length[self._pp_size - 1])
 
-            for i in range(self._pp_size):
-                self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_b_offsets[i][mb] +
-                                     self._basic_backward_b_length[i])
+            if SPLIT_BACKPROP:
+                for i in range(self._pp_size):
+                    self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_b_offsets[i][mb] +
+                                        self._basic_backward_b_length[i])
 
             if mb > 0:
                 for i in range(self._pp_size):
@@ -132,8 +137,9 @@ class GSimulator:
                                          self._basic_forward_f_length[i])
                     self.model.addConstr(self._backward_b_offsets[i][mb] >= self._backward_b_offsets[i][mb - 1] +
                                          self._basic_backward_b_length[i])
-                    self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_w_offsets[i][mb - 1] +
-                                         self._basic_backward_w_length[i])
+                    if SPLIT_BACKPROP:
+                        self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_w_offsets[i][mb - 1] +
+                                            self._basic_backward_w_length[i])
             else:
                 self.model.addConstr(self._forward_f_offsets[0][0] == 0)
 
@@ -146,9 +152,11 @@ class GSimulator:
             stages_within_device = self._devices[did]
             _pp_vars = []
             for pp in stages_within_device:
-                _pp_vars += self._forward_f_offsets[pp] + self._backward_b_offsets[pp] + self._backward_w_offsets[pp]
-            
-            group_size = self._num_microbatches * 3
+                _pp_vars += self._forward_f_offsets[pp] + self._backward_b_offsets[pp]
+                if SPLIT_BACKPROP:
+                    _pp_vars += self._backward_w_offsets[pp]
+            type_of_workload = 3 if SPLIT_BACKPROP else 2
+            group_size = self._num_microbatches * type_of_workload
             for i, _ in enumerate(_pp_vars):
                 i_pp = stages_within_device[i // group_size]
                 _i_length = (
@@ -162,7 +170,7 @@ class GSimulator:
                 )
                 for j in range(i + 1, len(_pp_vars)):
                     total_constraints += 1
-                    if j // (self._num_microbatches * 3) == i // (self._num_microbatches * 3):
+                    if j // (self._num_microbatches * type_of_workload) == i // (self._num_microbatches * type_of_workload):
                         if j % self._num_microbatches == i % self._num_microbatches:
                             same_mb_redundant_constraints += 1
                             continue
@@ -205,18 +213,28 @@ class GSimulator:
                 for mid in range(self._num_microbatches):
                     _mt_vars['f'].append(self._forward_f_offsets[sid][mid])
                     _mt_vars['b'].append(self._backward_b_offsets[sid][mid])
-                    _mt_vars['w'].append(self._backward_w_offsets[sid][mid])
+                    if SPLIT_BACKPROP:
+                        _mt_vars['w'].append(self._backward_w_offsets[sid][mid])
                     
                     _mt_vars['pf'].append([self.model.addVar(name=f'act_f_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
-                    _mt_vars['pb'].append([self.model.addVar(name=f'act_b_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
+                    # _mt_vars['pb'].append([self.model.addVar(name=f'act_b_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
                     _mt_vars['pw'].append([self.model.addVar(name=f'act_w_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
 
                 _pp_vars[sid] = _mt_vars
             _de_vars[did] = _pp_vars
         self._de_st_mb = _de_vars
 
+    def _offload_reload_strategy_constraint(self):
+        #
+        pass
+
+
     def _pipeline_activation_accumulation_constraint(self):
-        mt = 'w' #对每个Device上的所有W Microbatch进行检查：保证当前Device上的activation积累不超过上限 MAX_ACTIVATION_COUNTS * CHUNK_NUM
+        if MAX_ACTIVATION_COUNTS > MICRO_BATCH_NUM * CHUNK_NUM:
+            print("ACTIVATION LIMIT FREE")
+            return
+        #对每个Device上的所有W或B Microbatch进行检查：保证当前Device上的activation积累不超过上限 MAX_ACTIVATION_COUNTS * CHUNK_NUM
+        mt = 'w' if SPLIT_BACKPROP else 'b' 
         for did in self._de_st_mb:
             for sid in self._de_st_mb[did]:
                 for mid in range(self._num_microbatches):
@@ -227,12 +245,12 @@ class GSimulator:
                             binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'binary_w_{sid}_{mid}_{o_sid}_{o_mid}')
 
                             eps = 0.001
-                            M = 100000 # 大数限制
+                            M = 100000
                             self.model.addConstr(pivot >= self._de_st_mb[did][o_sid]['f'][o_mid] + eps - M * (1 - binary_f) )
                             self.model.addConstr(pivot <= self._de_st_mb[did][o_sid]['f'][o_mid] + M * binary_f)
 
-                            self.model.addConstr(pivot >= self._de_st_mb[did][o_sid]['w'][o_mid] + eps - M * (1 - binary_w) )
-                            self.model.addConstr(pivot <= self._de_st_mb[did][o_sid]['w'][o_mid] + M * binary_w)
+                            self.model.addConstr(pivot >= self._de_st_mb[did][o_sid][mt][o_mid] + eps - M * (1 - binary_w) )
+                            self.model.addConstr(pivot <= self._de_st_mb[did][o_sid][mt][o_mid] + M * binary_w)
 
                             self.model.addConstr((binary_f == 1) >> (self._de_st_mb[did][sid]['pf'][mid][o_mid + idx * self._num_microbatches] == 1))
                             self.model.addConstr((binary_f == 0) >> (self._de_st_mb[did][sid]['pf'][mid][o_mid + idx * self._num_microbatches] == 0))
@@ -249,7 +267,11 @@ class GSimulator:
     def _build_optimize_objectives(self) -> None:
         max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
         for pp in range(self._pp_size):
-            self.model.addConstr(max_var >= self._backward_w_offsets[pp][-1] + self._basic_backward_w_length[pp])
+            if SPLIT_BACKPROP:
+                self.model.addConstr(max_var >= self._backward_w_offsets[pp][-1] + self._basic_backward_w_length[pp])
+            else:
+                self.model.addConstr(max_var >= self._backward_b_offsets[pp][-1] + self._basic_backward_b_length[pp])
+
         self.model.setObjective(max_var, GRB.MINIMIZE)
 
     def set_baseline_solution(self):
