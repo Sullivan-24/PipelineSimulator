@@ -14,22 +14,25 @@ class GSimulator:
         self._model_size = config["model_size"]
         self._num_microbatches = config["num_microbatches"]
         self._max_activation_counts = config["max_activation_counts"]
+
+        # obtained by profiling
         self._basic_forward_f_length = config["forward_execution_time"]
         self._basic_backward_b_length = config["backward_execution_i_time"]
         self._basic_backward_w_length = config["backward_execution_g_time"]
         self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
-        self._sequential_order_constraint_strategy = config["sequential_order_constraint_strategy"]
 
-        self._forward_f_length            = self._basic_forward_f_length
-        self._backward_b_length         = self._basic_backward_b_length
-        self._backward_w_length         = self._basic_backward_w_length
+
+        self._forward_f_length  = []
+        self._backward_b_length = []
+        self._backward_w_length = []
+        # self._forward_f_length            = self._basic_forward_f_length
+        # self._backward_b_length         = self._basic_backward_b_length
+        # self._backward_w_length         = self._basic_backward_w_length
         
-        self._activations               = {}
         # 检查输入参数
         assert isinstance(self._basic_forward_f_length, (list, tuple))
         assert isinstance(self._basic_backward_b_length, (list, tuple))
         assert isinstance(self._basic_backward_w_length, (list, tuple))
-        assert self._sequential_order_constraint_strategy in ("strict", "double_interleaving", "full_interleaving")
 
         # 创建 Gurobi 模型
         self.model = Model("SPSimulator")
@@ -86,8 +89,10 @@ class GSimulator:
     
     def _build_constraints(self) -> None:
         for i in range(self._pp_size):
+            
             layer_var = self.model.addVar(vtype=GRB.INTEGER, name=f"l_{i}", lb=1, ub=self._model_size)
             self._layers.append(layer_var)
+
             recompute_var = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"r_{i}", lb=0, ub=1)
             self._recomputing_rate.append(recompute_var)
 
@@ -102,6 +107,14 @@ class GSimulator:
                 if SPLIT_BACKPROP:
                     w_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mb}_{i}", lb=0)
                     self._backward_w_offsets[i].append(w_offset)
+            # Set length per stage
+            self._forward_f_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"l_f_{i}"))
+            self.model.addConstr(self._forward_f_length[i] == self._layers[i] * self._basic_forward_f_length[i])
+            self._backward_b_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"l_b_{i}"))
+            self.model.addConstr(self._backward_b_length[i] == self._layers[i] * self._basic_backward_b_length[i])
+            self._backward_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"l_w_{i}"))
+            self.model.addConstr(self._backward_w_length[i] == self._layers[i] * self._basic_backward_w_length[i])
+
 
         self._get_device_stage_microbatch_alignment()
 
@@ -117,29 +130,29 @@ class GSimulator:
         for mb in range(self._num_microbatches):
             for i in range(1, self._pp_size):
                 self.model.addConstr(self._forward_f_offsets[i][mb] >= self._forward_f_offsets[i - 1][mb] +
-                                     self._basic_forward_f_length[i - 1] + self._comm_length[i - 1][i])
+                                     self._forward_f_length[i - 1] + self._comm_length[i - 1][i])
 
             for i in range(self._pp_size - 1, 0, -1):
                 self.model.addConstr(self._backward_b_offsets[i - 1][mb] >= self._backward_b_offsets[i][mb] +
-                                     self._basic_backward_b_length[i] + self._comm_length[i][i - 1])
+                                     self._backward_b_length[i] + self._comm_length[i][i - 1])
 
             self.model.addConstr(self._backward_b_offsets[self._pp_size - 1][mb] >= self._forward_f_offsets[self._pp_size - 1][mb] +
-                                 self._basic_forward_f_length[self._pp_size - 1])
+                                 self._forward_f_length[self._pp_size - 1])
 
             if SPLIT_BACKPROP:
                 for i in range(self._pp_size):
                     self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_b_offsets[i][mb] +
-                                        self._basic_backward_b_length[i])
+                                        self._backward_b_length[i])
 
             if mb > 0:
                 for i in range(self._pp_size):
                     self.model.addConstr(self._forward_f_offsets[i][mb] >= self._forward_f_offsets[i][mb - 1] +
-                                         self._basic_forward_f_length[i])
+                                         self._forward_f_length[i])
                     self.model.addConstr(self._backward_b_offsets[i][mb] >= self._backward_b_offsets[i][mb - 1] +
-                                         self._basic_backward_b_length[i])
+                                         self._backward_b_length[i])
                     if SPLIT_BACKPROP:
                         self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_w_offsets[i][mb - 1] +
-                                            self._basic_backward_w_length[i])
+                                            self._backward_w_length[i])
             else:
                 self.model.addConstr(self._forward_f_offsets[0][0] == 0)
 
@@ -268,9 +281,9 @@ class GSimulator:
         max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
         for pp in range(self._pp_size):
             if SPLIT_BACKPROP:
-                self.model.addConstr(max_var >= self._backward_w_offsets[pp][-1] + self._basic_backward_w_length[pp])
+                self.model.addConstr(max_var >= self._backward_w_offsets[pp][-1] + self._backward_w_length[pp])
             else:
-                self.model.addConstr(max_var >= self._backward_b_offsets[pp][-1] + self._basic_backward_b_length[pp])
+                self.model.addConstr(max_var >= self._backward_b_offsets[pp][-1] + self._backward_b_length[pp])
 
         self.model.setObjective(max_var, GRB.MINIMIZE)
 
@@ -337,6 +350,7 @@ class GSimulator:
             "backward_length2": self._backward_w_length,
             "comm_length": self._comm_length,
             "file_path": self._file_path,
+            "max_time": self.model_result['max_start_offset'],
         }
 
         SchedulingPainter(painter_conf).draw(results)

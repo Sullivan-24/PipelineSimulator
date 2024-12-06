@@ -15,6 +15,7 @@ class SchedulingPainter:
         self._pp_height     = config["pp_height"]
         self._pp_align      = config["pp_align"]
         self._pixel_base    = config["pixel_base"]
+        self._max_time      = config["max_time"]
         
         self._num_microbatches = config["num_microbatches"]
 
@@ -67,7 +68,8 @@ class SchedulingPainter:
         y_label = (0 + 30) // 2 + 5
 
         label_canvas.create_text(self._pp_align + 160, y_label, text="MinExeTime:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
-                (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
+                # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
+                self._max_time,
                 self._pp_size // self._device_size,
                 self._basic_forward_length[max_key_pid], 
                 self._basic_backward_b_length[max_key_pid], 
