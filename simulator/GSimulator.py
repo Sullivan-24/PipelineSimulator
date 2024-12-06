@@ -111,9 +111,9 @@ class GSimulator:
             self._forward_f_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"l_f_{i}"))
             self.model.addConstr(self._forward_f_length[i] == self._layers[i] * self._basic_forward_f_length[i])
             self._backward_b_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"l_b_{i}"))
-            self.model.addConstr(self._backward_b_length[i] == self._layers[i] * self._basic_backward_b_length[i])
+            self.model.addConstr(self._backward_b_length[i] == (self._layers[i] * self._basic_backward_b_length[i] + self._recomputing_rate[i] * self._forward_f_length[i]))
             self._backward_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"l_w_{i}"))
-            self.model.addConstr(self._backward_w_length[i] == self._layers[i] * self._basic_backward_w_length[i])
+            self.model.addConstr(self._backward_w_length[i] == (self._layers[i] * self._basic_backward_w_length[i] + self._recomputing_rate[i] * self._forward_f_length[i]))
 
 
         self._get_device_stage_microbatch_alignment()
