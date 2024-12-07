@@ -1,16 +1,20 @@
 from .Stage import *
+
 class Device:
     
     BUSY = 1
     IDLE = 2
 
-    def __init__(self, device_id: int):
+    def __init__(self, device_id: int, max_activation_counts: int, static_schedule: list = None):
         self.device_id = device_id
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
         self.proc_workload: Workload = None
         self.current_mem_usage: int = 0
+        self.max_activation_counts: int = max_activation_counts
         self.mem_usage_record: dict[int, int] = {}
+        self.static_schedule: list[str] = static_schedule
+        self.next_workload_idx: int = 0
     
     def show_stages(self):
         for sid in self.stages:
@@ -28,41 +32,33 @@ class Device:
     def update_constraints(self, constraint):
         for sid in self.stages:
             self.stages[sid].update_constraints(constraint=constraint)
-
-    # def execute_workload(self) -> None:
-    #     proc_info = [None, None]
-    #     if self.state == Device.BUSY:
-    #         if self._finish_proc_workload():
-    #             self.proc_workload.complete()
-    #             self.update_memory_usage()
-    #             proc_info[0] = self.proc_workload
-    #             self.state = Device.IDLE
-    #     elif self.state == Device.IDLE:
-    #         for workload_type in WorkloadType:
-    #             for mid in range(MICRO_BATCH_NUM):
-    #                 for sid in self.stages:
-    #                     proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
-    #                     if proc_workload:
-    #                         proc_info[1] = proc_workload
-    #                         self.proc_workload = proc_workload
-    #                         self.update_memory_usage()
-    #                         self.state = Device.BUSY
-    #                         return proc_info
-    #     else:
-    #         print("Wrong Device Status.")
-    #     return proc_info
     
     def execute_workload(self) -> None:
         if self.state == Device.IDLE:
-            for workload_type in WorkloadType:
-                for mid in range(MICRO_BATCH_NUM):
-                    for sid in self.stages:
-                        proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
-                        if proc_workload:
-                            self.proc_workload = proc_workload
-                            self.update_memory_usage()
-                            self.state = Device.BUSY
-                            return proc_workload
+            if SCHEDULE_METHOD == SchedulePriority.GREEDY:
+                for workload_type in WorkloadType:
+                    for mid in range(MICRO_BATCH_NUM):
+                        for sid in self.stages:
+                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            if proc_workload:
+                                self.proc_workload = proc_workload
+                                self.update_memory_usage()
+                                self.state = Device.BUSY
+                                return proc_workload
+            elif SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1):
+                if self.next_workload_idx == MICRO_BATCH_NUM * WORKLOAD_TYPE_NUM:
+                    return None
+                (workload_type, workload_mid, workload_sid) = self.static_schedule[self.next_workload_idx]
+                proc_workload = self.stages[workload_sid].execute_workload(mid=workload_mid,workload_type=workload_type)
+                if proc_workload:
+                    self.proc_workload = proc_workload
+                    self.update_memory_usage()
+                    self.state = Device.BUSY
+                    self.next_workload_idx += 1
+                    return proc_workload
+
+            else:
+                print("Schedule Not Supported")
         return None
 
     def _finish_proc_workload(self) -> bool: 

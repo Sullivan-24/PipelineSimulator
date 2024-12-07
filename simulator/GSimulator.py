@@ -15,6 +15,9 @@ class GSimulator:
         self._num_microbatches = config["num_microbatches"]
         self._max_activation_counts = config["max_activation_counts"]
 
+        self._mix_training = config["mix_training"]
+        self._model_para_num = config["model_para_num"]
+        self._device_mem = config["device_mem"]
         # obtained by profiling
         self._basic_forward_f_length = config["forward_execution_time"]
         self._basic_backward_b_length = config["backward_execution_i_time"]

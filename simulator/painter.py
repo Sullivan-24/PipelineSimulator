@@ -4,7 +4,7 @@ painter package
 import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
-from .abstract.mutils import COMM_TIME
+from .abstract.mutils import COMM_TIME, SPLIT_BACKPROP
 class SchedulingPainter:
     """Scheduling Painter"""
 
@@ -15,7 +15,7 @@ class SchedulingPainter:
         self._pp_height     = config["pp_height"]
         self._pp_align      = config["pp_align"]
         self._pixel_base    = config["pixel_base"]
-        self._max_time      = config["max_time"]
+        self._max_time      = config["max_time"] if 'max_time' in config else -1
         
         self._num_microbatches = config["num_microbatches"]
 
@@ -54,7 +54,7 @@ class SchedulingPainter:
 
         # Convert data offset to pixels
         data = {key: val * self._pixel_base for key, val in data.items()}
-        
+
         max_key = max(data, key=data.get)
         _, max_key_pid, _ = parse_microbatch_key(max_key)
 
@@ -66,6 +66,12 @@ class SchedulingPainter:
         # 0. Create label canvas
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
         y_label = (0 + 30) // 2 + 5
+
+        if self._max_time == -1:
+            if SPLIT_BACKPROP:
+                self._max_time = (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base
+            else:
+                self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
 
         label_canvas.create_text(self._pp_align + 160, y_label, text="MinExeTime:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
                 # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 

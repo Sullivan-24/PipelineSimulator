@@ -1,28 +1,4 @@
 from .mutils import *
-class WorkloadConstraint:
-
-    def __init__(self, 
-                 device_id: int,
-                 microbatch_id: int, 
-                 stage_id: int, 
-                 workload_type: WorkloadType,
-                ) -> None:
-        self.device_id = device_id
-        self.microbatch_id: int = microbatch_id  # 微批次编号
-        self.stage_id: int = stage_id              # 阶段编号
-        self.workload_type: WorkloadType = workload_type  # 工作负载类型
-
-    def __eq__(self, other):
-        if not isinstance(other, WorkloadConstraint):
-            return NotImplemented
-        return (
-            self.microbatch_id == other.microbatch_id 
-            and self.stage_id == other.stage_id
-            and self.workload_type == other.workload_type
-        )
-    
-    def __hash__(self):
-        return hash((self.microbatch_id, self.stage_id, self.workload_type))
     
 class Workload:
     # 定义状态常量

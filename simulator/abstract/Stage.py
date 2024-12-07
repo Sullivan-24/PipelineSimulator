@@ -31,18 +31,19 @@ class Stage:
                 workload_type=WorkloadType.INPUT_GRADIENT_WORKLOAD,
                 duration=IGW_TIME // CHUNK_NUM,    
             )
-            pgw = Workload(
-                device_id=self.device_id,
-                stage_id=self.stage_id,
-                microbatch_id=mid,
-                workload_type=WorkloadType.PARAMETER_GRADIENT_WORKLOAD,
-                duration=PGW_TIME // CHUNK_NUM,    
-            )
             self.workloads[mid]={
                 WorkloadType.FORWARD_PASS_WORKLOAD: fpw,
                 WorkloadType.INPUT_GRADIENT_WORKLOAD: igw,
-                WorkloadType.PARAMETER_GRADIENT_WORKLOAD: pgw
             }
+            if SPLIT_BACKPROP:
+                pgw = Workload(
+                    device_id=self.device_id,
+                    stage_id=self.stage_id,
+                    microbatch_id=mid,
+                    workload_type=WorkloadType.PARAMETER_GRADIENT_WORKLOAD,
+                    duration=PGW_TIME // CHUNK_NUM,    
+                )
+                self.workloads[mid][WorkloadType.PARAMETER_GRADIENT_WORKLOAD] = pgw
 
     def update_constraints(self, constraint: Workload):
         for mid in self.workloads:
@@ -60,6 +61,8 @@ class Stage:
         if workload.workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
             self.memory_usage += self.activation_memory_increment
         elif workload.workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
+            self.memory_usage -= self.activation_memory_increment
+        elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
             self.memory_usage -= self.activation_memory_increment
 
     def execute_workload(self, mid=None, workload_type=None):

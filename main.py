@@ -5,6 +5,7 @@ from datetime import datetime
 from simulator.DSASimulator import DSASimulator
 from simulator.GSimulator import GSimulator
 from simulator.SPSimulator import SPSimulator
+from simulator.abstract import Pipeline
 from simulator.abstract.mutils import *
 
 def main():
@@ -19,9 +20,12 @@ def main():
         "forward_execution_time": [FPW_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "backward_execution_i_time": [IGW_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "backward_execution_g_time": [PGW_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
+        "mix_training": MIX_TRAINING,
+        "model_para_num": MODEL_PARA_NUM,
         "communication_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
         "sequential_order_constraint_strategy": "strict",
-        "max_activation_counts": [MAX_ACTIVATION_COUNTS * CHUNK_NUM for _ in range(STAGE_NUM)],
+        "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
         "file_path": None,
     }
 
@@ -55,6 +59,11 @@ def main():
         )
         simulator.run(base_solution=True, draw=True)
         simulator.show_solution_detail()
+    elif config['run_mode'] == RunMode.SIM_SOLVE:
+        simulator = Pipeline.PipelineScheduler()
+        # simulator.generate_1f1b_schedule()
+        simulator.run_pipeline_parallelism()
+        simulator.draw()
     else:
         print("Unknown run mode.")
 
