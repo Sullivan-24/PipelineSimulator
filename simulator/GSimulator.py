@@ -63,7 +63,8 @@ class GSimulator:
 
     def show_solution_detail(self):
         for key in self.model_result:
-            print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
+            if not (str(key).startswith("Do") or str(key).startswith("act") or str(key).startswith("binary")):
+                print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
             if str(key) == "max_start_offset":
                 print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
 
