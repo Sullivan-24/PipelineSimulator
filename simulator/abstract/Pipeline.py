@@ -78,6 +78,13 @@ class PipelineScheduler:
             print()
     
     def generate_zbh1_schedule(self):
+        def custom_round(number):
+            import math
+            if number - math.floor(number) >= 0.5:
+                return math.ceil(number)
+            else:
+                return math.floor(number)
+            
         workload_type_num = 3
         warmup_type_order = [WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.FORWARD_PASS_WORKLOAD]
         workload_type_order = [WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD, WorkloadType.FORWARD_PASS_WORKLOAD]
@@ -89,17 +96,28 @@ class PipelineScheduler:
                 self.schedule[did].append((WorkloadType.FORWARD_PASS_WORKLOAD, mids[0], did))
                 mids[0] += 1
             
+            # Inject as much as possible F with limited max activation counts
+            if MAX_ACTIVATION_COUNTS > DEVICE_NUM * CHUNK_NUM:
+                comm_delay = (DEVICE_NUM - did - 1) * 2 * COMM_TIME
+                compute_delay = (DEVICE_NUM - did - 1) * IGW_TIME
+                additional_f_num = min(MAX_ACTIVATION_COUNTS - mids[0] - did, custom_round((comm_delay + compute_delay) / FPW_TIME))
+                while additional_f_num:
+                    self.schedule[did].append((WorkloadType.FORWARD_PASS_WORKLOAD ,mids[0], did))
+                    mids[0] += 1
+                    additional_f_num -= 1
 
-            iter = 0
-            while iter < did * 2:
-                next_workload_type = warmup_type_order[iter % 2]
-                next_mid = mids[workload_idx_in_mids[next_workload_type]]
-                if next_mid < MICRO_BATCH_NUM:
-                    self.schedule[did].append((next_workload_type, next_mid, did))
-                    mids[workload_idx_in_mids[next_workload_type]] += 1
-                else:
-                    finish_flag[workload_idx_in_mids[next_workload_type]] = 1
-                iter+=1
+            # iter = 0
+            # while iter < did * 2:
+            #     if mids[0] == MICRO_BATCH_NUM:
+            #         break
+            #     next_workload_type = warmup_type_order[iter % 2]
+            #     next_mid = mids[workload_idx_in_mids[next_workload_type]]
+            #     if next_mid < MICRO_BATCH_NUM:
+            #         self.schedule[did].append((next_workload_type, next_mid, did))
+            #         mids[workload_idx_in_mids[next_workload_type]] += 1
+            #     else:
+            #         finish_flag[workload_idx_in_mids[next_workload_type]] = 1
+            #     iter+=1
 
             # steady + cooldown
             iter = 0
@@ -107,6 +125,10 @@ class PipelineScheduler:
             while sum(finish_flag) < workload_type_num:
                 next_workload_type = workload_type_order[iter % workload_type_num]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
+                if MAX_ACTIVATION_COUNTS > mids[0]:
+                    if next_workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
+                        iter += 1
+                        continue 
                 if next_mid < MICRO_BATCH_NUM:
                     self.schedule[did].append((next_workload_type, next_mid, did))
                     mids[workload_idx_in_mids[next_workload_type]] += 1
