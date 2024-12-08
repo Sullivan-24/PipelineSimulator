@@ -51,20 +51,20 @@ class PipelineScheduler:
             print("Selected Schedule is Not Supported")
 
     def generate_1f1b_schedule(self):
-        workload_type_num = 2
+        assert WORKLOAD_TYPE_NUM == 2
         workload_type_order = [WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.FORWARD_PASS_WORKLOAD]
         workload_idx_in_mids = {WorkloadType.FORWARD_PASS_WORKLOAD: 0, WorkloadType.INPUT_GRADIENT_WORKLOAD : 1}
         for did in range(DEVICE_NUM):
-            mids = [0 for _ in range(workload_type_num)]
+            mids = [0 for _ in range(WORKLOAD_TYPE_NUM)]
             # warmup
             while mids[0] < DEVICE_NUM - did:
                 self.schedule[did].append((WorkloadType.FORWARD_PASS_WORKLOAD, mids[0], did))
                 mids[0] += 1
             
             iter = 0
-            finish_flag = [0 for _ in range(workload_type_num)]
-            while sum(finish_flag) < workload_type_num:
-                next_workload_type = workload_type_order[iter % workload_type_num]
+            finish_flag = [0 for _ in range(WORKLOAD_TYPE_NUM)]
+            while sum(finish_flag) < WORKLOAD_TYPE_NUM:
+                next_workload_type = workload_type_order[iter % WORKLOAD_TYPE_NUM]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
                 if next_mid < MICRO_BATCH_NUM:
                     self.schedule[did].append((next_workload_type, next_mid, did))
@@ -77,6 +77,10 @@ class PipelineScheduler:
                 print(wt.value, mid, end=" ")
             print()
     
+    def generate_zbv_schedule(self):
+        
+        pass
+
     def generate_zbh1_schedule(self):
         def custom_round(number):
             import math
@@ -84,14 +88,12 @@ class PipelineScheduler:
                 return math.ceil(number)
             else:
                 return math.floor(number)
-            
-        workload_type_num = 3
-        warmup_type_order = [WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.FORWARD_PASS_WORKLOAD]
+        assert WORKLOAD_TYPE_NUM == 3
         workload_type_order = [WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD, WorkloadType.FORWARD_PASS_WORKLOAD]
         workload_idx_in_mids = {WorkloadType.FORWARD_PASS_WORKLOAD: 0, WorkloadType.INPUT_GRADIENT_WORKLOAD : 1, WorkloadType.PARAMETER_GRADIENT_WORKLOAD : 2}
         for did in range(DEVICE_NUM):
-            mids = [0 for _ in range(workload_type_num)]
-            # warmup
+            mids = [0 for _ in range(WORKLOAD_TYPE_NUM)]
+            # warmup, should not be simplified
             while mids[0] < DEVICE_NUM - did:
                 self.schedule[did].append((WorkloadType.FORWARD_PASS_WORKLOAD, mids[0], did))
                 mids[0] += 1
@@ -100,7 +102,7 @@ class PipelineScheduler:
             if MAX_ACTIVATION_COUNTS > DEVICE_NUM * CHUNK_NUM:
                 comm_delay = (DEVICE_NUM - did - 1) * 2 * COMM_TIME
                 compute_delay = (DEVICE_NUM - did - 1) * IGW_TIME
-                additional_f_num = min(MAX_ACTIVATION_COUNTS - mids[0] - did, custom_round((comm_delay + compute_delay) / FPW_TIME))
+                additional_f_num = min(MAX_ACTIVATION_COUNTS - mids[0] - did, (comm_delay + compute_delay) // FPW_TIME)
                 while additional_f_num:
                     self.schedule[did].append((WorkloadType.FORWARD_PASS_WORKLOAD ,mids[0], did))
                     mids[0] += 1
@@ -121,9 +123,9 @@ class PipelineScheduler:
 
             # steady + cooldown
             iter = 0
-            finish_flag = [0 for _ in range(workload_type_num)]
-            while sum(finish_flag) < workload_type_num:
-                next_workload_type = workload_type_order[iter % workload_type_num]
+            finish_flag = [0 for _ in range(WORKLOAD_TYPE_NUM)]
+            while sum(finish_flag) < WORKLOAD_TYPE_NUM:
+                next_workload_type = workload_type_order[iter % WORKLOAD_TYPE_NUM]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
                 if MAX_ACTIVATION_COUNTS > mids[0]:
                     if next_workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
