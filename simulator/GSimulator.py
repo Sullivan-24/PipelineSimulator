@@ -7,6 +7,7 @@ from .abstract import Pipeline
 class GSimulator:
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None, draw_baseline=False) -> None:
+        self._base_solution = config['base_solution']
         self._file_path = config["file_path"]
         self._time_limit = config["time_limit"]
         self._pp_size = config["pp_size"]
@@ -14,7 +15,7 @@ class GSimulator:
         self._model_size = config["model_size"]
         self._num_microbatches = config["num_microbatches"]
         self._max_activation_counts = config["max_activation_counts"]
-
+        
         self._mix_training = config["mix_training"]
         self._model_para_num = config["model_para_num"]
         self._device_mem = config["device_mem"]
@@ -54,10 +55,11 @@ class GSimulator:
             self._fix_stages(stage_type="ZBV")
 
         # baseline solution
-        self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
-        self.pipeline_scheduler.run_pipeline_parallelism()
-        if draw_baseline:
-            self.pipeline_scheduler.draw()
+        if self._base_solution:
+            self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
+            self.pipeline_scheduler.run_pipeline_parallelism()
+            if draw_baseline:
+                self.pipeline_scheduler.draw()
         self.model_result = None
 
     def show_device_stage_mapping(self):
@@ -242,12 +244,10 @@ class GSimulator:
         self._de_st_mb = _de_vars
 
     def _offload_reload_strategy_constraint(self):
-        #
         pass
 
-
     def _pipeline_activation_accumulation_constraint(self):
-        if MAX_ACTIVATION_COUNTS > MICRO_BATCH_NUM * CHUNK_NUM:
+        if MAX_ACTIVATION_COUNTS >= MICRO_BATCH_NUM * CHUNK_NUM:
             print("ACTIVATION LIMIT FREE")
             return
         #对每个Device上的所有W或B Microbatch进行检查：保证当前Device上的activation积累不超过上限 MAX_ACTIVATION_COUNTS * CHUNK_NUM
@@ -274,11 +274,11 @@ class GSimulator:
                             
                             self.model.addConstr((binary_w == 1) >> (self._de_st_mb[did][sid]['pw'][mid][o_mid + idx * self._num_microbatches] == 1))
                             self.model.addConstr((binary_w == 0) >> (self._de_st_mb[did][sid]['pw'][mid][o_mid + idx * self._num_microbatches] == 0))
-
                     self.model.addConstr(
-                        (quicksum(self._de_st_mb[did][sid]['pf'][mid]) - quicksum(self._de_st_mb[did][sid]['pw'][mid])) 
+                        # set recomputing rate to 0 when searching procedure is slow
+                        quicksum(self._de_st_mb[did][sid]['pf'][mid]) * (1 - self._recomputing_rate[sid]) - quicksum(self._de_st_mb[did][sid]['pw'][mid]) 
                         <= 
-                        self._max_activation_counts[sid]
+                        self._max_activation_counts[did]
                     )
 
     def _build_optimize_objectives(self) -> None:
