@@ -283,11 +283,11 @@ class PipelineScheduler:
                 else:
                     raise("UNKOWN OPERATION FLAG")
         
-        for did in range(DEVICE_NUM):
-            for (wt, mid, sid) in self.schedule[did]:
-                print((wt.value, mid, sid), end=" ")
-            print()
-            print()
+        # for did in range(DEVICE_NUM):
+        #     for (wt, mid, sid) in self.schedule[did]:
+        #         print((wt.value, mid, sid), end=" ")
+        #     print()
+        #     print()
 
     def show_record(self):
         for k in self.results:

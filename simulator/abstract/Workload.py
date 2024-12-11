@@ -40,7 +40,7 @@ class Workload:
                         microbatch_id= self.microbatch_id, 
                         workload_type = WorkloadType.INPUT_GRADIENT_WORKLOAD)
                 )
-            if self.stage_id == STAGE_NUM - 1:
+            else:
                 self.constraints.add(
                     WorkloadConstraint(
                         device_id = self.device_id,
@@ -85,7 +85,7 @@ class Workload:
         now_len = len(self.constraints)
 
         if origin_len != now_len:
-            print(self.device_id, self.stage_id, self.workload_type, self.microbatch_id)
+            # print(self.device_id, self.stage_id, self.workload_type, self.microbatch_id)
             self._generate_communication(constraint)
 
     def execute(self) -> bool:
@@ -114,12 +114,12 @@ class Workload:
     def complete(self) -> None:
         """完成任务并更新状态"""
         if self.state == Workload.IN_PROGRESS and self.end_time <= GET_TIME():
-            print("T={},\tS={},\tMB={}-{} is completed.".format(
-                GET_TIME(),
-                self.stage_id,
-                self.microbatch_id,
-                self.workload_type.value,
-            ))
+            # print("T={},\tS={},\tMB={}-{} is completed.".format(
+            #     GET_TIME(),
+            #     self.stage_id,
+            #     self.microbatch_id,
+            #     self.workload_type.value,
+            # ))
             self.state = Workload.COMPLETED
 
     def __repr__(self) -> str:
