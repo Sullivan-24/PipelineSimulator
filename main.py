@@ -55,7 +55,6 @@ def main():
         simulator.show_solution_detail()
     elif config['run_mode'] == RunMode.SIM_SOLVE:
         simulator = Pipeline.PipelineScheduler()
-        # simulator.generate_1f1b_schedule()
         simulator.run_pipeline_parallelism()
         simulator.draw()
     else:

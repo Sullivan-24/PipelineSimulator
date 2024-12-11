@@ -45,7 +45,7 @@ class Device:
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
                                 return proc_workload
-            elif SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1):
+            elif SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1, SchedulePriority.ZBV, SchedulePriority.INTERLEAVED):
                 if self.next_workload_idx == MICRO_BATCH_NUM * WORKLOAD_TYPE_NUM:
                     return None
                 (workload_type, workload_mid, workload_sid) = self.static_schedule[self.next_workload_idx]

@@ -41,6 +41,9 @@ class GSimulator:
         # 创建 Gurobi 模型
         self.model = Model("SPSimulator")
 
+        self.minimal_time_with_sync_update = (DEVICE_NUM - 1) * (FPW_TIME // CHUNK_NUM + COMM_TIME) + (FPW_TIME + IGW_TIME + PGW_TIME) * MICRO_BATCH_NUM
+        print("MINIMAL TIME WITH SYNC UPDATE:{}".format(self.minimal_time_with_sync_update))
+
         # 变量初始化
         self._recomputing_rate = []
         self._layers = []
@@ -52,7 +55,7 @@ class GSimulator:
             self._devices = device_stage_alignments
         else:
             self._devices = [[] for _ in range(self._device_size)]
-            self._fix_stages(stage_type="ZBV")
+            self._fix_stages(stage_type="I1F1B")
 
         # baseline solution
         if self._base_solution:
@@ -159,8 +162,9 @@ class GSimulator:
                     if SPLIT_BACKPROP:
                         self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_w_offsets[i][mb - 1] +
                                             self._backward_w_length[i])
-            else:
-                self.model.addConstr(self._forward_f_offsets[0][0] == 0)
+            # else:
+            #     self.model.addConstr(self._forward_f_offsets[0][0] == 0)
+        self.model.addConstr(self._forward_f_offsets[0][0] == 0)
 
     def _serial_computation_within_device_constraint(self):
         print_to_file(self._file_path, "Stage alignment:{}.\n".format(self._devices))
@@ -276,7 +280,8 @@ class GSimulator:
                             self.model.addConstr((binary_w == 0) >> (self._de_st_mb[did][sid]['pw'][mid][o_mid + idx * self._num_microbatches] == 0))
                     self.model.addConstr(
                         # set recomputing rate to 0 when searching procedure is slow
-                        quicksum(self._de_st_mb[did][sid]['pf'][mid]) * (1 - self._recomputing_rate[sid]) - quicksum(self._de_st_mb[did][sid]['pw'][mid]) 
+                        quicksum(self._de_st_mb[did][sid]['pf'][mid]) * (1 - 0) - quicksum(self._de_st_mb[did][sid]['pw'][mid]) 
+                        # quicksum(self._de_st_mb[did][sid]['pf'][mid]) * (1 - self._recomputing_rate[sid]) - quicksum(self._de_st_mb[did][sid]['pw'][mid]) 
                         <= 
                         self._max_activation_counts[did]
                     )
