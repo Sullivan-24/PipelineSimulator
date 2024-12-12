@@ -288,7 +288,7 @@ class PipelineScheduler:
         #         print((wt.value, mid, sid), end=" ")
         #     print()
         #     print()
-
+    
     def show_record(self):
         for k in self.results:
             print(k, self.results[k])
@@ -318,7 +318,7 @@ class PipelineScheduler:
             processing_workload = device.execute_workload()
             self.record_workload(processing_workload)
             
-    def run_pipeline_parallelism(self, time_limit = 1000):
+    def run_pipeline_parallelism(self, time_limit = 10000):
         while GET_TIME() <= time_limit:
             self.check_workload_status()
             self.execute_workload()

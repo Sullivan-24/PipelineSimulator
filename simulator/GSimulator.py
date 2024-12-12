@@ -67,9 +67,12 @@ class GSimulator:
             print_to_file(self._file_path, "Device {}: {}.\n".format(did, ds))
 
     def show_solution_detail(self):
+        prefixes = ('f_', 'b_', 'w_')
         for key in self.model_result:
-            if not (str(key).startswith("Do") or str(key).startswith("act") or str(key).startswith("binary")):
+            if str(key).startswith(prefixes):
                 print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
+            # if not (str(key).startswith("Do") or str(key).startswith("act") or str(key).startswith("binary")):
+            #     print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
             if str(key) == "max_start_offset":
                 print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
 

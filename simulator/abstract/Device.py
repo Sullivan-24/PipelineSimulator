@@ -15,7 +15,8 @@ class Device:
         self.mem_usage_record: dict[int, int] = {}
         self.static_schedule: list[str] = static_schedule
         self.next_workload_idx: int = 0
-    
+        self.workload_type_priority_order = [WorkloadType.FORWARD_PASS_WORKLOAD, WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD]
+
     def show_stages(self):
         for sid in self.stages:
             print("Stage {} on Device {}".format(sid, self.device_id))
@@ -36,7 +37,9 @@ class Device:
     def execute_workload(self) -> None:
         if self.state == Device.IDLE:
             if SCHEDULE_METHOD == SchedulePriority.GREEDY:
-                for workload_type in WorkloadType:
+                for workload_type in self.workload_type_priority_order:
+                    if self.current_mem_usage == MAX_ACTIVATION_COUNTS and workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+                        workload_type = WorkloadType.PARAMETER_GRADIENT_WORKLOAD
                     for mid in range(MICRO_BATCH_NUM):
                         for sid in self.stages:
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
