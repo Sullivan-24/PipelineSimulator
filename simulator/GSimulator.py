@@ -6,8 +6,9 @@ from .utils import resort_microbatch_index, print_to_file
 from .abstract import Pipeline
 class GSimulator:
 
-    def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None, draw_baseline=False) -> None:
+    def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
         self._base_solution = config['base_solution']
+        self._schedule_method = config['schedule_method']
         self._file_path = config["file_path"]
         self._time_limit = config["time_limit"]
         self._pp_size = config["pp_size"]
@@ -29,9 +30,6 @@ class GSimulator:
         self._forward_f_length  = []
         self._backward_b_length = []
         self._backward_w_length = []
-        # self._forward_f_length            = self._basic_forward_f_length
-        # self._backward_b_length         = self._basic_backward_b_length
-        # self._backward_w_length         = self._basic_backward_w_length
         
         # 检查输入参数
         assert isinstance(self._basic_forward_f_length, (list, tuple))
@@ -55,14 +53,13 @@ class GSimulator:
             self._devices = device_stage_alignments
         else:
             self._devices = [[] for _ in range(self._device_size)]
-            self._fix_stages(stage_type="I1F1B")
+            self._fix_stages()
 
         # baseline solution
         if self._base_solution:
             self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
             self.pipeline_scheduler.run_pipeline_parallelism()
-            if draw_baseline:
-                self.pipeline_scheduler.draw()
+            self.pipeline_scheduler.draw()
         self.model_result = None
 
     def show_device_stage_mapping(self):
@@ -76,16 +73,18 @@ class GSimulator:
             if str(key) == "max_start_offset":
                 print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
 
-    def _fix_stages(self, stage_type="ZBV"):
-        if stage_type == "ZBV":
+    def _fix_stages(self):
+        if self._schedule_method in (SchedulePriority.ZBV, SchedulePriority.GREEDY):
             for pid in range(self._pp_size):
                 if (pid // self._device_size) % 2 == 0:
                     self._devices[pid % self._device_size].append(pid)
                 else:
                     self._devices[self._device_size - 1 - pid % self._device_size].append(pid)
-        elif stage_type == "I1F1B":
+        elif self._schedule_method in (SchedulePriority.ZBH1, SchedulePriority.ONE_F_ONE_B, SchedulePriority.INTERLEAVED):
             for pid in range(self._pp_size):
                 self._devices[pid % self._device_size].append(pid)
+        else:
+            assert("Stage alignment is not set.")
 
     def _reset_comm_length(self, dsa):
         new_comm_length = [[COMM_TIME if i != j else 0 for j in range(self._pp_size)] for i in range(self._pp_size)]
@@ -302,7 +301,7 @@ class GSimulator:
             if var.VarName in self.pipeline_scheduler.results.keys():
                 var.Start = self.pipeline_scheduler.results[var.VarName]
 
-    def run(self, base_solution=False, draw=False) -> None:
+    def run(self, draw=False) -> None:
         """run simulation"""
         self._build_constraints()        
         self._build_optimize_objectives()
@@ -310,7 +309,7 @@ class GSimulator:
         self.model.setParam('TimeLimit', self._time_limit)
         # self.model.setParam('MIPGap', 0.00)
 
-        if base_solution:
+        if self._base_solution:
             self.set_baseline_solution()
 
         start_time = time.time()

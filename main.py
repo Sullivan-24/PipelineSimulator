@@ -27,7 +27,8 @@ def main():
         "sequential_order_constraint_strategy": "strict",
         "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
         "file_path": None,
-        "base_solution" : False,
+        "base_solution" : BASE_SOLUTION,
+        "schedule_method": SCHEDULE_METHOD,
     }
 
     if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
@@ -46,7 +47,7 @@ def main():
             #     [4, 5],
             #     ]
         )
-        simulator.run(base_solution=False, draw=True)
+        simulator.run(draw=True)
         simulator.show_solution_detail()
     elif config["run_mode"] == RunMode.Z3_SOLVE:
         simulator = SPSimulator(config,
