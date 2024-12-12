@@ -175,51 +175,58 @@ class PipelineScheduler:
             while (mids[0] < MICRO_BATCH_NUM or mids[0 + WORKLOAD_TYPE_NUM] < MICRO_BATCH_NUM) and mids[0] + mids[0 + WORKLOAD_TYPE_NUM] < warmup_f_num_in_first_device:
                 if last_sid == sid_1:
                     next_mid = mids[0 + WORKLOAD_TYPE_NUM]
-                    if next_mid < did + 1:
+                    if next_mid < MICRO_BATCH_NUM and next_mid < did + 1:
                         self.schedule[did].append((WorkloadType.FORWARD_PASS_WORKLOAD, next_mid, sid_2))
                         mids[0 + WORKLOAD_TYPE_NUM] += 1
                     last_sid = sid_2
                 elif last_sid == sid_2:
                     next_mid = mids[0]
-                    if next_mid < warmup_f_num_in_first_device - did - 1:
+                    if next_mid < MICRO_BATCH_NUM and next_mid < warmup_f_num_in_first_device - did - 1:
                         self.schedule[did].append((WorkloadType.FORWARD_PASS_WORKLOAD, next_mid, sid_1))
                         mids[0] += 1
                     last_sid = sid_1
-            
+
             previous_sid2_f_num = mids[0 + WORKLOAD_TYPE_NUM]
             iter = 0
-            # while mids[0 + WORKLOAD_TYPE_NUM] < DEVICE_NUM:
+            now_sid = sid_2
             while mids[0 + WORKLOAD_TYPE_NUM] < previous_sid2_f_num + DEVICE_NUM - did:
                 next_workload_type = workload_type_order[iter % WORKLOAD_TYPE_NUM]
                 next_mid = mids[workload_idx_in_mids[next_workload_type] + WORKLOAD_TYPE_NUM]
+                
                 if mids[0] + mids[0 + WORKLOAD_TYPE_NUM] < MAX_ACTIVATION_COUNTS :
                     if next_workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
                         iter += 1
-                        continue 
+                        continue
                 if next_mid < MICRO_BATCH_NUM:
-                    self.schedule[did].append((next_workload_type, next_mid, sid_2))
+                    # Special situation
+                    if mids[0 + WORKLOAD_TYPE_NUM] == previous_sid2_f_num + DEVICE_NUM - did - 1 and next_workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+                        break
+                    self.schedule[did].append((next_workload_type, next_mid, now_sid))
                     mids[workload_idx_in_mids[next_workload_type] + WORKLOAD_TYPE_NUM] += 1
                 iter+=1
 
             # steady + cooldown
-            continue
-            iter = 0
+            iter = 2
+            last_sid = sid_2
             finish_flag = [0 for _ in range(WORKLOAD_TYPE_NUM * CHUNK_NUM)]
             while sum(finish_flag) < WORKLOAD_TYPE_NUM * CHUNK_NUM:
+            # while finish_flag[0] + finish_flag[WORKLOAD_TYPE_NUM] < 2:
                 next_workload_type = workload_type_order[iter % WORKLOAD_TYPE_NUM]
                 next_sid = sid_1 if last_sid == sid_2 else sid_2
                 mids_sid_offset = 0 if next_sid == sid_1 else WORKLOAD_TYPE_NUM
                 next_mid = mids[workload_idx_in_mids[next_workload_type] + mids_sid_offset]
+                if next_workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
+                    last_sid = next_sid
+                
                 if mids[0] + mids[0 + WORKLOAD_TYPE_NUM] < MAX_ACTIVATION_COUNTS :
                     if next_workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
                         iter += 1
                         continue 
                 if next_mid < MICRO_BATCH_NUM:
-                    self.schedule[did].append((next_workload_type, next_mid, did))
+                    self.schedule[did].append((next_workload_type, next_mid, next_sid))
                     mids[workload_idx_in_mids[next_workload_type] + mids_sid_offset] += 1
-                    last_sid = next_sid
-                else:
-                    finish_flag[workload_idx_in_mids[next_workload_type] + mids_sid_offset] = 1
+                    if next_mid == MICRO_BATCH_NUM - 1:
+                        finish_flag[workload_idx_in_mids[next_workload_type] + mids_sid_offset] = 1
                 iter+=1
 
         for did in range(DEVICE_NUM):
