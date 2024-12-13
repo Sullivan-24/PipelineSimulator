@@ -101,7 +101,7 @@ class GSimulator:
     def _build_constraints(self) -> None:
         for i in range(self._pp_size):
             
-            layer_var = self.model.addVar(vtype=GRB.INTEGER, name=f"l_{i}", lb=1, ub=self._model_size)
+            layer_var = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"l_{i}", lb=1, ub=self._model_size)
             self._layers.append(layer_var)
 
             recompute_var = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"r_{i}", lb=0, ub=1)
@@ -109,21 +109,21 @@ class GSimulator:
 
             for mb in range(self._num_microbatches):
                 
-                f_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mb}_{i}", lb=0)
+                f_offset = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"f_{mb}_{i}", lb=0)
                 self._forward_f_offsets[i].append(f_offset)
 
-                b_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mb}_{i}", lb=0)
+                b_offset = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"b_{mb}_{i}", lb=0)
                 self._backward_b_offsets[i].append(b_offset)
 
                 if SPLIT_BACKPROP:
-                    w_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mb}_{i}", lb=0)
+                    w_offset = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"w_{mb}_{i}", lb=0)
                     self._backward_w_offsets[i].append(w_offset)
             # Set length per stage
-            self._forward_f_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"l_f_{i}"))
+            self._forward_f_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"l_f_{i}"))
             self.model.addConstr(self._forward_f_length[i] == self._layers[i] * self._basic_forward_f_length[i])
-            self._backward_b_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"l_b_{i}"))
+            self._backward_b_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"l_b_{i}"))
             self.model.addConstr(self._backward_b_length[i] == (self._layers[i] * self._basic_backward_b_length[i] + self._recomputing_rate[i] * self._forward_f_length[i]))
-            self._backward_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"l_w_{i}"))
+            self._backward_w_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"l_w_{i}"))
             self.model.addConstr(self._backward_w_length[i] == (self._layers[i] * self._basic_backward_w_length[i] + self._recomputing_rate[i] * self._forward_f_length[i]))
 
 
@@ -222,7 +222,7 @@ class GSimulator:
                     # )
                     y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{did}_{i}_{j}")
                     # when time increses, M also increases to ensure right answer
-                    M = 1e4
+                    M = 1e5
                     self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M) 
                     self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M)
                     
@@ -289,7 +289,7 @@ class GSimulator:
                     )
 
     def _build_optimize_objectives(self) -> None:
-        max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
+        max_var = self.model.addVar(vtype=GRB.CONTINUOUS, name="max_start_offset")
         for pp in range(self._pp_size):
             if SPLIT_BACKPROP:
                 self.model.addConstr(max_var >= self._backward_w_offsets[pp][-1] + self._backward_w_length[pp])
