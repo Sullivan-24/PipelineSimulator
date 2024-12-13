@@ -61,7 +61,6 @@ class Device:
                     self.state = Device.BUSY
                     self.next_workload_idx += 1
                     return proc_workload
-
             else:
                 print("Schedule Not Supported")
         return None

@@ -59,7 +59,7 @@ class GSimulator:
         if self._base_solution:
             self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
             self.pipeline_scheduler.run_pipeline_parallelism()
-            self.pipeline_scheduler.draw()
+            # self.pipeline_scheduler.draw()
         self.model_result = None
 
     def show_device_stage_mapping(self):

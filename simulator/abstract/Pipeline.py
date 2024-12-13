@@ -84,10 +84,10 @@ class PipelineScheduler:
                 else:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                 iter+=1
-        for did in range(DEVICE_NUM):
-            for (wt, mid, sid) in self.schedule[did]:
-                print(wt.value, mid, end=" ")
-            print()
+        # for did in range(DEVICE_NUM):
+        #     for (wt, mid, sid) in self.schedule[did]:
+        #         print(wt.value, mid, end=" ")
+        #     print()
 
     def generate_zbh1_schedule(self):
         assert WORKLOAD_TYPE_NUM == 3
@@ -141,10 +141,10 @@ class PipelineScheduler:
                 iter+=1
                 print(finish_flag)
 
-        for did in range(DEVICE_NUM):
-            for (wt, mid, sid) in self.schedule[did]:
-                print(wt.value, mid, end=" ")
-            print()
+        # for did in range(DEVICE_NUM):
+        #     for (wt, mid, sid) in self.schedule[did]:
+        #         print(wt.value, mid, end=" ")
+        #     print()
 
     def generate_zbv_schedule(self):
         assert WORKLOAD_TYPE_NUM == 3
@@ -229,23 +229,23 @@ class PipelineScheduler:
                         finish_flag[workload_idx_in_mids[next_workload_type] + mids_sid_offset] = 1
                 iter+=1
 
-        for did in range(DEVICE_NUM):
-            for (wt, mid, sid) in self.schedule[did]:
-                print((wt.value, mid, sid), end=" ")
-            print()
-            print()
+        # for did in range(DEVICE_NUM):
+        #     for (wt, mid, sid) in self.schedule[did]:
+        #         print((wt.value, mid, sid), end=" ")
+        #     print()
+        #     print()
 
     def generate_interleaved_1f1b_schedule(self):
-        assert WORKLOAD_TYPE_NUM == 2
+        workload_type_num = 2
         for did in range(DEVICE_NUM):
             sids = list(self.dsa[did])
             
-            mids = [0 for _ in range(WORKLOAD_TYPE_NUM * CHUNK_NUM)]
+            mids = [0 for _ in range(workload_type_num * CHUNK_NUM)]
             f_mid_count = 0
             
             f_next_sid_idx = 0
             f_next_sid = sids[f_next_sid_idx]
-            idx_in_f_mids = f_next_sid_idx * WORKLOAD_TYPE_NUM
+            idx_in_f_mids = f_next_sid_idx * workload_type_num
         
             # warmup, inject as much microbatches as possible
             warmup_f_num = (CHUNK_NUM - 1) * DEVICE_NUM + (DEVICE_NUM - did - 1) * 2
@@ -256,17 +256,17 @@ class PipelineScheduler:
                 if f_mid_count % DEVICE_NUM == 0:
                     f_next_sid_idx = (f_next_sid_idx + 1) % len(sids)
                     f_next_sid = sids[f_next_sid_idx]
-                    idx_in_f_mids = f_next_sid_idx * WORKLOAD_TYPE_NUM
+                    idx_in_f_mids = f_next_sid_idx * workload_type_num
 
             b_mid_count = 0
             bsids = list(reversed(sids))
             b_next_sid_idx = 0
             b_next_sid = bsids[b_next_sid_idx]
-            idx_in_b_mids = 1 + b_next_sid_idx * WORKLOAD_TYPE_NUM
+            idx_in_b_mids = 1 + b_next_sid_idx * workload_type_num
 
             # Start 1f1b with F operation
             operation_flag = 'f'
-            while b_mid_count + f_mid_count < MICRO_BATCH_NUM * CHUNK_NUM * WORKLOAD_TYPE_NUM:
+            while b_mid_count + f_mid_count < MICRO_BATCH_NUM * CHUNK_NUM * workload_type_num:
                 if operation_flag == 'f':
                     if mids[idx_in_f_mids] < MICRO_BATCH_NUM:
                         self.schedule[did].append((WorkloadType.FORWARD_PASS_WORKLOAD ,mids[idx_in_f_mids], f_next_sid))
@@ -275,17 +275,19 @@ class PipelineScheduler:
                         if f_mid_count % DEVICE_NUM == 0:
                             f_next_sid_idx = (f_next_sid_idx + 1) % len(sids)
                             f_next_sid = sids[f_next_sid_idx]
-                            idx_in_f_mids = f_next_sid_idx * WORKLOAD_TYPE_NUM
+                            idx_in_f_mids = f_next_sid_idx * workload_type_num
                     operation_flag = 'b'
                 elif operation_flag == 'b':
                     if mids[idx_in_b_mids] < MICRO_BATCH_NUM:
                         self.schedule[did].append((WorkloadType.INPUT_GRADIENT_WORKLOAD ,mids[idx_in_b_mids], b_next_sid))
+                        if WORKLOAD_TYPE_NUM == 3:
+                            self.schedule[did].append((WorkloadType.PARAMETER_GRADIENT_WORKLOAD ,mids[idx_in_b_mids], b_next_sid))
                         mids[idx_in_b_mids] += 1
                         b_mid_count += 1
                         if b_mid_count % DEVICE_NUM == 0:
                             b_next_sid_idx = (b_next_sid_idx + 1) % len(bsids)
                             b_next_sid = bsids[b_next_sid_idx]
-                            idx_in_b_mids = 1 + b_next_sid_idx * WORKLOAD_TYPE_NUM
+                            idx_in_b_mids = 1 + b_next_sid_idx * workload_type_num
                     operation_flag = 'f'
                 else:
                     raise("UNKOWN OPERATION FLAG")

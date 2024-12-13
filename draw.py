@@ -17,8 +17,6 @@ def plot_line_chart(x_data, y_data, labels, title='Comparison of Different Sched
     plt.legend()  # 显示图例
     plt.show()  # 显示图表
 
-# x_data = [1, 2, 3, 4, 5]  # X轴数据
-# y_data = [2, 3, 5, 7, 11]  # Y轴数据
 colors = [
     ["1F1B"],
     ["Interleaved-1F1B"],
