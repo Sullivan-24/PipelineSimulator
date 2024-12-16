@@ -6,12 +6,13 @@ class WorkloadType(Enum):
 
 
 class SchedulePriority(Enum):
-    GREEDY = 1
+    GREEDY_v1 = 1
     INTERLEAVED = 2
     ONE_F_ONE_B = 3
     ZBV = 4
     ZBH1 = 5
     BFW = 6
+    GREEDY_v2 = 7
 
 class StageSearchOrder(Enum):
     Random = "Random"

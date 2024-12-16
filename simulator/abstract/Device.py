@@ -16,6 +16,7 @@ class Device:
         self.static_schedule: list[str] = static_schedule
         self.next_workload_idx: int = 0
         self.workload_type_priority_order = [WorkloadType.FORWARD_PASS_WORKLOAD, WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD]
+        self.last_workload_type = None
 
     def show_stages(self):
         for sid in self.stages:
@@ -36,7 +37,7 @@ class Device:
     
     def execute_workload(self) -> None:
         if self.state == Device.IDLE:
-            if SCHEDULE_METHOD == SchedulePriority.GREEDY:
+            if SCHEDULE_METHOD == SchedulePriority.GREEDY_v1:
                 for workload_type in self.workload_type_priority_order:
                     if self.current_mem_usage == MAX_ACTIVATION_COUNTS and workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
                         workload_type = WorkloadType.PARAMETER_GRADIENT_WORKLOAD
@@ -44,6 +45,25 @@ class Device:
                         for sid in self.stages:
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
                             if proc_workload:
+                                self.proc_workload = proc_workload
+                                self.update_memory_usage()
+                                self.state = Device.BUSY
+                                return proc_workload
+            elif SCHEDULE_METHOD == SchedulePriority.GREEDY_v2:
+                now_workload_priority_order = [WorkloadType.FORWARD_PASS_WORKLOAD, WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD]
+                if self.last_workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
+                    now_workload_priority_order = [WorkloadType.FORWARD_PASS_WORKLOAD, WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD]
+                elif self.last_workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+                    now_workload_priority_order = [WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.FORWARD_PASS_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD]
+                
+                for workload_type in now_workload_priority_order:
+                    if self.current_mem_usage == MAX_ACTIVATION_COUNTS and workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+                        workload_type = WorkloadType.PARAMETER_GRADIENT_WORKLOAD
+                    for mid in range(MICRO_BATCH_NUM):
+                        for sid in self.stages:
+                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            if proc_workload:
+                                self.last_workload_type = workload_type
                                 self.proc_workload = proc_workload
                                 self.update_memory_usage()
                                 self.state = Device.BUSY

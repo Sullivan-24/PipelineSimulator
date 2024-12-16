@@ -77,7 +77,7 @@ class GSimulator:
                 print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
 
     def _fix_stages(self):
-        if self._schedule_method in (SchedulePriority.ZBV, SchedulePriority.GREEDY):
+        if self._schedule_method in (SchedulePriority.ZBV, SchedulePriority.GREEDY_v1):
             for pid in range(self._pp_size):
                 if (pid // self._device_size) % 2 == 0:
                     self._devices[pid % self._device_size].append(pid)
@@ -354,7 +354,7 @@ class GSimulator:
             "pp_size": self._pp_size,
             "pp_height": 50,
             "pp_align": 10,
-            "pixel_base": 2,
+            "pixel_base": PIXEL_BASE,
             "num_microbatches": self._num_microbatches,
             "forward_length": self._forward_f_length,
             "backward_length": self._backward_b_length,

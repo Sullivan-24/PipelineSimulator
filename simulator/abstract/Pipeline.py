@@ -29,7 +29,7 @@ class PipelineScheduler:
                 for pid in self.dsa[did]:
                     self.devices[did].add_stage(pid)
         else:
-            if SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1, SchedulePriority.ZBV, SchedulePriority.GREEDY):
+            if SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1, SchedulePriority.ZBV, SchedulePriority.GREEDY_v1, SchedulePriority.GREEDY_v2):
                 for pid in range(STAGE_NUM):
                     if (pid // DEVICE_NUM) % 2 == 0:
                         self.devices[pid % DEVICE_NUM].add_stage(pid)
@@ -347,7 +347,7 @@ class PipelineScheduler:
             "pp_size": STAGE_NUM,
             "pp_height": 50,
             "pp_align": 10,
-            "pixel_base": 2,
+            "pixel_base": PIXEL_BASE,
             "num_microbatches": MICRO_BATCH_NUM,
             "forward_length": [FPW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
             "backward_length": [IGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
