@@ -1,4 +1,8 @@
 from enum import Enum
+class RecomputeType(Enum):
+    FULL = 1
+    SELECTIVE = 2
+
 class WorkloadType(Enum):
     FORWARD_PASS_WORKLOAD = "F"
     INPUT_GRADIENT_WORKLOAD = "B"
