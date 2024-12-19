@@ -26,7 +26,8 @@ def main():
         "communication_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
         "sequential_order_constraint_strategy": "strict",
         "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
-        "file_path": None,
+        "file_path": filename,
+        # "file_path": None,
         "base_solution" : BASE_SOLUTION,
         "schedule_method": SCHEDULE_METHOD,
     }
