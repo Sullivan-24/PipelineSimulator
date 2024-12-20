@@ -13,7 +13,7 @@ class GSimulator:
         self._time_limit = config["time_limit"]
         self._pp_size = config["pp_size"]
         self._device_size = config["device_size"]
-        self._model_size = config["model_size"]
+        self._model_layer_num = config["model_size"]
         self._num_microbatches = config["num_microbatches"]
         self._max_activation_counts = config["max_activation_counts"]
         
@@ -21,20 +21,15 @@ class GSimulator:
         self._model_para_num = config["model_para_num"]
         self._device_mem = config["device_mem"]
         # obtained by profiling
-        self._basic_forward_f_length = config["forward_execution_time"]
-        self._basic_backward_b_length = config["backward_execution_i_time"]
-        self._basic_backward_w_length = config["backward_execution_g_time"]
+        self._profiled_layer_f_length = config["forward_execution_time"]
+        self._profiled_layer_b_length = config["backward_execution_i_time"]
+        self._profiled_layer_w_length = config["backward_execution_g_time"]
         self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
-
-
-        self._forward_f_length  = []
-        self._backward_b_length = []
-        self._backward_w_length = []
         
         # 检查输入参数
-        assert isinstance(self._basic_forward_f_length, (list, tuple))
-        assert isinstance(self._basic_backward_b_length, (list, tuple))
-        assert isinstance(self._basic_backward_w_length, (list, tuple))
+        assert isinstance(self._profiled_layer_f_length, (list, tuple))
+        assert isinstance(self._profiled_layer_b_length, (list, tuple))
+        assert isinstance(self._profiled_layer_w_length, (list, tuple))
 
         # 创建 Gurobi 模型
         self.model = Model("SPSimulator")
@@ -43,11 +38,20 @@ class GSimulator:
         print("MINIMAL TIME WITH SYNC UPDATE:{}".format(self.minimal_time_with_sync_update))
 
         # 变量初始化
-        self._recomputing_rate = []
+        self._stage_f_length  = []
+        self._stage_b_length = []
+        self._stage_w_length = []
+
+        self._layer_f_length  = []
+        self._layer_b_length = []
+        self._layer_w_length = []
+
+        self._layer_recomp_rate = []
         self._layers = []
-        self._forward_f_offsets = [[] for _ in range(self._pp_size)]
-        self._backward_b_offsets = [[] for _ in range(self._pp_size)]
-        self._backward_w_offsets = [[] for _ in range(self._pp_size)]
+
+        self._stage_f_offsets = [[] for _ in range(self._pp_size)]
+        self._stage_b_offsets = [[] for _ in range(self._pp_size)]
+        self._stage_w_offsets = [[] for _ in range(self._pp_size)]
 
         if device_stage_alignments:
             self._devices = device_stage_alignments
@@ -98,39 +102,48 @@ class GSimulator:
                     new_comm_length[d[j]][d[i]] = 0
         return new_comm_length
     
-    def _build_constraints(self) -> None:
-        for i in range(self._pp_size):
-            
-            layer_var = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"l_{i}", lb=1, ub=self._model_size)
+    def _generate_unsolved_parameters(self):
+        for i in range(self._model_layer_num):
+            layer_var = self.model.addVar(vtype=GRB.INTEGER, name=f"l_{i}", lb=1, ub=self._model_layer_num)
             self._layers.append(layer_var)
 
-            recompute_var = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"r_{i}", lb=0, ub=1)
-            self._recomputing_rate.append(recompute_var)
+            recompute_var = self.model.addVar(vtype=GRB.BINARY, name=f"theta_{i}")
+            self._layer_recomp_rate.append(recompute_var)
+        pass
+
+    def _build_constraints(self) -> None:
+        for i in range(self._pp_size):
+
+            layer_var = self.model.addVar(vtype=GRB.INTEGER, name=f"l_{i}", lb=1, ub=self._model_layer_num)
+            self._layers.append(layer_var)
+
+            recompute_var = self.model.addVar(vtype=GRB.BINARY, name=f"theta_{i}")
+            self._layer_recomp_rate.append(recompute_var)
 
             for mb in range(self._num_microbatches):
                 
                 f_offset = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"f_{mb}_{i}", lb=0)
-                self._forward_f_offsets[i].append(f_offset)
+                self._stage_f_offsets[i].append(f_offset)
 
                 b_offset = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"b_{mb}_{i}", lb=0)
-                self._backward_b_offsets[i].append(b_offset)
+                self._stage_b_offsets[i].append(b_offset)
 
                 if SPLIT_BACKPROP:
                     w_offset = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"w_{mb}_{i}", lb=0)
-                    self._backward_w_offsets[i].append(w_offset)
+                    self._stage_w_offsets[i].append(w_offset)
             # Set length per stage
-            self._forward_f_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"l_f_{i}"))
-            self.model.addConstr(self._forward_f_length[i] == self._layers[i] * self._basic_forward_f_length[i])
-            self._backward_b_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"l_b_{i}"))
-            self.model.addConstr(self._backward_b_length[i] == (self._layers[i] * self._basic_backward_b_length[i] + self._recomputing_rate[i] * self._forward_f_length[i]))
-            self._backward_w_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"l_w_{i}"))
-            self.model.addConstr(self._backward_w_length[i] == (self._layers[i] * self._basic_backward_w_length[i] + self._recomputing_rate[i] * self._forward_f_length[i]))
+            self._stage_f_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{i}_f"))
+            self.model.addConstr(self._stage_f_length[i] == self._layers[i] * self._profiled_layer_f_length[i])
+            self._stage_b_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{i}_b"))
+            self.model.addConstr(self._stage_b_length[i] == (self._layers[i] * self._profiled_layer_b_length[i] + self._layer_recomp_rate[i] * self._stage_f_length[i]))
+            self._stage_w_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{i}_w"))
+            self.model.addConstr(self._stage_w_length[i] == (self._layers[i] * self._profiled_layer_w_length[i] + self._layer_recomp_rate[i] * self._stage_f_length[i]))
 
 
         self._get_device_stage_microbatch_alignment()
 
         # 添加约束
-        self.model.addConstr(quicksum(self._layers) == self._model_size)
+        self.model.addConstr(quicksum(self._layers) == self._model_layer_num)
         self._comm_length = self._reset_comm_length(self._devices)
 
         self._real_pipeline_modeling_constraint_strict()
@@ -140,33 +153,33 @@ class GSimulator:
     def _real_pipeline_modeling_constraint_strict(self):
         for mb in range(self._num_microbatches):
             for i in range(1, self._pp_size):
-                self.model.addConstr(self._forward_f_offsets[i][mb] >= self._forward_f_offsets[i - 1][mb] +
-                                     self._forward_f_length[i - 1] + self._comm_length[i - 1][i])
+                self.model.addConstr(self._stage_f_offsets[i][mb] >= self._stage_f_offsets[i - 1][mb] +
+                                     self._stage_f_length[i - 1] + self._comm_length[i - 1][i])
 
             for i in range(self._pp_size - 1, 0, -1):
-                self.model.addConstr(self._backward_b_offsets[i - 1][mb] >= self._backward_b_offsets[i][mb] +
-                                     self._backward_b_length[i] + self._comm_length[i][i - 1])
+                self.model.addConstr(self._stage_b_offsets[i - 1][mb] >= self._stage_b_offsets[i][mb] +
+                                     self._stage_b_length[i] + self._comm_length[i][i - 1])
 
-            self.model.addConstr(self._backward_b_offsets[self._pp_size - 1][mb] >= self._forward_f_offsets[self._pp_size - 1][mb] +
-                                 self._forward_f_length[self._pp_size - 1])
+            self.model.addConstr(self._stage_b_offsets[self._pp_size - 1][mb] >= self._stage_f_offsets[self._pp_size - 1][mb] +
+                                 self._stage_f_length[self._pp_size - 1])
 
             if SPLIT_BACKPROP:
                 for i in range(self._pp_size):
-                    self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_b_offsets[i][mb] +
-                                        self._backward_b_length[i])
+                    self.model.addConstr(self._stage_w_offsets[i][mb] >= self._stage_b_offsets[i][mb] +
+                                        self._stage_b_length[i])
 
             if mb > 0:
                 for i in range(self._pp_size):
-                    self.model.addConstr(self._forward_f_offsets[i][mb] >= self._forward_f_offsets[i][mb - 1] +
-                                         self._forward_f_length[i])
-                    self.model.addConstr(self._backward_b_offsets[i][mb] >= self._backward_b_offsets[i][mb - 1] +
-                                         self._backward_b_length[i])
+                    self.model.addConstr(self._stage_f_offsets[i][mb] >= self._stage_f_offsets[i][mb - 1] +
+                                         self._stage_f_length[i])
+                    self.model.addConstr(self._stage_b_offsets[i][mb] >= self._stage_b_offsets[i][mb - 1] +
+                                         self._stage_b_length[i])
                     if SPLIT_BACKPROP:
-                        self.model.addConstr(self._backward_w_offsets[i][mb] >= self._backward_w_offsets[i][mb - 1] +
-                                            self._backward_w_length[i])
+                        self.model.addConstr(self._stage_w_offsets[i][mb] >= self._stage_w_offsets[i][mb - 1] +
+                                            self._stage_w_length[i])
             # else:
             #     self.model.addConstr(self._forward_f_offsets[0][0] == 0)
-        self.model.addConstr(self._forward_f_offsets[0][0] == 0)
+        self.model.addConstr(self._stage_f_offsets[0][0] == 0)
 
     def _serial_computation_within_device_constraint(self):
         print_to_file(self._file_path, "Stage alignment:{}.\n".format(self._devices))
@@ -177,20 +190,20 @@ class GSimulator:
             stages_within_device = self._devices[did]
             _pp_vars = []
             for pp in stages_within_device:
-                _pp_vars += self._forward_f_offsets[pp] + self._backward_b_offsets[pp]
+                _pp_vars += self._stage_f_offsets[pp] + self._stage_b_offsets[pp]
                 if SPLIT_BACKPROP:
-                    _pp_vars += self._backward_w_offsets[pp]
+                    _pp_vars += self._stage_w_offsets[pp]
             type_of_workload = 3 if SPLIT_BACKPROP else 2
             group_size = self._num_microbatches * type_of_workload
             for i, _ in enumerate(_pp_vars):
                 i_pp = stages_within_device[i // group_size]
                 _i_length = (
-                    self._forward_f_length[i_pp]
+                    self._stage_f_length[i_pp]
                     if (i % group_size) // self._num_microbatches == 0 
                     else(
-                        self._backward_b_length[i_pp] 
+                        self._stage_b_length[i_pp] 
                         if (i % group_size) // self._num_microbatches == 1 
-                        else self._backward_w_length[i_pp]
+                        else self._stage_w_length[i_pp]
                     )
                 )
                 for j in range(i + 1, len(_pp_vars)):
@@ -201,12 +214,12 @@ class GSimulator:
                             continue
                     j_pp = stages_within_device[j // group_size]
                     _j_length = (
-                        self._forward_f_length[j_pp]
+                        self._stage_f_length[j_pp]
                         if (j % group_size) // self._num_microbatches == 0
                         else(
-                            self._backward_b_length[j_pp] 
+                            self._stage_b_length[j_pp] 
                             if (j % group_size) // self._num_microbatches == 1 
-                            else self._backward_w_length[j_pp]
+                            else self._stage_w_length[j_pp]
                         )
                     )
                     # z3-solver way
@@ -236,10 +249,10 @@ class GSimulator:
             for sid in stages_within_device:
                 _mt_vars = {'f':[],'b':[],'w':[],'pf':[],'pb':[],'pw':[]}
                 for mid in range(self._num_microbatches):
-                    _mt_vars['f'].append(self._forward_f_offsets[sid][mid])
-                    _mt_vars['b'].append(self._backward_b_offsets[sid][mid])
+                    _mt_vars['f'].append(self._stage_f_offsets[sid][mid])
+                    _mt_vars['b'].append(self._stage_b_offsets[sid][mid])
                     if SPLIT_BACKPROP:
-                        _mt_vars['w'].append(self._backward_w_offsets[sid][mid])
+                        _mt_vars['w'].append(self._stage_w_offsets[sid][mid])
                     
                     _mt_vars['pf'].append([self.model.addVar(name=f'act_f_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
                     # _mt_vars['pb'].append([self.model.addVar(name=f'act_b_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
@@ -292,9 +305,9 @@ class GSimulator:
         max_var = self.model.addVar(vtype=GRB.CONTINUOUS, name="max_start_offset")
         for pp in range(self._pp_size):
             if SPLIT_BACKPROP:
-                self.model.addConstr(max_var >= self._backward_w_offsets[pp][-1] + self._backward_w_length[pp])
+                self.model.addConstr(max_var >= self._stage_w_offsets[pp][-1] + self._stage_w_length[pp])
             else:
-                self.model.addConstr(max_var >= self._backward_b_offsets[pp][-1] + self._backward_b_length[pp])
+                self.model.addConstr(max_var >= self._stage_b_offsets[pp][-1] + self._stage_b_length[pp])
 
         self.model.setObjective(max_var, GRB.MINIMIZE)
 
@@ -333,10 +346,10 @@ class GSimulator:
         print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"]))
         for i in range(self._pp_size):
             number_of_layers = self.model_result[self._layers[i].varName]
-            recompute_rate = float(self.model_result[self._recomputing_rate[i].varName])
-            self._forward_f_length[i] = self._basic_forward_f_length[i] * number_of_layers
-            self._backward_b_length[i] = (self._basic_backward_b_length[i] + self._basic_forward_f_length[i] * recompute_rate) * number_of_layers 
-            self._backward_w_length[i] = self._basic_backward_w_length[i] * number_of_layers
+            recompute_rate = float(self.model_result[self._layer_recomp_rate[i].varName])
+            self._stage_f_length[i] = self._profiled_layer_f_length[i] * number_of_layers
+            self._stage_b_length[i] = (self._profiled_layer_b_length[i] + self._profiled_layer_f_length[i] * recompute_rate) * number_of_layers 
+            self._stage_w_length[i] = self._profiled_layer_w_length[i] * number_of_layers
         if draw:
             # 4. draws the result.
             results = {str(key) : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}
@@ -356,9 +369,9 @@ class GSimulator:
             "pp_align": 10,
             "pixel_base": PIXEL_BASE,
             "num_microbatches": self._num_microbatches,
-            "forward_length": self._forward_f_length,
-            "backward_length": self._backward_b_length,
-            "backward_length2": self._backward_w_length,
+            "forward_length": self._stage_f_length,
+            "backward_length": self._stage_b_length,
+            "backward_length2": self._stage_w_length,
             "comm_length": self._comm_length,
             "file_path": self._file_path,
             "max_time": self.model_result['max_start_offset'],
