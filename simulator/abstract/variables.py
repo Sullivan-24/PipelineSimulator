@@ -27,6 +27,7 @@ class RunMode(Enum):
     Z3_SOLVE = "z3"
     GUROBI_SOLVE = "gurobi"
     SIM_SOLVE = "sim"
+    LAYERWISE_GUROBI_SOLVE = "layer"
 
 class WorkloadConstraint:
 

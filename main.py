@@ -3,6 +3,7 @@ import sys
 import time
 from datetime import datetime
 from simulator.DSASimulator import DSASimulator
+from simulator.LayerwiseSimulator import LayerwiseSimulator
 from simulator.GSimulator import GSimulator
 from simulator.SPSimulator import SPSimulator
 from simulator.abstract import Pipeline
@@ -26,11 +27,17 @@ def main():
         "communication_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
         "sequential_order_constraint_strategy": "strict",
         "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
-        "file_path": filename,
-        # "file_path": None,
+        # "file_path": filename,
+        "file_path": None,
         "base_solution" : BASE_SOLUTION,
         "schedule_method": SCHEDULE_METHOD,
     }
+
+    if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
+        config["forward_execution_time"] = [EMBEDDING_TIME] + config["forward_execution_time"] + [LAST_FFN_F_TIME, LOSS_F_TIME]
+        config["backward_execution_i_time"] = [0] + config["backward_execution_i_time"] + [LAST_FFN_B_TIME, LOSS_B_TIME]
+        config["backward_execution_g_time"] = [0] + config["backward_execution_g_time"] + [0, 0]
+        config["model_size"] = config["model_size"] + 3
 
     if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
         config["file_path"] = os.path.join("results", filename)
@@ -38,6 +45,18 @@ def main():
         simulator = DSASimulator(config)
         e_time = simulator.traverse_run()
         print(f"Traverse Run Total time: {e_time - s_time}")
+    elif config["run_mode"] == RunMode.LAYERWISE_GUROBI_SOLVE:
+        simulator = LayerwiseSimulator(config, 
+            # device_stage_alignments=[
+            #     [0, 9],
+            #     [1, 8],
+            #     [2, 7],
+            #     [3, 6],
+            #     [4, 5],
+            #     ]
+        )
+        simulator.run(draw=True)
+        simulator.show_solution_detail()
     elif config["run_mode"] == RunMode.GUROBI_SOLVE:
         simulator = GSimulator(config, 
             # device_stage_alignments=[
