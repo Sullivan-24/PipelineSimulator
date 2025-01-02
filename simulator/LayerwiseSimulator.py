@@ -1,6 +1,6 @@
 import time
 from gurobipy import Model, GRB, quicksum
-from .LayerwisePainter import SchedulingPainter
+from .LayerwisePainter import LayerwiseSchedulingPainter
 from .abstract.mutils import *
 from .utils import resort_microbatch_index, print_to_file
 from .abstract import Pipeline
@@ -25,9 +25,6 @@ class LayerwiseSimulator:
         self._profiled_layer_b_length = config["backward_execution_i_time"]
         self._profiled_layer_w_length = config["backward_execution_g_time"]
         
-        # self._profiled_additional_layer_f_length = [EMBEDDING_TIME  if lid == 0 else (LAST_FFN_F_TIME if lid == self._num_layer-1 else 0) for lid in range(self._num_layer)]
-        # self._profiled_additional_layer_b_length = [LAST_FFN_B_TIME if lid == self._num_layer-1 else 0 for lid in range(self._num_layer)]
-        # self._profiled_additional_layer_w_length = [0 for _ in range(self._num_layer)]
         
         self._profiled_additional_layer_f_length = [0 for _ in range(self._num_layer)]
         self._profiled_additional_layer_b_length = [0 for _ in range(self._num_layer)]
@@ -38,7 +35,6 @@ class LayerwiseSimulator:
         # self._profiled_additional_layer_f_length[self._num_layer-2] += LAST_FFN_F_TIME + LOSS_F_TIME 
         # self._profiled_additional_layer_b_length[self._num_layer-2] += LAST_FFN_B_TIME + LOSS_B_TIME
 
-        #TODO Embedding layer should not be binded with the first layer
         self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
         
         # 检查输入参数
@@ -55,7 +51,6 @@ class LayerwiseSimulator:
         self._layer_w_length = []
 
         self._layer_recomp_rate = []
-        self._layers = []
         self._device_layers_mapping = [[] for _ in range(self._num_device)]
 
         self._layer_f_offsets = [[] for _ in range(self._num_layer)]
@@ -74,6 +69,8 @@ class LayerwiseSimulator:
             self.pipeline_scheduler.run_pipeline_parallelism()
             # self.pipeline_scheduler.draw()
         self.model_result = None
+        additional_time = LAST_FFN_F_TIME + LAST_FFN_B_TIME + LAST_FFN_W_TIME
+        print("Theoretical minimal time:{}.".format(EMBEDDING_TIME + COMM_TIME + MICRO_BATCH_NUM * (len(self._devices[0]) - 1) * (FPW_TIME + IGW_TIME + PGW_TIME) + MICRO_BATCH_NUM * additional_time))
 
     def show_device_stage_mapping(self):
         for did, ds in enumerate(self._devices):
@@ -92,23 +89,22 @@ class LayerwiseSimulator:
     def _fix_stages(self):
         idx_offset = 1 if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE else 0
         lid_range = range(idx_offset, self._num_layer - 2) if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE else range(self._num_layer)
-        if self._schedule_method in (SchedulePriority.ZBV, SchedulePriority.GREEDY_v1, SchedulePriority.GREEDY_v2):
+        if self._schedule_method in (SchedulePriority.ZBH1, SchedulePriority.ONE_F_ONE_B, SchedulePriority.INTERLEAVED):
+            for lid in lid_range:
+                self._devices[(lid-1) % self._num_device].append(lid-idx_offset)
+        else:
             for lid in lid_range:
                 if ((lid-idx_offset) // self._num_device) % 2 == 0:
                     self._devices[(lid-idx_offset) % self._num_device].append(lid)
                 else:
                     self._devices[self._num_device - 1 - (lid-idx_offset) % self._num_device].append(lid)
-        elif self._schedule_method in (SchedulePriority.ZBH1, SchedulePriority.ONE_F_ONE_B, SchedulePriority.INTERLEAVED):
-            for lid in lid_range:
-                self._devices[(lid-1) % self._num_device].append(lid-idx_offset)
-        else:
-            assert("Stage alignment is not set.")
-
-        if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
-            # Reduce time waiting for embedding
-            self._devices[self._num_device - 1] = [0] + self._devices[self._num_device - 1]
-            self._devices[-2] = self._devices[-2] + [self._num_layer - 1]
-            self._devices[-3] = self._devices[-3] + [self._num_layer - 2]
+        
+        embedding_device_id = self._num_device - 1
+        head_device_id = 0
+        loss_device_id = 1
+        self._devices[embedding_device_id] = [0] + self._devices[embedding_device_id]
+        self._devices[head_device_id] = self._devices[head_device_id] + [self._num_layer - 2]
+        self._devices[loss_device_id] = self._devices[loss_device_id] + [self._num_layer - 1]
             
 
     def _reset_comm_length(self, dsa):
@@ -124,7 +120,7 @@ class LayerwiseSimulator:
         for lid in range(self._num_layer):
             self._layer_recomp_rate.append(self.model.addVar(vtype=GRB.BINARY, name=f"theta_{lid}"))
             #TODO
-            # self.model.addConstr(self._layer_recomp_rate[-1] == 0)
+            self.model.addConstr(self._layer_recomp_rate[-1] == 0)
             for mid in range(self._num_microbatches):
                 
                 self._layer_f_offsets[lid].append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"f_{mid}_{lid}", lb=0))
@@ -140,29 +136,89 @@ class LayerwiseSimulator:
             self.model.addConstr(self._layer_b_length[lid] == self._profiled_layer_b_length[lid] + self._layer_recomp_rate[lid] * self._layer_f_length[lid] + self._profiled_additional_layer_b_length[lid])
             self.model.addConstr(self._layer_w_length[lid] == self._profiled_layer_w_length[lid] + self._profiled_additional_layer_w_length[lid])
 
-    def _set_stage_layer_mapping_constraints(self):
-        # self.model.addConstr(
-        #     quicksum(
-        #         [quicksum(self._device_layers_mapping[did]) for did in range(self._num_device)]
-        #     )
-        #     == self._num_layer
-        # )
-        # # print(self._num_layer)
-        # for did in range(self._num_device):
-        #     for lid in range(self._num_layer):
-        #         if did == lid:
-        #             self.model.addConstr(
-        #                 self._device_layers_mapping[did][lid] == 1
-        #             )
-        #         else:
-        #             self.model.addConstr(
-        #                 self._device_layers_mapping[did][lid] == 0
-        #             )
-        pass
+    def _get_device_stage_microbatch_alignment(self):
+        _de_vars = {}
+        for did in range(self._num_device):
+            _pp_vars = {}
+            for lid in self._devices[did]:
+                if lid == 0:
+                    continue
+                _mt_vars = {'f':[],'b':[],'w':[],'pf':[],'pb':[],'pw':[]}
+                for mid in range(self._num_microbatches):
+                    _mt_vars['f'].append(self._layer_f_offsets[lid][mid])
+                    _mt_vars['b'].append(self._layer_b_offsets[lid][mid])
+                    if SPLIT_BACKPROP:
+                        _mt_vars['w'].append(self._layer_w_offsets[lid][mid])
+                    
+                    _mt_vars['pf'].append([self.model.addVar(name=f'act_f_{mid}_{lid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * len(self._devices[did]))])
+                    _mt_vars['pb'].append([self.model.addVar(name=f'act_b_{mid}_{lid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * len(self._devices[did]))])
+                    _mt_vars['pw'].append([self.model.addVar(name=f'act_w_{mid}_{lid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * len(self._devices[did]))])
+
+                _pp_vars[lid] = _mt_vars
+            _de_vars[did] = _pp_vars
+        self._de_st_mb = _de_vars
+
+    def _set_memory_constraints(self):
+        self._get_device_stage_microbatch_alignment()
+        # There is no need to search for other operation types, as the maximum overhead of GPU memory must start with either w or b.
+        workload_types = ('w') if SPLIT_BACKPROP else ('b') 
+        for mt in workload_types:
+            for did in self._de_st_mb:
+                for lid in self._de_st_mb[did]:
+                    for mid in range(self._num_microbatches):
+                        pivot = self._de_st_mb[did][lid][mt][mid]
+                        for o_mid in range(self._num_microbatches):
+                            for idx, o_lid in enumerate(self._de_st_mb[did]):
+                                if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
+                                    continue 
+                                binary_f = self.model.addVar(vtype=GRB.BINARY, name=f'binary_f_{lid}_{mid}_{o_lid}_{o_mid}')
+                                binary_b = self.model.addVar(vtype=GRB.BINARY, name=f'binary_b_{lid}_{mid}_{o_lid}_{o_mid}')
+                                binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'binary_w_{lid}_{mid}_{o_lid}_{o_mid}')
+
+                                eps = 0.001
+                                M = 10000
+                                self.model.addConstr(pivot >= self._de_st_mb[did][o_lid]['f'][o_mid] + eps - M * (1 - binary_f) )
+                                self.model.addConstr(pivot <= self._de_st_mb[did][o_lid]['f'][o_mid] + M * binary_f)
+
+                                self.model.addConstr(pivot >= self._de_st_mb[did][o_lid]['b'][o_mid] + eps - M * (1 - binary_b) )
+                                self.model.addConstr(pivot <= self._de_st_mb[did][o_lid]['b'][o_mid] + M * binary_b)
+
+                                if SPLIT_BACKPROP:
+                                    self.model.addConstr(pivot >= self._de_st_mb[did][o_lid]['w'][o_mid] + eps - M * (1 - binary_w) )
+                                    self.model.addConstr(pivot <= self._de_st_mb[did][o_lid]['w'][o_mid] + M * binary_w)
+
+                                self.model.addConstr((binary_f == 1) >> (self._de_st_mb[did][lid]['pf'][mid][o_mid + idx * self._num_microbatches] == 1))
+                                self.model.addConstr((binary_f == 0) >> (self._de_st_mb[did][lid]['pf'][mid][o_mid + idx * self._num_microbatches] == 0))
+                                
+                                self.model.addConstr((binary_b == 1) >> (self._de_st_mb[did][lid]['pb'][mid][o_mid + idx * self._num_microbatches] == 1))
+                                self.model.addConstr((binary_b == 0) >> (self._de_st_mb[did][lid]['pb'][mid][o_mid + idx * self._num_microbatches] == 0))
+
+                                if SPLIT_BACKPROP:                                
+                                    self.model.addConstr((binary_w == 1) >> (self._de_st_mb[did][lid]['pw'][mid][o_mid + idx * self._num_microbatches] == 1))
+                                    self.model.addConstr((binary_w == 0) >> (self._de_st_mb[did][lid]['pw'][mid][o_mid + idx * self._num_microbatches] == 0))
+                        if mt == 'f':
+                            required_memory = Activation.FULL_LAYER * (1 - self._layer_recomp_rate[lid])
+                        elif mt == 'b':
+                            #TODO Memory variance in situation with non-backprop-splitting 
+                            required_memory = Gradient.INPUT + Activation.FULL_LAYER * self._layer_recomp_rate[lid]
+                        elif mt == 'w':
+                            required_memory = Gradient.PARAMETER
+                        else:
+                            raise Exception("Undefined workload type")
+                        
+                        base_memory = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) + LAYER_MEMORY + required_memory
+                        self.model.addConstr(
+                            quicksum(self._de_st_mb[did][lid]['pf'][mid]) * (Activation.FULL_LAYER * (1 - self._layer_recomp_rate[lid])) 
+                            + quicksum(self._de_st_mb[did][lid]['pb'][mid]) * (Gradient.INPUT + Activation.FULL_LAYER * self._layer_recomp_rate[lid])
+                            - quicksum(self._de_st_mb[did][lid]['pw'][mid]) * (Gradient.INPUT + Activation.FULL_LAYER)
+                            + base_memory
+                            <= 
+                            GPU_MAX_MEM
+                        )
 
     def _build_constraints(self) -> None:
         self._generate_variables()
-        self._set_stage_layer_mapping_constraints()
+        self._set_memory_constraints()
         # 添加约束
         self._comm_length = self._reset_comm_length(self._devices)
         self._real_pipeline_modeling_constraint_strict()
@@ -291,9 +347,8 @@ class LayerwiseSimulator:
         self.model_result = results
         print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"]))
         for i in range(self._num_layer):
-            recompute_rate = float(self.model_result[self._layer_recomp_rate[i].varName])
             self._layer_f_length[i] = self._profiled_layer_f_length[i] + self._profiled_additional_layer_f_length[i]
-            self._layer_b_length[i] = self._profiled_layer_b_length[i] + self._profiled_layer_f_length[i] * recompute_rate + self._profiled_additional_layer_b_length[i]
+            self._layer_b_length[i] = self._profiled_layer_b_length[i] + self._profiled_additional_layer_b_length[i]
             self._layer_w_length[i] = self._profiled_layer_w_length[i] + self._profiled_additional_layer_w_length[i]
         if draw:
             # 4. draws the result.
@@ -323,4 +378,4 @@ class LayerwiseSimulator:
             "num_layer": self._num_layer,
         }
 
-        SchedulingPainter(painter_conf).draw(results)
+        LayerwiseSchedulingPainter(painter_conf).draw(results)

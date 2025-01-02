@@ -345,11 +345,9 @@ class GSimulator:
         self.model_result = results
         print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"]))
         for i in range(self._pp_size):
-            number_of_layers = self.model_result[self._layers[i].varName]
-            recompute_rate = float(self.model_result[self._layer_recomp_rate[i].varName])
-            self._stage_f_length[i] = self._profiled_layer_f_length[i] * number_of_layers
-            self._stage_b_length[i] = (self._profiled_layer_b_length[i] + self._profiled_layer_f_length[i] * recompute_rate) * number_of_layers 
-            self._stage_w_length[i] = self._profiled_layer_w_length[i] * number_of_layers
+            self._stage_f_length[i] = self.model_result[self._stage_f_length[i].varName]
+            self._stage_b_length[i] = self.model_result[self._stage_b_length[i].varName] 
+            self._stage_w_length[i] = self.model_result[self._stage_w_length[i].varName]
         if draw:
             # 4. draws the result.
             results = {str(key) : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}

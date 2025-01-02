@@ -3,7 +3,7 @@ utils package
 """
 from typing import Dict, Tuple
 from z3 import If
-from .config import *
+from .z3_config import *
 # def parse_microbatch_key(key: str) -> Tuple[bool, int, int]:
 #     "parse microbatch key"
 #     is_forward = key.startswith("f")

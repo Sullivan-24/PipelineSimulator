@@ -25,9 +25,9 @@ class LayerwiseSimulator:
         self._profiled_layer_b_length = config["backward_execution_i_time"]
         self._profiled_layer_w_length = config["backward_execution_g_time"]
         
-        self._profiled_additional_layer_f_length = [EMBEDDING_TIME  if lid == 0 else (LAST_FFN_F_TIME if lid == MODEL_LAYER_NUM-1 else 0) for lid in range(MODEL_LAYER_NUM)]
-        self._profiled_additional_layer_b_length = [LAST_FFN_B_TIME if lid == MODEL_LAYER_NUM-1 else 0 for lid in range(MODEL_LAYER_NUM)]
-        self._profiled_additional_layer_w_length = [0 for _ in range(MODEL_LAYER_NUM)]
+        self._profiled_additional_layer_f_length = [EMBEDDING_TIME  if lid == 0 else (LAST_FFN_F_TIME if lid == LAYER_NUM-1 else 0) for lid in range(LAYER_NUM)]
+        self._profiled_additional_layer_b_length = [LAST_FFN_B_TIME if lid == LAYER_NUM-1 else 0 for lid in range(LAYER_NUM)]
+        self._profiled_additional_layer_w_length = [0 for _ in range(LAYER_NUM)]
         
         self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
         

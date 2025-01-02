@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
 from .abstract.mutils import *
-class SchedulingPainter:
+class LayerwiseSchedulingPainter:
     """Scheduling Painter"""
 
     def __init__(self, config: dict) -> None:
@@ -60,7 +60,7 @@ class SchedulingPainter:
         else:
             color = "#00FF6F"
 
-        if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
+        if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE or SCHEDULE_METHOD == SchedulePriority.Layerwise:
             if pid == 0:
                 color = "#FF0000" # 红色: #FF0000
             elif pid == self._num_layer - 2:
@@ -103,21 +103,19 @@ class SchedulingPainter:
             else:
                 self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
 
-        label_canvas.create_text(self._pp_align + 160, y_label, text="MinExeTime:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
-                # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
-                self._max_time,
-                self._pp_size // self._device_size,
-                self._basic_forward_length[max_key_pid], 
-                self._basic_backward_b_length[max_key_pid], 
-                self._basic_backward_w_length[max_key_pid], 
-                # int(sum(self._comm_length) / len(self._comm_length))
+        label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Layers:{}(+3), F:{}, B:{}, W:{}, C:{}".format(
+                round(self._max_time),
+                self._num_layer-3,
+                self._basic_forward_length[1], 
+                self._basic_backward_b_length[1], 
+                self._basic_backward_w_length[1], 
                 COMM_TIME
             ),
         )
 
-        label_canvas.create_text(
-            canvas_width - self._pp_align - 120, y_label, text="BlockCoords:"
-        )
+        # label_canvas.create_text(
+        #     canvas_width - self._pp_align - 120, y_label, text="Selected:"
+        # )
         coords_label = label_canvas.create_text(
             canvas_width - self._pp_align - 40, y_label, text="(start,end)"
         )
@@ -153,20 +151,6 @@ class SchedulingPainter:
 
             tag = f"p_{pid}_m_{mid}_{k}"
             color = self._set_color(pid=pid, k=k)
-            # if k == 'f':    #颜色设置，加上w的情况
-            #     color = "#00AFFF"
-            # elif k == 'b':
-            #     color = "#00FFFF" 
-            # else:
-            #     color = "#00FF6F"
-
-            # if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
-            #     if pid == 0:
-            #         color = "#FF0000" # 红色: #FF0000
-            #     elif pid == self._num_layer - 2:
-            #         color = "#800080" # 紫色: #800080
-            #     elif pid == self._num_layer - 1:
-            #         color = "#FFA500" # 橙色: #FFA500
             if x0 == x1:
                 continue
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)

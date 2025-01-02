@@ -17,6 +17,7 @@ class SchedulePriority(Enum):
     ZBH1 = 5
     BFW = 6
     GREEDY_v2 = 7
+    Layerwise = 8
 
 class StageSearchOrder(Enum):
     Random = "Random"
@@ -54,3 +55,7 @@ class WorkloadConstraint:
     def __hash__(self):
         return hash((self.microbatch_id, self.stage_id, self.workload_type))
     
+    def __repr__(self):
+        return (f"{self.__class__.__name__}(device_id={self.device_id}, "
+            f"microbatch_id={self.microbatch_id}, stage_id={self.stage_id}, "
+            f"workload_type={self.workload_type})")

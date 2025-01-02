@@ -2,7 +2,8 @@ from .Device import Device, SchedulePriority
 from .Stage import Stage
 from .Workload import Workload
 from .mutils import *
-from ..painter import SchedulingPainter
+from ..painter import SchedulingPainter as SP
+from ..LayerwisePainter import LayerwiseSchedulingPainter as LSP
 
 class PipelineScheduler:
 
@@ -15,11 +16,18 @@ class PipelineScheduler:
         self.schedule = [[] for _ in range(DEVICE_NUM)]
         self.generate_schedule()
         self.set_schedule()
+    
+    def show_detail_info(self):
+        for device in self.devices:
+            print("Device ID:{}".format(device.device_id))
+            if device.device_id == 7:
+                device.show_stages(detail_info=True)
 
     def _init_stage(self):
         for did in range(DEVICE_NUM):
             device = Device(device_id = did, 
                             max_activation_counts=MAX_ACTIVATION_COUNTS, 
+                            nmb=MICRO_BATCH_NUM,
                             # static_schedule=self.schedule[did],
                             )
             self.devices.append(device)
@@ -28,16 +36,25 @@ class PipelineScheduler:
             for did in range(DEVICE_NUM):
                 for pid in self.dsa[did]:
                     self.devices[did].add_stage(pid)
+        elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            for pid in range(LAYER_NUM):
+                if (pid // DEVICE_NUM) % 2 == 0:
+                    self.devices[pid % DEVICE_NUM].add_stage(pid + 1)
+                else:
+                    self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1)
+            self.devices[-1].add_stage(0)
+            self.devices[0].add_stage(LAYER_NUM+1)
+            self.devices[1].add_stage(LAYER_NUM+2)
         else:
-            if SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1, SchedulePriority.ZBV, SchedulePriority.GREEDY_v1, SchedulePriority.GREEDY_v2):
+            if SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
+                for pid in range(STAGE_NUM):
+                    self.devices[pid % DEVICE_NUM].add_stage(pid)
+            else:
                 for pid in range(STAGE_NUM):
                     if (pid // DEVICE_NUM) % 2 == 0:
                         self.devices[pid % DEVICE_NUM].add_stage(pid)
                     else:
                         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid)
-            elif SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
-                for pid in range(STAGE_NUM):
-                    self.devices[pid % DEVICE_NUM].add_stage(pid)
 
         for did in range(DEVICE_NUM):
             self.devices[did].show_stages()
@@ -139,7 +156,6 @@ class PipelineScheduler:
                 else:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                 iter+=1
-                print(finish_flag)
 
         # for did in range(DEVICE_NUM):
         #     for (wt, mid, sid) in self.schedule[did]:
@@ -148,9 +164,8 @@ class PipelineScheduler:
 
     def generate_zbv_schedule(self):
         assert WORKLOAD_TYPE_NUM == 3
-        real_f_len = FPW_TIME // CHUNK_NUM
-        real_b_len = IGW_TIME // CHUNK_NUM
-        real_w_len = PGW_TIME // CHUNK_NUM
+        layers_per_stage = LAYER_NUM // STAGE_NUM
+        real_f_len = FPW_TIME * layers_per_stage
         comm_time  = COMM_TIME
         workload_type_order = [WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD, WorkloadType.FORWARD_PASS_WORKLOAD]
         workload_idx_in_mids = {WorkloadType.FORWARD_PASS_WORKLOAD: 0, WorkloadType.INPUT_GRADIENT_WORKLOAD : 1, WorkloadType.PARAMETER_GRADIENT_WORKLOAD : 2}
@@ -331,6 +346,8 @@ class PipelineScheduler:
         while GET_TIME() <= time_limit:
             self.check_workload_status()
             self.execute_workload()
+            if GET_TIME() == 640:
+                self.show_detail_info()
             UPDATE_TIME()
 
     def show_mem_usage(self):
@@ -341,18 +358,53 @@ class PipelineScheduler:
 
     def draw(self) -> None:
         # 绘制结果的逻辑
-        painter_conf = {
-            "device_size": DEVICE_NUM,
-            "devices": self.dsa,
-            "pp_size": STAGE_NUM,
-            "pp_height": 50,
-            "pp_align": 10,
-            "pixel_base": PIXEL_BASE,
-            "num_microbatches": MICRO_BATCH_NUM,
-            "forward_length": [FPW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
-            "backward_length": [IGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
-            "backward_length2": [PGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
-            "comm_length": [COMM_TIME for _ in range(STAGE_NUM)],
-        }
-
-        SchedulingPainter(painter_conf).draw(self.results)
+        if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            fwd_time = [FPW_TIME for _ in range(LAYER_NUM+3)]
+            fwd_time[0] = EMBEDDING_TIME
+            fwd_time[-1] = LOSS_F_TIME
+            fwd_time[-2] = LAST_FFN_F_TIME
+            iwd_time = [IGW_TIME for _ in range(LAYER_NUM+3)]
+            iwd_time[0] = 0
+            iwd_time[-1] = LOSS_B_TIME
+            iwd_time[-2] = LAST_FFN_B_TIME
+            pwd_time = [PGW_TIME for _ in range(LAYER_NUM+3)]
+            pwd_time[0] = 0
+            pwd_time[-1] = LOSS_W_TIME
+            pwd_time[-2] = LAST_FFN_W_TIME
+            
+            painter_conf = {
+                "device_size": DEVICE_NUM,
+                "devices": self.dsa,
+                "num_layer": LAYER_NUM+3,
+                "pp_size": LAYER_NUM+3,
+                "pp_height": 50,
+                "pp_align": 10,
+                "pixel_base": PIXEL_BASE,
+                "num_microbatches": MICRO_BATCH_NUM,
+                "forward_length": fwd_time,
+                "backward_length": iwd_time,
+                "backward_length2": pwd_time,
+                "comm_length": [COMM_TIME for _ in range(STAGE_NUM)],
+            }
+            LSP(painter_conf).draw(self.results)
+        else:
+            layers_per_stage = LAYER_NUM // STAGE_NUM
+            base_f = FPW_TIME * layers_per_stage
+            base_b = IGW_TIME * layers_per_stage
+            base_w = PGW_TIME * layers_per_stage
+            painter_conf = {
+                "device_size": DEVICE_NUM,
+                "devices": self.dsa,
+                "pp_size": STAGE_NUM,
+                "pp_height": 50,
+                "pp_align": 10,
+                "pixel_base": PIXEL_BASE,
+                "num_microbatches": MICRO_BATCH_NUM,
+                "forward_length": [base_f + EMBEDDING_TIME if _ == 0 else (base_f + LAST_FFN_F_TIME + LOSS_F_TIME if _ == STAGE_NUM - 1 else base_f) for _ in range(STAGE_NUM)],
+                "backward_length": [base_b + EMBEDDING_TIME if _ == 0 else (base_b + LAST_FFN_B_TIME + LOSS_B_TIME if _ == STAGE_NUM - 1 else base_b) for _ in range(STAGE_NUM)],
+                "backward_length2": [base_w + EMBEDDING_TIME if _ == 0 else (base_w + LAST_FFN_W_TIME + LOSS_W_TIME if _ == STAGE_NUM - 1 else base_w) for _ in range(STAGE_NUM)],
+                # "backward_length": [IGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
+                # "backward_length2": [PGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
+                "comm_length": [COMM_TIME for _ in range(STAGE_NUM)],
+            }
+            SP(painter_conf).draw(self.results)

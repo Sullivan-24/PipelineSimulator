@@ -6,7 +6,7 @@ class Workload:
     IN_PROGRESS = 2
     COMPLETED = 3
 
-    def __init__(self, device_id:int, microbatch_id: int, stage_id: int, duration: int, workload_type: WorkloadType):
+    def __init__(self, device_id:int, microbatch_id: int, stage_id: int, duration: int, total_stages:int, workload_type: WorkloadType):
         self.device_id = device_id
         self.microbatch_id: int = microbatch_id  # 微批次编号
         self.stage_id: int = stage_id              # 阶段编号
@@ -15,6 +15,7 @@ class Workload:
         self.end_time: float = None                 # 结束时间
         self.state: int = Workload.NOT_STARTED      # 初始状态为未开始
         self.ready_time: int = -1
+        self.total_stages: int = total_stages
         if self.microbatch_id == 0 and self.stage_id == 0:
             self.ready_time = 0
         self.workload_type: WorkloadType = workload_type  # 工作负载类型
@@ -23,7 +24,7 @@ class Workload:
 
     def _generate_constraints(self):
         if self.workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
-            if self.stage_id - 1 >= 0:
+            if self.stage_id > 0:
                 self.constraints.add(
                     WorkloadConstraint(
                         device_id = self.device_id,
@@ -32,7 +33,7 @@ class Workload:
                         workload_type = WorkloadType.FORWARD_PASS_WORKLOAD)
                 )
         elif self.workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
-            if self.stage_id + 1 < STAGE_NUM:
+            if self.stage_id + 1 < self.total_stages:
                 self.constraints.add(
                     WorkloadConstraint(
                         device_id = self.device_id,
@@ -44,14 +45,14 @@ class Workload:
                 self.constraints.add(
                     WorkloadConstraint(
                         device_id = self.device_id,
-                        stage_id=STAGE_NUM - 1, 
+                        stage_id=self.total_stages - 1, 
                         microbatch_id=self.microbatch_id, 
                         workload_type = WorkloadType.FORWARD_PASS_WORKLOAD)
                 )
             # self.constraints.add(
             #     WorkloadConstraint(
             #         device_id = self.device_id,
-            #         stage_id=STAGE_NUM - 1, 
+            #         stage_id=self.total_stages - 1, 
             #         microbatch_id=self.microbatch_id, 
             #         workload_type = WorkloadType.FORWARD_PASS_WORKLOAD)
             # )
@@ -67,9 +68,9 @@ class Workload:
         #     if self.stage_id - 1 >= 0:
         #         self.constraints.add((self.stage_id-1, self.microbatch_id, WorkloadType.FORWARD_PASS_WORKLOAD))
         # elif self.workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
-        #     if self.stage_id + 1 < STAGE_NUM:
+        #     if self.stage_id + 1 < self.total_stages:
         #         self.constraints.add((self.stage_id+1, self.microbatch_id, WorkloadType.INPUT_GRADIENT_WORKLOAD))
-        #     self.constraints.add((STAGE_NUM - 1, self.microbatch_id, WorkloadType.FORWARD_PASS_WORKLOAD))
+        #     self.constraints.add((self.total_stages - 1, self.microbatch_id, WorkloadType.FORWARD_PASS_WORKLOAD))
         # elif self.workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
         #     self.constraints.add((self.stage_id, self.microbatch_id, WorkloadType.INPUT_GRADIENT_WORKLOAD))
 
@@ -122,7 +123,10 @@ class Workload:
             # ))
             self.state = Workload.COMPLETED
 
-    def __repr__(self) -> str:
-        return (f"{self.workload_type.value}(microbatch_id={self.microbatch_id}, "
-                f"stage_id={self.stage_id}, duration={self.duration}, "
-                f"state={self.state})")
+    def __repr__(self):
+        return (f"{self.__class__.__name__}(device_id={self.device_id}, "
+            f"microbatch_id={self.microbatch_id}, stage_id={self.stage_id}, "
+            f"duration={self.duration}, start_time={self.start_time}, "
+            f"end_time={self.end_time}, state={self.state}, "
+            f"ready_time={self.ready_time}, total_stages={self.total_stages}, "
+            f"workload_type={self.workload_type}, constraints={self.constraints})")
