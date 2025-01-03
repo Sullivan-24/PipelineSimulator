@@ -98,19 +98,20 @@ class Device:
                 for workload_type in now_workload_priority_order:
                     for mid in range(self.nmb):
                         for sid in self.stages:
-                            required_mem = self.get_required_memory(
+                            required_memory = self.get_required_memory(
                                 stage_id=sid, 
                                 layer_num=1,
                                 workload_type=workload_type,
                                 workload_type_num=WORKLOAD_TYPE_NUM, 
                                 layer_wise=True
                             )
-                            if workload_type in (WorkloadType.B, WorkloadType.F):
-                                if self.current_mem_usage + required_mem >= GPU_MAX_MEM - Gradient.PARAMETER:
-                                    workload_type = WorkloadType.B
-                                if self.current_mem_usage + required_mem >= GPU_MAX_MEM:
-                                    workload_type = WorkloadType.W
-
+                            workload_type = self._reset_workload_type(
+                                workload_type=workload_type,
+                                required_memory=required_memory,
+                                current_mem_usage=self.current_mem_usage,
+                                max_memory=GPU_MAX_MEM,
+                                workload_situations=None
+                            )
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
                             if proc_workload:
                                 self.proc_workload = proc_workload
@@ -120,6 +121,14 @@ class Device:
             else:
                 print("Schedule Not Supported")
         return None
+
+    def _reset_workload_type(self, workload_type, required_memory, current_mem_usage, max_memory, workload_situations):
+        if workload_type == WorkloadType.F:
+            if current_mem_usage + required_memory >= max_memory - Gradient.INPUT - Gradient.PARAMETER:
+                workload_type = WorkloadType.B
+            if current_mem_usage + required_memory >= max_memory - Gradient.PARAMETER:
+                workload_type = WorkloadType.W
+        return workload_type
 
     def get_required_memory(self, stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True):
         assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type"
