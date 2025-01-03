@@ -16,7 +16,7 @@ class Stage:
     
     def _get_workload_duration(self, device_id, stage_id, microbatch_id, workload_type):
         if SchedulePriority.Layerwise == SCHEDULE_METHOD:
-            if workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+            if workload_type == WorkloadType.F:
                 duration = FPW_TIME
                 if stage_id == 0:
                     duration = EMBEDDING_TIME
@@ -25,13 +25,13 @@ class Stage:
                 elif stage_id == LAYER_NUM + 1:
                     duration = LAST_FFN_F_TIME
 
-            elif workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
+            elif workload_type == WorkloadType.B:
                 duration = IGW_TIME
                 if stage_id == LAYER_NUM + 2:
                     duration = LOSS_B_TIME
                 elif stage_id == LAYER_NUM + 1:
                     duration = LAST_FFN_B_TIME
-            elif workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
+            elif workload_type == WorkloadType.W:
                 duration = PGW_TIME
                 if stage_id == LAYER_NUM + 2:
                     duration = LOSS_W_TIME
@@ -39,17 +39,17 @@ class Stage:
                     duration = LAST_FFN_W_TIME
         else:
             layer_per_stage = LAYER_NUM // STAGE_NUM
-            if workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+            if workload_type == WorkloadType.F:
                 duration = FPW_TIME * layer_per_stage
                 if stage_id == 0:
                     duration += EMBEDDING_TIME
                 elif stage_id == STAGE_NUM - 1:
                     duration += LAST_FFN_F_TIME + LOSS_F_TIME
-            elif workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
+            elif workload_type == WorkloadType.B:
                 duration = IGW_TIME * layer_per_stage
                 if stage_id == STAGE_NUM - 1:
                     duration += LAST_FFN_B_TIME + LOSS_B_TIME
-            elif workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
+            elif workload_type == WorkloadType.W:
                 duration = PGW_TIME * layer_per_stage
                 if stage_id == STAGE_NUM - 1:
                     duration += LAST_FFN_W_TIME + LOSS_W_TIME
@@ -63,18 +63,18 @@ class Stage:
                 device_id=self.device_id,
                 stage_id=self.stage_id,
                 microbatch_id=mid,
-                workload_type=WorkloadType.FORWARD_PASS_WORKLOAD,
+                workload_type=WorkloadType.F,
                 duration=self._get_workload_duration(
                     device_id=self.device_id,
                     stage_id=self.stage_id,
                     microbatch_id=mid,
-                    workload_type=WorkloadType.FORWARD_PASS_WORKLOAD,
+                    workload_type=WorkloadType.F,
                 ),    
                 total_stages=LAYER_NUM+3 if SchedulePriority.Layerwise == SCHEDULE_METHOD else STAGE_NUM,
             )
             if self.stage_id == 0 and SCHEDULE_METHOD == SchedulePriority.Layerwise:
                 self.workloads[mid]={
-                    WorkloadType.FORWARD_PASS_WORKLOAD: fpw,
+                    WorkloadType.F: fpw,
                 }
                 continue
 
@@ -82,34 +82,34 @@ class Stage:
                 device_id=self.device_id,
                 stage_id=self.stage_id,
                 microbatch_id=mid,
-                workload_type=WorkloadType.INPUT_GRADIENT_WORKLOAD,
+                workload_type=WorkloadType.B,
                 duration=self._get_workload_duration(
                     device_id=self.device_id,
                     stage_id=self.stage_id,
                     microbatch_id=mid,
-                    workload_type=WorkloadType.INPUT_GRADIENT_WORKLOAD,
+                    workload_type=WorkloadType.B,
                 ),   
                 total_stages=LAYER_NUM+3 if SchedulePriority.Layerwise == SCHEDULE_METHOD else STAGE_NUM,   
             )
             self.workloads[mid]={
-                WorkloadType.FORWARD_PASS_WORKLOAD: fpw,
-                WorkloadType.INPUT_GRADIENT_WORKLOAD: igw,
+                WorkloadType.F: fpw,
+                WorkloadType.B: igw,
             }
             if SPLIT_BACKPROP:
                 pgw = Workload(
                     device_id=self.device_id,
                     stage_id=self.stage_id,
                     microbatch_id=mid,
-                    workload_type=WorkloadType.PARAMETER_GRADIENT_WORKLOAD,
+                    workload_type=WorkloadType.W,
                     duration=self._get_workload_duration(
                         device_id=self.device_id,
                         stage_id=self.stage_id,
                         microbatch_id=mid,
-                        workload_type=WorkloadType.PARAMETER_GRADIENT_WORKLOAD,
+                        workload_type=WorkloadType.W,
                     ),     
                     total_stages=LAYER_NUM+3 if SchedulePriority.Layerwise == SCHEDULE_METHOD else STAGE_NUM,
                 )
-                self.workloads[mid][WorkloadType.PARAMETER_GRADIENT_WORKLOAD] = pgw
+                self.workloads[mid][WorkloadType.W] = pgw
 
     def update_constraints(self, constraint: Workload):
         for mid in self.workloads:
@@ -125,14 +125,14 @@ class Stage:
 
     def update_memory_usage(self, workload:Workload):
         layers_per_stage = 1 if SCHEDULE_METHOD == SchedulePriority.Layerwise else LAYER_NUM // STAGE_NUM
-        if workload.workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+        if workload.workload_type == WorkloadType.F:
             if self.stage_id != 0:
                 self.memory_usage += Activation.FULL_LAYER * layers_per_stage
-        elif workload.workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
+        elif workload.workload_type == WorkloadType.W:
             self.memory_usage -= (Activation.FULL_LAYER + Gradient.INPUT) * layers_per_stage
-        elif SPLIT_BACKPROP and workload.workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
+        elif SPLIT_BACKPROP and workload.workload_type == WorkloadType.B:
             self.memory_usage += Gradient.INPUT * layers_per_stage
-        elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
+        elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.B:
             self.memory_usage -= Activation.FULL_LAYER * layers_per_stage
         
     def execute_workload(self, mid=None, workload_type=None):
@@ -141,7 +141,7 @@ class Stage:
             if w.execute():
                 return copy.deepcopy(w)
         else:
-            if self.stage_id == 0 and workload_type in (WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD):
+            if self.stage_id == 0 and workload_type in (WorkloadType.B, WorkloadType.W):
                 return None
             print("Lack of workload info.")
         return None

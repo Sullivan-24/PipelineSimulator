@@ -4,9 +4,9 @@ class RecomputeType(Enum):
     SELECTIVE = 2
 
 class WorkloadType(Enum):
-    FORWARD_PASS_WORKLOAD = "F"
-    INPUT_GRADIENT_WORKLOAD = "B"
-    PARAMETER_GRADIENT_WORKLOAD = "W"
+    F = "F"
+    B = "B"
+    W = "W"
 
 
 class SchedulePriority(Enum):

@@ -23,23 +23,23 @@ class Workload:
         self._generate_constraints()
 
     def _generate_constraints(self):
-        if self.workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
+        if self.workload_type == WorkloadType.F:
             if self.stage_id > 0:
                 self.constraints.add(
                     WorkloadConstraint(
                         device_id = self.device_id,
                         microbatch_id = self.microbatch_id,
                         stage_id = self.stage_id - 1,
-                        workload_type = WorkloadType.FORWARD_PASS_WORKLOAD)
+                        workload_type = WorkloadType.F)
                 )
-        elif self.workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
+        elif self.workload_type == WorkloadType.B:
             if self.stage_id + 1 < self.total_stages:
                 self.constraints.add(
                     WorkloadConstraint(
                         device_id = self.device_id,
                         stage_id = self.stage_id+1, 
                         microbatch_id= self.microbatch_id, 
-                        workload_type = WorkloadType.INPUT_GRADIENT_WORKLOAD)
+                        workload_type = WorkloadType.B)
                 )
             else:
                 self.constraints.add(
@@ -47,7 +47,7 @@ class Workload:
                         device_id = self.device_id,
                         stage_id=self.total_stages - 1, 
                         microbatch_id=self.microbatch_id, 
-                        workload_type = WorkloadType.FORWARD_PASS_WORKLOAD)
+                        workload_type = WorkloadType.F)
                 )
             # self.constraints.add(
             #     WorkloadConstraint(
@@ -56,13 +56,13 @@ class Workload:
             #         microbatch_id=self.microbatch_id, 
             #         workload_type = WorkloadType.FORWARD_PASS_WORKLOAD)
             # )
-        elif self.workload_type == WorkloadType.PARAMETER_GRADIENT_WORKLOAD:
+        elif self.workload_type == WorkloadType.W:
             self.constraints.add(
                 WorkloadConstraint(
                     device_id = self.device_id,
                     stage_id=self.stage_id, 
                     microbatch_id=self.microbatch_id, 
-                    workload_type=WorkloadType.INPUT_GRADIENT_WORKLOAD)
+                    workload_type=WorkloadType.B)
             )
         # if self.workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
         #     if self.stage_id - 1 >= 0:
