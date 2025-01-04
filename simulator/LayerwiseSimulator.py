@@ -127,8 +127,6 @@ class LayerwiseSimulator:
     def _generate_variables(self):
         for lid in range(self._num_layer):
             self._layer_recomp_rate.append(self.model.addVar(vtype=GRB.BINARY, name=f"theta_{lid}"))
-            #TODO
-            self.model.addConstr(self._layer_recomp_rate[-1] == 0)
             for mid in range(self._num_microbatches):
                 
                 self._layer_f_offsets[lid].append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"f_{mid}_{lid}", lb=0))
@@ -249,7 +247,7 @@ class LayerwiseSimulator:
             if o_lid == 0 or o_lid >= LAYER_NUM - 2:
                 continue
             for o_mid in range(self._num_microbatches):
-                if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
+                if o_lid == lid and o_mid == mid: # necessary
                     continue
                 accumulated_activations += orders[o_lid]['f'][o_mid] * Activation.FULL_LAYER * (1 - self._layer_recomp_rate[o_lid])
         return accumulated_activations
@@ -261,7 +259,7 @@ class LayerwiseSimulator:
             if o_lid == 0 or o_lid >= LAYER_NUM - 2:
                 continue
             for o_mid in range(self._num_microbatches):
-                if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
+                if o_lid == lid and o_mid == mid: # necessary
                     continue
                 accumulated_input_gradients += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER * self._layer_recomp_rate[o_lid])
         return accumulated_input_gradients
@@ -273,7 +271,7 @@ class LayerwiseSimulator:
             if o_lid == 0 or o_lid >= LAYER_NUM - 2:
                 continue
             for o_mid in range(self._num_microbatches):
-                if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
+                if o_lid == lid and o_mid == mid: # necessary
                     continue
                 released_memory += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER)
         return released_memory
@@ -292,20 +290,28 @@ class LayerwiseSimulator:
                 self.model.addConstr(self._layer_f_offsets[i][mb] >= self._layer_f_offsets[i - 1][mb] +
                                      self._layer_f_length[i - 1] + self._comm_length[i - 1][i])
 
-            for i in range(self._num_layer - 1, 0, -1):
+            for i in range(self._num_layer - 1, 1, -1):
                 self.model.addConstr(self._layer_b_offsets[i - 1][mb] >= self._layer_b_offsets[i][mb] +
                                      self._layer_b_length[i] + self._comm_length[i][i - 1])
+            # Special case: Embedding layer
+            self.model.addConstr(self._layer_b_offsets[0][mb] == self._layer_f_offsets[0][mb] + self._layer_f_length[0])
+            
 
             self.model.addConstr(self._layer_b_offsets[self._num_layer - 1][mb] >= self._layer_f_offsets[self._num_layer - 1][mb] +
                                  self._layer_f_length[self._num_layer - 1])
 
             if SPLIT_BACKPROP:
-                for i in range(self._num_layer):
+                # Special case: Embedding layer
+                self.model.addConstr(self._layer_w_offsets[0][mb] == self._layer_f_offsets[0][mb] + self._layer_f_length[0])
+                for i in range(1, self._num_layer):
                     self.model.addConstr(self._layer_w_offsets[i][mb] >= self._layer_b_offsets[i][mb] +
                                         self._layer_b_length[i])
 
             if mb > 0:
-                for i in range(self._num_layer):
+                # Special case: Embedding layer
+                self.model.addConstr(self._layer_f_offsets[0][mb] >= self._layer_f_offsets[0][mb - 1] +
+                                         self._layer_f_length[0])
+                for i in range(1, self._num_layer):
                     self.model.addConstr(self._layer_f_offsets[i][mb] >= self._layer_f_offsets[i][mb - 1] +
                                          self._layer_f_length[i])
                     self.model.addConstr(self._layer_b_offsets[i][mb] >= self._layer_b_offsets[i][mb - 1] +
