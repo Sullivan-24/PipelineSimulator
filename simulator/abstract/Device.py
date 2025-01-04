@@ -1,5 +1,40 @@
 from .Stage import *
 
+def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True, recomp=None):
+        assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type"
+        if workload_type ==WorkloadType.F:
+            required_memory = Activation.FULL_LAYER * layer_num 
+            if recomp: 
+                required_memory = Activation.FULL_LAYER * layer_num * (1 - recomp)
+            if layer_wise and stage_id == LAYER_NUM - 2:
+                required_memory = Activation.LOSS
+            elif not layer_wise and stage_id == STAGE_NUM - 1:
+                    required_memory += Activation.LOSS
+        else:
+            if workload_type_num == 3:
+                if workload_type == WorkloadType.B:
+                    required_memory = Gradient.INPUT * layer_num 
+                    if recomp:
+                        required_memory = Gradient.INPUT * layer_num + Activation.FULL_LAYER * recomp
+                elif workload_type == WorkloadType.W:
+                    required_memory = Gradient.PARAMETER * layer_num
+                else:
+                    raise Exception("Unsupported workload type {}".format(workload_type))
+            elif workload_type_num == 2:
+                if workload_type == WorkloadType.B:
+                    required_memory = (Gradient.INPUT + Gradient.PARAMETER) * layer_num
+                    if recomp:
+                        required_memory = (Gradient.INPUT + Gradient.PARAMETER) * layer_num + Activation.FULL_LAYER * recomp
+                else:
+                    raise Exception("Unsupported workload type {}".format(workload_type))
+            else:
+                raise Exception("Wrong workload_type_num")
+
+        if layer_wise:
+            if stage_id == 0:
+                required_memory = 0
+        return required_memory
+
 class Device:
     
     BUSY = 1
@@ -89,16 +124,16 @@ class Device:
                     return proc_workload
             elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-                # now_workload_priority_order = [WorkloadType.FORWARD_PASS_WORKLOAD, WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD]
-                # if self.last_workload_type == WorkloadType.INPUT_GRADIENT_WORKLOAD:
-                #     now_workload_priority_order = [WorkloadType.FORWARD_PASS_WORKLOAD, WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD]
-                # elif self.last_workload_type == WorkloadType.FORWARD_PASS_WORKLOAD:
-                #     now_workload_priority_order = [WorkloadType.INPUT_GRADIENT_WORKLOAD, WorkloadType.FORWARD_PASS_WORKLOAD, WorkloadType.PARAMETER_GRADIENT_WORKLOAD]
+                # now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
+                # if self.last_workload_type == WorkloadType.B:
+                #     now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
+                # elif self.last_workload_type == WorkloadType.F:
+                #     now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 
                 for workload_type in now_workload_priority_order:
                     for mid in range(self.nmb):
                         for sid in self.stages:
-                            required_memory = self.get_required_memory(
+                            required_memory = get_required_memory(
                                 stage_id=sid, 
                                 layer_num=1,
                                 workload_type=workload_type,
@@ -130,34 +165,6 @@ class Device:
                 workload_type = WorkloadType.W
         return workload_type
 
-    def get_required_memory(self, stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True):
-        assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type"
-        if workload_type ==WorkloadType.F:
-            required_memory = Activation.FULL_LAYER * layer_num
-            if layer_wise and stage_id == LAYER_NUM - 2:
-                required_memory = Activation.LOSS
-            elif not layer_wise and stage_id == STAGE_NUM - 1:
-                    required_memory += Activation.LOSS
-        else:
-            if workload_type_num == 3:
-                if workload_type == WorkloadType.B:
-                    required_memory = Gradient.INPUT * layer_num
-                elif workload_type == WorkloadType.W:
-                    required_memory = Gradient.PARAMETER * layer_num
-                else:
-                    raise Exception("Unsupported workload type {}".format(workload_type))
-            elif workload_type_num == 2:
-                if workload_type == WorkloadType.B:
-                    required_memory = (Gradient.INPUT + Gradient.PARAMETER) * layer_num
-                else:
-                    raise Exception("Unsupported workload type {}".format(workload_type))
-            else:
-                raise Exception("Wrong workload_type_num")
-
-        if layer_wise:
-            if stage_id == 0:
-                required_memory = 0
-        return required_memory
 
     def _finish_proc_workload(self) -> bool: 
         if self.state == Device.BUSY and GET_TIME() >= self.proc_workload.end_time:

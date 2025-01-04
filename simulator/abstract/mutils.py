@@ -1,10 +1,10 @@
 from .variables import *
 from ..config import *
 PIXEL_BASE = 1
-BASE_SOLUTION = False
+BASE_SOLUTION = True
 RUN_MODE = RunMode.LAYERWISE_GUROBI_SOLVE
 # RUN_MODE = RunMode.GUROBI_SOLVE
-RUN_MODE = RunMode.SIM_SOLVE
+# RUN_MODE = RunMode.SIM_SOLVE
 SOLVING_TIME_LIMIT = 60 * 30
 GLOBAL_TIME = 0
 CHUNK_NUM = 2

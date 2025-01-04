@@ -4,6 +4,14 @@ from .LayerwisePainter import LayerwiseSchedulingPainter
 from .abstract.mutils import *
 from .utils import resort_microbatch_index, print_to_file
 from .abstract import Pipeline
+from .abstract.Device import get_required_memory
+
+workload_type_mapping = {
+    'f':WorkloadType.F,
+    'b':WorkloadType.B,
+    'w':WorkloadType.W,
+}
+
 class LayerwiseSimulator:
 
     def __init__(self, config: dict, device_layer_alignments=None, new_comm_length=None) -> None:
@@ -130,95 +138,149 @@ class LayerwiseSimulator:
             
             self._layer_f_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{lid}_f"))
             self._layer_b_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{lid}_b"))
-            self._layer_w_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{lid}_w"))
+            if SPLIT_BACKPROP:
+                self._layer_w_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{lid}_w"))
             
             self.model.addConstr(self._layer_f_length[lid] == self._profiled_layer_f_length[lid] + self._profiled_additional_layer_f_length[lid])
             self.model.addConstr(self._layer_b_length[lid] == self._profiled_layer_b_length[lid] + self._layer_recomp_rate[lid] * self._layer_f_length[lid] + self._profiled_additional_layer_b_length[lid])
-            self.model.addConstr(self._layer_w_length[lid] == self._profiled_layer_w_length[lid] + self._profiled_additional_layer_w_length[lid])
+            if SPLIT_BACKPROP:
+                self.model.addConstr(self._layer_w_length[lid] == self._profiled_layer_w_length[lid] + self._profiled_additional_layer_w_length[lid])
 
-    def _get_device_stage_microbatch_alignment(self):
-        _de_vars = {}
+    def _add_memory_constraints(self):
+        """
+            self._orders = {
+                device_id:{
+                    lid:{
+                        mid:{
+                            lid1:{
+                                f:[],
+                                b:[],
+                                w:[],
+                            },
+                            lid2:{
+                                f:[],
+                                b:[],
+                                w:[],
+                            },
+                            ...
+                        },
+                        ...
+                    }
+                    ...
+                }
+                ...
+            }
+        """
+        self._orders = {}
         for did in range(self._num_device):
-            _pp_vars = {}
+            self._orders[did] = {}
             for lid in self._devices[did]:
-                if lid == 0:
-                    continue
-                _mt_vars = {'f':[],'b':[],'w':[],'pf':[],'pb':[],'pw':[]}
+                self._orders[did][lid] = {}
                 for mid in range(self._num_microbatches):
-                    _mt_vars['f'].append(self._layer_f_offsets[lid][mid])
-                    _mt_vars['b'].append(self._layer_b_offsets[lid][mid])
-                    if SPLIT_BACKPROP:
-                        _mt_vars['w'].append(self._layer_w_offsets[lid][mid])
-                    
-                    _mt_vars['pf'].append([self.model.addVar(name=f'act_f_{mid}_{lid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * len(self._devices[did]))])
-                    _mt_vars['pb'].append([self.model.addVar(name=f'act_b_{mid}_{lid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * len(self._devices[did]))])
-                    _mt_vars['pw'].append([self.model.addVar(name=f'act_w_{mid}_{lid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * len(self._devices[did]))])
+                    self._orders[did][lid][mid] = {}
+                    for o_lid in self._devices[did]:
+                        self._orders[did][lid][mid][o_lid] = {
+                            'f': [self.model.addVar(name=f'act_f_{did}_{lid}_{mid}_{o_lid}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)],
+                            'b': [self.model.addVar(name=f'act_b_{did}_{lid}_{mid}_{o_lid}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)],
+                        }
+                        if SPLIT_BACKPROP:
+                            self._orders[did][lid][mid][o_lid]['w'] = [self.model.addVar(name=f'act_w_{did}_{lid}_{mid}_{o_lid}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)]
 
-                _pp_vars[lid] = _mt_vars
-            _de_vars[did] = _pp_vars
-        self._de_st_mb = _de_vars
-
-    def _set_memory_constraints(self):
-        self._get_device_stage_microbatch_alignment()
-        # There is no need to search for other operation types, as the maximum overhead of GPU memory must start with either w or b.
-        workload_types = ('w') if SPLIT_BACKPROP else ('b') 
-        for mt in workload_types:
-            for did in self._de_st_mb:
-                for lid in self._de_st_mb[did]:
-                    for mid in range(self._num_microbatches):
-                        pivot = self._de_st_mb[did][lid][mt][mid]
+        for did in range(self._num_device):
+            for lid in self._devices[did]:
+                for mid in range(self._num_microbatches):
+                    pivot = self._layer_w_offsets[lid][mid]
+                    for o_lid in self._devices[did]:
                         for o_mid in range(self._num_microbatches):
-                            for idx, o_lid in enumerate(self._de_st_mb[did]):
-                                if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
-                                    continue 
-                                binary_f = self.model.addVar(vtype=GRB.BINARY, name=f'binary_f_{lid}_{mid}_{o_lid}_{o_mid}')
-                                binary_b = self.model.addVar(vtype=GRB.BINARY, name=f'binary_b_{lid}_{mid}_{o_lid}_{o_mid}')
-                                binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'binary_w_{lid}_{mid}_{o_lid}_{o_mid}')
+                            if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
+                                continue 
+                            binary_f = self.model.addVar(vtype=GRB.BINARY, name=f'binary_f_{lid}_{mid}_{o_lid}_{o_mid}')
+                            binary_b = self.model.addVar(vtype=GRB.BINARY, name=f'binary_b_{lid}_{mid}_{o_lid}_{o_mid}')
+                            binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'binary_w_{lid}_{mid}_{o_lid}_{o_mid}')
 
-                                eps = 0.001
-                                M = 10000
-                                self.model.addConstr(pivot >= self._de_st_mb[did][o_lid]['f'][o_mid] + eps - M * (1 - binary_f) )
-                                self.model.addConstr(pivot <= self._de_st_mb[did][o_lid]['f'][o_mid] + M * binary_f)
+                            eps = 0.001
+                            M = 10000
+                            self.model.addConstr(pivot >= self._layer_f_offsets[o_lid][o_mid] + eps - M * (1 - binary_f) )
+                            self.model.addConstr(pivot <= self._layer_f_offsets[o_lid][o_mid] + M * binary_f)
 
-                                self.model.addConstr(pivot >= self._de_st_mb[did][o_lid]['b'][o_mid] + eps - M * (1 - binary_b) )
-                                self.model.addConstr(pivot <= self._de_st_mb[did][o_lid]['b'][o_mid] + M * binary_b)
+                            self.model.addConstr(pivot >= self._layer_b_offsets[o_lid][o_mid] + eps - M * (1 - binary_b) )
+                            self.model.addConstr(pivot <= self._layer_b_offsets[o_lid][o_mid] + M * binary_b)
 
-                                if SPLIT_BACKPROP:
-                                    self.model.addConstr(pivot >= self._de_st_mb[did][o_lid]['w'][o_mid] + eps - M * (1 - binary_w) )
-                                    self.model.addConstr(pivot <= self._de_st_mb[did][o_lid]['w'][o_mid] + M * binary_w)
+                            if SPLIT_BACKPROP:
+                                self.model.addConstr(pivot >= self._layer_w_offsets[o_lid][o_mid] + eps - M * (1 - binary_w) )
+                                self.model.addConstr(pivot <= self._layer_w_offsets[o_lid][o_mid] + M * binary_w)
 
-                                self.model.addConstr((binary_f == 1) >> (self._de_st_mb[did][lid]['pf'][mid][o_mid + idx * self._num_microbatches] == 1))
-                                self.model.addConstr((binary_f == 0) >> (self._de_st_mb[did][lid]['pf'][mid][o_mid + idx * self._num_microbatches] == 0))
-                                
-                                self.model.addConstr((binary_b == 1) >> (self._de_st_mb[did][lid]['pb'][mid][o_mid + idx * self._num_microbatches] == 1))
-                                self.model.addConstr((binary_b == 0) >> (self._de_st_mb[did][lid]['pb'][mid][o_mid + idx * self._num_microbatches] == 0))
+                            self.model.addConstr((binary_f == 1) >> (self._orders[did][lid][mid][o_lid]['f'][o_mid] == 1))
+                            self.model.addConstr((binary_f == 0) >> (self._orders[did][lid][mid][o_lid]['f'][o_mid] == 0))
+                            
+                            self.model.addConstr((binary_b == 1) >> (self._orders[did][lid][mid][o_lid]['b'][o_mid] == 1))
+                            self.model.addConstr((binary_b == 0) >> (self._orders[did][lid][mid][o_lid]['b'][o_mid] == 0))
 
-                                if SPLIT_BACKPROP:                                
-                                    self.model.addConstr((binary_w == 1) >> (self._de_st_mb[did][lid]['pw'][mid][o_mid + idx * self._num_microbatches] == 1))
-                                    self.model.addConstr((binary_w == 0) >> (self._de_st_mb[did][lid]['pw'][mid][o_mid + idx * self._num_microbatches] == 0))
-                        if mt == 'f':
-                            required_memory = Activation.FULL_LAYER * (1 - self._layer_recomp_rate[lid])
-                        elif mt == 'b':
-                            #TODO Memory variance in situation with non-backprop-splitting 
-                            required_memory = Gradient.INPUT + Activation.FULL_LAYER * self._layer_recomp_rate[lid]
-                        elif mt == 'w':
-                            required_memory = Gradient.PARAMETER
-                        else:
-                            raise Exception("Undefined workload type")
-                        
-                        base_memory = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) + LAYER_MEMORY + required_memory
-                        self.model.addConstr(
-                            quicksum(self._de_st_mb[did][lid]['pf'][mid]) * (Activation.FULL_LAYER * (1 - self._layer_recomp_rate[lid])) 
-                            + quicksum(self._de_st_mb[did][lid]['pb'][mid]) * (Gradient.INPUT + Activation.FULL_LAYER * self._layer_recomp_rate[lid])
-                            - quicksum(self._de_st_mb[did][lid]['pw'][mid]) * (Gradient.INPUT + Activation.FULL_LAYER)
-                            + base_memory
-                            <= 
-                            GPU_MAX_MEM
-                        )
+                            if SPLIT_BACKPROP:                                
+                                self.model.addConstr((binary_w == 1) >> (self._orders[did][lid][mid][o_lid]['w'][o_mid] == 1))
+                                self.model.addConstr((binary_w == 0) >> (self._orders[did][lid][mid][o_lid]['w'][o_mid] == 0))
+                    
+                    required_memory = get_required_memory(
+                            stage_id=lid,
+                            layer_num=1,
+                            workload_type=workload_type_mapping['w' if SPLIT_BACKPROP else 'b'],
+                            workload_type_num=WORKLOAD_TYPE_NUM,
+                            layer_wise=True,
+                            recomp=self._layer_recomp_rate[lid],
+                    )
+
+                    base_memory = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) + LAYER_MEMORY + required_memory
+                    accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid)
+                    accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid)
+                    released_memory = self._get_released_memory(did=did, lid=lid, mid=mid)
+                    self.model.addConstr(
+                        accumulated_activations
+                        + accumulated_input_gradients
+                        - released_memory
+                        + base_memory
+                        <= 
+                        GPU_MAX_MEM
+                    )   
+
+    def _get_accumulated_activations(self, did, lid, mid):
+        accumulated_activations = 0
+        orders = self._orders[did][lid][mid]
+        for o_lid in self._devices[did]:
+            if o_lid == 0 or o_lid >= LAYER_NUM - 2:
+                continue
+            for o_mid in range(self._num_microbatches):
+                if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
+                    continue
+                accumulated_activations += orders[o_lid]['f'][o_mid] * Activation.FULL_LAYER * (1 - self._layer_recomp_rate[o_lid])
+        return accumulated_activations
+
+    def _get_accumulated_input_gradients(self, did, lid, mid):
+        accumulated_input_gradients = 0
+        orders = self._orders[did][lid][mid]
+        for o_lid in self._devices[did]:
+            if o_lid == 0 or o_lid >= LAYER_NUM - 2:
+                continue
+            for o_mid in range(self._num_microbatches):
+                if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
+                    continue
+                accumulated_input_gradients += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER * self._layer_recomp_rate[o_lid])
+        return accumulated_input_gradients
+    
+    def _get_released_memory(self, did, lid, mid):
+        released_memory = 0
+        orders = self._orders[did][lid][mid]
+        for o_lid in self._devices[did]:
+            if o_lid == 0 or o_lid >= LAYER_NUM - 2:
+                continue
+            for o_mid in range(self._num_microbatches):
+                if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
+                    continue
+                released_memory += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER)
+        return released_memory
 
     def _build_constraints(self) -> None:
         self._generate_variables()
-        self._set_memory_constraints()
+        self._add_memory_constraints()
         # 添加约束
         self._comm_length = self._reset_comm_length(self._devices)
         self._real_pipeline_modeling_constraint_strict()

@@ -124,16 +124,41 @@ class Stage:
                 ) 
 
     def update_memory_usage(self, workload:Workload):
-        layers_per_stage = 1 if SCHEDULE_METHOD == SchedulePriority.Layerwise else LAYER_NUM // STAGE_NUM
-        if workload.workload_type == WorkloadType.F:
-            if self.stage_id != 0:
+        if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if self.stage_id == 0:
+                return
+            if workload.workload_type == WorkloadType.F:
+                if self.stage_id == LAYER_NUM - 2:
+                    self.memory_usage += Activation.LOSS
+                else:
+                    self.memory_usage += Activation.FULL_LAYER
+            elif workload.workload_type == WorkloadType.B:
+                if SPLIT_BACKPROP:
+                    self.memory_usage += Gradient.INPUT
+                else:
+                    if self.stage_id == LAYER_NUM - 2:
+                        self.memory_usage -= Activation.LOSS
+                    else:
+                        self.memory_usage -= Activation.FULL_LAYER
+            elif workload.workload_type == WorkloadType.W:
+                if SPLIT_BACKPROP:
+                    self.memory_usage -= Gradient.INPUT
+                    if self.stage_id == LAYER_NUM - 2:
+                        self.memory_usage -= Activation.LOSS
+                    else:
+                        self.memory_usage -= Activation.FULL_LAYER
+        else:
+            layers_per_stage = LAYER_NUM // STAGE_NUM
+            if workload.workload_type == WorkloadType.F:
                 self.memory_usage += Activation.FULL_LAYER * layers_per_stage
-        elif workload.workload_type == WorkloadType.W:
-            self.memory_usage -= (Activation.FULL_LAYER + Gradient.INPUT) * layers_per_stage
-        elif SPLIT_BACKPROP and workload.workload_type == WorkloadType.B:
-            self.memory_usage += Gradient.INPUT * layers_per_stage
-        elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.B:
-            self.memory_usage -= Activation.FULL_LAYER * layers_per_stage
+                if self.stage_id == STAGE_NUM - 1:
+                    self.memory_usage += Activation.LOSS
+            elif workload.workload_type == WorkloadType.W:
+                self.memory_usage -= (Activation.FULL_LAYER + Gradient.INPUT) * layers_per_stage
+            elif SPLIT_BACKPROP and workload.workload_type == WorkloadType.B:
+                self.memory_usage += Gradient.INPUT * layers_per_stage
+            elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.B:
+                self.memory_usage -= Activation.FULL_LAYER * layers_per_stage
         
     def execute_workload(self, mid=None, workload_type=None):
         if mid is not None and workload_type is not None and workload_type in self.workloads[mid]:
