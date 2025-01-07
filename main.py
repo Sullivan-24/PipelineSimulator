@@ -18,9 +18,9 @@ def main():
         "pp_size": int(STAGE_NUM),
         "model_size": int(LAYER_NUM),
         "num_microbatches": int(MICRO_BATCH_NUM),
-        "forward_execution_time": [FPW_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-        "backward_execution_i_time": [IGW_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-        "backward_execution_g_time": [PGW_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "forward_execution_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "backward_execution_i_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "backward_execution_g_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
         "mix_training": MIX_TRAINING,
         "model_para_num": PARAMETER_NUM,
@@ -39,27 +39,27 @@ def main():
     print(GPU_MAX_MEM)
 
     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
-        config["forward_execution_time"] = [EMBEDDING_TIME] + [FPW_TIME for _ in range(LAYER_NUM)] + [LAST_FFN_F_TIME, LOSS_F_TIME]
-        config["backward_execution_i_time"] = [0] + [IGW_TIME for _ in range(LAYER_NUM)] + [LAST_FFN_B_TIME, LOSS_B_TIME]
+        config["forward_execution_time"] = [EMBEDDING_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
+        config["backward_execution_i_time"] = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
         #TODO cross entropy does not need W
-        config["backward_execution_g_time"] = [0] + [PGW_TIME for _ in range(LAYER_NUM)] + [LAST_FFN_W_TIME, LOSS_W_TIME]
+        config["backward_execution_g_time"] = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
         config["model_size"] = config["model_size"] + 3
     else:
-        config["forward_execution_time"] =    [FPW_TIME for _ in range(LAYER_NUM)] 
-        config["backward_execution_i_time"] = [IGW_TIME for _ in range(LAYER_NUM)] 
-        config["backward_execution_g_time"] = [PGW_TIME for _ in range(LAYER_NUM)]
+        config["forward_execution_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
+        config["backward_execution_i_time"] = [B_TIME for _ in range(LAYER_NUM)] 
+        config["backward_execution_g_time"] = [W_TIME for _ in range(LAYER_NUM)]
         
         fwd_time = config["forward_execution_time"]
         fwd_time[0] += EMBEDDING_TIME
-        fwd_time[-1] += LOSS_F_TIME + LAST_FFN_F_TIME
+        fwd_time[-1] += CE_F_TIME + HEAD_F_TIME
         config["forward_execution_time"] = fwd_time
 
         iwd_time = config["backward_execution_i_time"]
-        iwd_time[-1] += LOSS_B_TIME + LAST_FFN_B_TIME
+        iwd_time[-1] += CE_B_TIME + HEAD_B_TIME
         config["backward_execution_i_time"] = iwd_time
 
         gwd_time = config["backward_execution_g_time"]
-        gwd_time[-1] += LOSS_W_TIME + LAST_FFN_W_TIME
+        gwd_time[-1] += CE_W_TIME + HEAD_W_TIME
         config["backward_execution_g_time"] = gwd_time
         
     if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
@@ -108,7 +108,7 @@ def main():
 if __name__ == "__main__":
     current_time = datetime.now()
     timestamp = current_time.strftime("%Y%m%d%H%M%S")
-    filename = f"{timestamp}-{DEVICE_NUM}-{MICRO_BATCH_NUM}-{int(FPW_TIME)}-{int(IGW_TIME)}-{int(PGW_TIME)}.txt"
+    filename = f"{timestamp}-{DEVICE_NUM}-{MICRO_BATCH_NUM}-{int(F_TIME)}-{int(B_TIME)}-{int(W_TIME)}.txt"
 
     print(f"Begin solving procedure...")
     main()

@@ -25,8 +25,8 @@ class LayerwiseSimulator:
         self._profiled_layer_b_length = config["backward_execution_i_time"]
         self._profiled_layer_w_length = config["backward_execution_g_time"]
         
-        self._profiled_additional_layer_f_length = [EMBEDDING_TIME  if lid == 0 else (LAST_FFN_F_TIME if lid == LAYER_NUM-1 else 0) for lid in range(LAYER_NUM)]
-        self._profiled_additional_layer_b_length = [LAST_FFN_B_TIME if lid == LAYER_NUM-1 else 0 for lid in range(LAYER_NUM)]
+        self._profiled_additional_layer_f_length = [EMBEDDING_TIME  if lid == 0 else (HEAD_F_TIME if lid == LAYER_NUM-1 else 0) for lid in range(LAYER_NUM)]
+        self._profiled_additional_layer_b_length = [HEAD_B_TIME if lid == LAYER_NUM-1 else 0 for lid in range(LAYER_NUM)]
         self._profiled_additional_layer_w_length = [0 for _ in range(LAYER_NUM)]
         
         self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
@@ -39,7 +39,7 @@ class LayerwiseSimulator:
         # 创建 Gurobi 模型
         self.model = Model("SPSimulator")
 
-        self.minimal_time_with_sync_update = (DEVICE_NUM - 1) * (FPW_TIME // CHUNK_NUM + COMM_TIME) + (FPW_TIME + IGW_TIME + PGW_TIME) * MICRO_BATCH_NUM
+        self.minimal_time_with_sync_update = (DEVICE_NUM - 1) * (F_TIME // CHUNK_NUM + COMM_TIME) + (F_TIME + B_TIME + W_TIME) * MICRO_BATCH_NUM
         print("MINIMAL TIME WITH SYNC UPDATE:{}".format(self.minimal_time_with_sync_update))
 
         # 变量初始化

@@ -20,12 +20,12 @@ if RUN_MODE == RunMode.SIM_SOLVE:
     if SCHEDULE_METHOD == SchedulePriority.ONE_F_ONE_B:
         SPLIT_BACKPROP = False
         CHUNK_NUM = 1
-        IGW_TIME += PGW_TIME
+        B_TIME += W_TIME
     elif SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
         assert CHUNK_NUM > 1, "INTERLEAVED: CHUNK_NUM should be larger than 1"
         SPLIT_BACKPROP = False
         if not SPLIT_BACKPROP:
-            IGW_TIME += PGW_TIME
+            B_TIME += W_TIME
     elif SCHEDULE_METHOD == SchedulePriority.ZBH1:
         SPLIT_BACKPROP = True
         CHUNK_NUM = 1

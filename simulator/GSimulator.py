@@ -34,7 +34,7 @@ class GSimulator:
         # 创建 Gurobi 模型
         self.model = Model("SPSimulator")
 
-        self.minimal_time_with_sync_update = (DEVICE_NUM - 1) * (FPW_TIME // CHUNK_NUM + COMM_TIME) + (FPW_TIME + IGW_TIME + PGW_TIME) * MICRO_BATCH_NUM
+        self.minimal_time_with_sync_update = (DEVICE_NUM - 1) * (F_TIME // CHUNK_NUM + COMM_TIME) + (F_TIME + B_TIME + W_TIME) * MICRO_BATCH_NUM
         print("MINIMAL TIME WITH SYNC UPDATE:{}".format(self.minimal_time_with_sync_update))
 
         # 变量初始化

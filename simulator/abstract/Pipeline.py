@@ -120,8 +120,8 @@ class PipelineScheduler:
             # Inject as much as possible F with limited max activation counts
             if MAX_ACTIVATION_COUNTS > STAGE_NUM * CHUNK_NUM:
                 comm_delay = (DEVICE_NUM - did - 1) * 2 * COMM_TIME
-                compute_delay = (DEVICE_NUM - did - 1) * IGW_TIME
-                additional_f_num = min(MAX_ACTIVATION_COUNTS - mids[0] - did, (comm_delay + compute_delay) // FPW_TIME)
+                compute_delay = (DEVICE_NUM - did - 1) * B_TIME
+                additional_f_num = min(MAX_ACTIVATION_COUNTS - mids[0] - did, (comm_delay + compute_delay) // F_TIME)
                 while mids[0] < min(MAX_ACTIVATION_COUNTS, MICRO_BATCH_NUM) and additional_f_num:
                     self.schedule[did].append((WorkloadType.F ,mids[0], did))
                     mids[0] += 1
@@ -165,7 +165,7 @@ class PipelineScheduler:
     def generate_zbv_schedule(self):
         assert WORKLOAD_TYPE_NUM == 3
         layers_per_stage = LAYER_NUM // STAGE_NUM
-        real_f_len = FPW_TIME * layers_per_stage
+        real_f_len = F_TIME * layers_per_stage
         comm_time  = COMM_TIME
         workload_type_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F]
         workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1, WorkloadType.W : 2}
@@ -360,18 +360,18 @@ class PipelineScheduler:
     def draw(self) -> None:
         # 绘制结果的逻辑
         if SCHEDULE_METHOD == SchedulePriority.Layerwise:
-            fwd_time = [FPW_TIME for _ in range(LAYER_NUM+3)]
+            fwd_time = [F_TIME for _ in range(LAYER_NUM+3)]
             fwd_time[0] = EMBEDDING_TIME
-            fwd_time[-1] = LOSS_F_TIME
-            fwd_time[-2] = LAST_FFN_F_TIME
-            iwd_time = [IGW_TIME for _ in range(LAYER_NUM+3)]
+            fwd_time[-1] = CE_F_TIME
+            fwd_time[-2] = HEAD_F_TIME
+            iwd_time = [B_TIME for _ in range(LAYER_NUM+3)]
             iwd_time[0] = 0
-            iwd_time[-1] = LOSS_B_TIME
-            iwd_time[-2] = LAST_FFN_B_TIME
-            pwd_time = [PGW_TIME for _ in range(LAYER_NUM+3)]
+            iwd_time[-1] = CE_B_TIME
+            iwd_time[-2] = HEAD_B_TIME
+            pwd_time = [W_TIME for _ in range(LAYER_NUM+3)]
             pwd_time[0] = 0
-            pwd_time[-1] = LOSS_W_TIME
-            pwd_time[-2] = LAST_FFN_W_TIME
+            pwd_time[-1] = CE_W_TIME
+            pwd_time[-2] = HEAD_W_TIME
             
             painter_conf = {
                 "device_size": DEVICE_NUM,
@@ -390,9 +390,9 @@ class PipelineScheduler:
             LSP(painter_conf).draw(self.results)
         else:
             layers_per_stage = LAYER_NUM // STAGE_NUM
-            base_f = FPW_TIME * layers_per_stage
-            base_b = IGW_TIME * layers_per_stage
-            base_w = PGW_TIME * layers_per_stage
+            base_f = F_TIME * layers_per_stage
+            base_b = B_TIME * layers_per_stage
+            base_w = W_TIME * layers_per_stage
             painter_conf = {
                 "device_size": DEVICE_NUM,
                 "devices": self.dsa,
@@ -401,9 +401,9 @@ class PipelineScheduler:
                 "pp_align": 10,
                 "pixel_base": PIXEL_BASE,
                 "num_microbatches": MICRO_BATCH_NUM,
-                "forward_length": [base_f + EMBEDDING_TIME if _ == 0 else (base_f + LAST_FFN_F_TIME + LOSS_F_TIME if _ == STAGE_NUM - 1 else base_f) for _ in range(STAGE_NUM)],
-                "backward_length": [base_b + EMBEDDING_TIME if _ == 0 else (base_b + LAST_FFN_B_TIME + LOSS_B_TIME if _ == STAGE_NUM - 1 else base_b) for _ in range(STAGE_NUM)],
-                "backward_length2": [base_w + EMBEDDING_TIME if _ == 0 else (base_w + LAST_FFN_W_TIME + LOSS_W_TIME if _ == STAGE_NUM - 1 else base_w) for _ in range(STAGE_NUM)],
+                "forward_length": [base_f + EMBEDDING_TIME if _ == 0 else (base_f + HEAD_F_TIME + CE_F_TIME if _ == STAGE_NUM - 1 else base_f) for _ in range(STAGE_NUM)],
+                "backward_length": [base_b + EMBEDDING_TIME if _ == 0 else (base_b + HEAD_B_TIME + CE_B_TIME if _ == STAGE_NUM - 1 else base_b) for _ in range(STAGE_NUM)],
+                "backward_length2": [base_w + EMBEDDING_TIME if _ == 0 else (base_w + HEAD_W_TIME + CE_W_TIME if _ == STAGE_NUM - 1 else base_w) for _ in range(STAGE_NUM)],
                 # "backward_length": [IGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
                 # "backward_length2": [PGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
                 "comm_length": [COMM_TIME for _ in range(STAGE_NUM)],

@@ -17,42 +17,42 @@ class Stage:
     def _get_workload_duration(self, device_id, stage_id, microbatch_id, workload_type):
         if SchedulePriority.Layerwise == SCHEDULE_METHOD:
             if workload_type == WorkloadType.F:
-                duration = FPW_TIME
+                duration = F_TIME
                 if stage_id == 0:
                     duration = EMBEDDING_TIME
                 elif stage_id == LAYER_NUM + 2:
-                    duration = LOSS_F_TIME
+                    duration = CE_F_TIME
                 elif stage_id == LAYER_NUM + 1:
-                    duration = LAST_FFN_F_TIME
+                    duration = HEAD_F_TIME
 
             elif workload_type == WorkloadType.B:
-                duration = IGW_TIME
+                duration = B_TIME
                 if stage_id == LAYER_NUM + 2:
-                    duration = LOSS_B_TIME
+                    duration = CE_B_TIME
                 elif stage_id == LAYER_NUM + 1:
-                    duration = LAST_FFN_B_TIME
+                    duration = HEAD_B_TIME
             elif workload_type == WorkloadType.W:
-                duration = PGW_TIME
+                duration = W_TIME
                 if stage_id == LAYER_NUM + 2:
-                    duration = LOSS_W_TIME
+                    duration = CE_W_TIME
                 elif stage_id == LAYER_NUM + 1:
-                    duration = LAST_FFN_W_TIME
+                    duration = HEAD_W_TIME
         else:
             layer_per_stage = LAYER_NUM // STAGE_NUM
             if workload_type == WorkloadType.F:
-                duration = FPW_TIME * layer_per_stage
+                duration = F_TIME * layer_per_stage
                 if stage_id == 0:
                     duration += EMBEDDING_TIME
                 elif stage_id == STAGE_NUM - 1:
-                    duration += LAST_FFN_F_TIME + LOSS_F_TIME
+                    duration += HEAD_F_TIME + CE_F_TIME
             elif workload_type == WorkloadType.B:
-                duration = IGW_TIME * layer_per_stage
+                duration = B_TIME * layer_per_stage
                 if stage_id == STAGE_NUM - 1:
-                    duration += LAST_FFN_B_TIME + LOSS_B_TIME
+                    duration += HEAD_B_TIME + CE_B_TIME
             elif workload_type == WorkloadType.W:
-                duration = PGW_TIME * layer_per_stage
+                duration = W_TIME * layer_per_stage
                 if stage_id == STAGE_NUM - 1:
-                    duration += LAST_FFN_W_TIME + LOSS_W_TIME
+                    duration += HEAD_W_TIME + CE_W_TIME
             else:
                 raise Exception("Wrong workload type!")
         return duration

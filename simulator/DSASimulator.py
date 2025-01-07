@@ -5,7 +5,7 @@ import itertools
 from .GSimulator import GSimulator
 from .SPSimulator import SPSimulator
 from .utils import resort_microbatch_index, print_to_file
-from .abstract.mutils import FPW_TIME, PGW_TIME, IGW_TIME, LAYER_NUM
+from .abstract.mutils import F_TIME, W_TIME, B_TIME, LAYER_NUM
 
 class DSASimulator:
     def __init__(self, config, solver_type="gurobi") -> None:
@@ -106,8 +106,8 @@ class DSASimulator:
         print_to_file(self._file_path, "Traversing over. {} situations found.\n".format(len(self._dsa_hash)))
         print_to_file(self._file_path, "D={},S={},M={},F={},B={},W={},C={},SOS={}.\n".format(
             self._device_size, self._pp_size, LAYER_NUM, 
-            FPW_TIME, IGW_TIME, 
-            PGW_TIME, self._basic_comm_length,
+            F_TIME, B_TIME, 
+            W_TIME, self._basic_comm_length,
             self._stage_order_search,
         ))
         

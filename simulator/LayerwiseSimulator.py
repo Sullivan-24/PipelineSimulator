@@ -51,7 +51,7 @@ class LayerwiseSimulator:
         assert isinstance(self._profiled_layer_w_length, (list, tuple))
 
         # TODO 估算总时间限定大M取值（须大于等于估算值）
-        self.estimated_time_cost = MICRO_BATCH_NUM * (FPW_TIME)
+        self.estimated_time_cost = MICRO_BATCH_NUM * (F_TIME)
         # 创建 Gurobi 模型
         self.model = Model("SPSimulator")
 
@@ -79,8 +79,8 @@ class LayerwiseSimulator:
             self.pipeline_scheduler.run_pipeline_parallelism()
             # self.pipeline_scheduler.draw()
         self.model_result = None
-        additional_time = LAST_FFN_F_TIME + LAST_FFN_B_TIME + LAST_FFN_W_TIME
-        print("Theoretical minimal time:{}.".format(EMBEDDING_TIME + COMM_TIME + MICRO_BATCH_NUM * (len(self._devices[0]) - 1) * (FPW_TIME + IGW_TIME + PGW_TIME) + MICRO_BATCH_NUM * additional_time))
+        additional_time = HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME
+        print("Theoretical minimal time:{}.".format(EMBEDDING_TIME + COMM_TIME + MICRO_BATCH_NUM * (len(self._devices[0]) - 1) * (F_TIME + B_TIME + W_TIME) + MICRO_BATCH_NUM * additional_time))
 
     def show_device_stage_mapping(self):
         for did, ds in enumerate(self._devices):
