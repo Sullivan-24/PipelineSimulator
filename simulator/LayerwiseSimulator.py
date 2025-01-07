@@ -80,7 +80,7 @@ class LayerwiseSimulator:
         print("Theoretical minimal time:{}.".format(EMBEDDING_TIME + COMM_TIME + MICRO_BATCH_NUM * (len(self._devices[0]) - 1) * (F_TIME + B_TIME + W_TIME) + MICRO_BATCH_NUM * additional_time))
 
     def estimate_time_cost(self):
-        fbw_time = MICRO_BATCH_NUM * (F_TIME + B_TIME + W_TIME)
+        fbw_time = (MICRO_BATCH_NUM + DEVICE_NUM) * (F_TIME + B_TIME + W_TIME)
         emb_time = EMBEDDING_TIME
         head_time = MICRO_BATCH_NUM * (HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME)
         ce_time = MICRO_BATCH_NUM * (CE_F_TIME + CE_B_TIME + CE_W_TIME)
@@ -313,7 +313,7 @@ class LayerwiseSimulator:
             for i in range(self._num_layer - 1, 1, -1):
                 self.model.addConstr(self._layer_b_offsets[i - 1][mb] >= self._layer_b_offsets[i][mb] +
                                      self._layer_b_length[i] + self._comm_length[i][i - 1])
-            # Special case: Embedding layer
+            # NOTE: Embedding layer has no B
             self.model.addConstr(self._layer_b_offsets[0][mb] == self._layer_f_offsets[0][mb] + self._layer_f_length[0])
             
 
@@ -321,17 +321,21 @@ class LayerwiseSimulator:
                                  self._layer_f_length[self._num_layer - 1])
 
             if SPLIT_BACKPROP:
-                # Special case: Embedding layer
+                # NOTE: Embedding layer has no W
                 self.model.addConstr(self._layer_w_offsets[0][mb] == self._layer_f_offsets[0][mb] + self._layer_f_length[0])
-                for i in range(1, self._num_layer):
+                for i in range(1, self._num_layer - 1):
                     self.model.addConstr(self._layer_w_offsets[i][mb] >= self._layer_b_offsets[i][mb] +
                                         self._layer_b_length[i])
+                # NOTE: CE layer has no W
+                self.model.addConstr(self._layer_w_offsets[self._num_layer - 1][mb] == self._layer_b_offsets[self._num_layer - 1][mb] +
+                                        self._layer_b_length[self._num_layer - 1])
 
             if mb > 0:
-                # Special case: Embedding layer
+                # NOTE: Embedding layer has no B and W
                 self.model.addConstr(self._layer_f_offsets[0][mb] >= self._layer_f_offsets[0][mb - 1] +
                                          self._layer_f_length[0])
-                for i in range(1, self._num_layer):
+                # Transformer layer + Head layer
+                for i in range(1, self._num_layer - 1):
                     self.model.addConstr(self._layer_f_offsets[i][mb] >= self._layer_f_offsets[i][mb - 1] +
                                          self._layer_f_length[i])
                     self.model.addConstr(self._layer_b_offsets[i][mb] >= self._layer_b_offsets[i][mb - 1] +
@@ -339,6 +343,11 @@ class LayerwiseSimulator:
                     if SPLIT_BACKPROP:
                         self.model.addConstr(self._layer_w_offsets[i][mb] >= self._layer_w_offsets[i][mb - 1] +
                                             self._layer_w_length[i])
+                # NOTE: CE layer has no W
+                self.model.addConstr(self._layer_f_offsets[self._num_layer - 1][mb] >= self._layer_f_offsets[self._num_layer - 1][mb - 1] +
+                                        self._layer_f_length[self._num_layer - 1])
+                self.model.addConstr(self._layer_b_offsets[self._num_layer - 1][mb] >= self._layer_b_offsets[self._num_layer - 1][mb - 1] +
+                                        self._layer_b_length[self._num_layer - 1])
         
         self.model.addConstr(self._layer_f_offsets[0][0] == 0)
 

@@ -64,12 +64,25 @@ class Device:
                             print(self.stages[sid].workloads[mid][wlt])
 
     def add_stage(self, stage_id: int) -> None:
-        layer_per_stage = 1 if SchedulePriority.Layerwise else LAYER_NUM // STAGE_NUM
+        layer_per_stage = LAYER_NUM // STAGE_NUM
+        stage_type = StageType.LAYERS
+        if SchedulePriority.Layerwise:
+            layer_per_stage = 1 
+            if stage_id == 0:
+                stage_type = StageType.EMBD
+            elif stage_id == LAYER_NUM + 1:
+                stage_type = StageType.HEAD
+            elif stage_id == LAYER_NUM + 2:
+                stage_type = StageType.CE
+            else:
+                stage_type = StageType.LAYER
+                
         stage = Stage(
                 device_id=self.device_id, 
                 stage_id=stage_id,
                 # memory_usage=0, 
                 memory_usage=OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) + LAYER_MEMORY * layer_per_stage, 
+                stage_type=stage_type,
             )
         self.stages[stage.stage_id] = stage
 

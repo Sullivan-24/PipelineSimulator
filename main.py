@@ -41,7 +41,6 @@ def main():
     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
         config["forward_execution_time"] = [EMBEDDING_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
         config["backward_execution_i_time"] = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
-        #TODO cross entropy does not need W
         config["backward_execution_g_time"] = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
         config["model_size"] = config["model_size"] + 3
     else:
