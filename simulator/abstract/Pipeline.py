@@ -348,11 +348,14 @@ class PipelineScheduler:
             self.execute_workload()
             UPDATE_TIME()
 
-    def show_mem_usage(self):
+    def show_mem_usage(self, device_id=(0,)):
         for device in self.devices:
-            print("Device {} mem usage:".format(device.device_id))
-            for t, mem_record in device.mem_usage_record.items():
-                print("Time {}, mem = {}.".format(t, mem_record))
+            if device.device_id in device_id:
+                print("Device {} mem usage:".format(device.device_id))
+                last_mem_record = 0
+                for t, mem_record in device.mem_usage_record.items():
+                    print("Time {}, mem = {}, {}.".format(t, round(mem_record/G,2), round((mem_record - last_mem_record) / G, 2)))
+                    last_mem_record = mem_record
 
     def draw(self) -> None:
         # 绘制结果的逻辑

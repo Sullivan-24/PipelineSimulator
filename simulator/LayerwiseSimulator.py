@@ -50,6 +50,8 @@ class LayerwiseSimulator:
         assert isinstance(self._profiled_layer_b_length, (list, tuple))
         assert isinstance(self._profiled_layer_w_length, (list, tuple))
 
+        # TODO 估算总时间限定大M取值（须大于等于估算值）
+        self.estimated_time_cost = MICRO_BATCH_NUM * (FPW_TIME)
         # 创建 Gurobi 模型
         self.model = Model("SPSimulator")
 
@@ -84,16 +86,15 @@ class LayerwiseSimulator:
         for did, ds in enumerate(self._devices):
             print_to_file(self._file_path, "Device {}: {}.\n".format(did, ds))
 
-    def show_solution_detail(self):
-        prefixes = ('f_', 'b_', 'w_')
-        for key in self.model_result:
+    def show_solution_detail(self, prefixes = ('f_', 'b_', 'w_'), results=None):
+        if not results:
+            results = self.model_result
+        for key in results:
             if str(key).startswith(prefixes):
-                print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
-            # if not (str(key).startswith("Do") or str(key).startswith("act") or str(key).startswith("binary")):
-            #     print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
+                print_to_file(self._file_path, "{},{}.\n".format(str(key), round(results[key] / G,3) if results[key] > G else results[key]))
             if str(key) == "max_start_offset":
-                print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
-
+                print_to_file(self._file_path, "MinExeTime:{}.\n".format(results[key]))
+                
     def _fix_stages(self):
         idx_offset = 1 if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE else 0
         lid_range = range(idx_offset, self._num_layer - 2) if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE else range(self._num_layer)
@@ -129,15 +130,15 @@ class LayerwiseSimulator:
             self._layer_recomp_rate.append(self.model.addVar(vtype=GRB.BINARY, name=f"theta_{lid}"))
             for mid in range(self._num_microbatches):
                 
-                self._layer_f_offsets[lid].append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"f_{mid}_{lid}", lb=0))
-                self._layer_b_offsets[lid].append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"b_{mid}_{lid}", lb=0))
+                self._layer_f_offsets[lid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid}_{lid}", lb=0))
+                self._layer_b_offsets[lid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid}_{lid}", lb=0))
                 if SPLIT_BACKPROP:
-                    self._layer_w_offsets[lid].append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"w_{mid}_{lid}", lb=0))
+                    self._layer_w_offsets[lid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid}_{lid}", lb=0))
             
-            self._layer_f_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{lid}_f"))
-            self._layer_b_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{lid}_b"))
+            self._layer_f_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{lid}_f"))
+            self._layer_b_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{lid}_b"))
             if SPLIT_BACKPROP:
-                self._layer_w_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{lid}_w"))
+                self._layer_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{lid}_w"))
             
             self.model.addConstr(self._layer_f_length[lid] == self._profiled_layer_f_length[lid] + self._profiled_additional_layer_f_length[lid])
             self.model.addConstr(self._layer_b_length[lid] == self._profiled_layer_b_length[lid] + self._layer_recomp_rate[lid] * self._layer_f_length[lid] + self._profiled_additional_layer_b_length[lid])
@@ -196,7 +197,7 @@ class LayerwiseSimulator:
                             binary_b = self.model.addVar(vtype=GRB.BINARY, name=f'binary_b_{lid}_{mid}_{o_lid}_{o_mid}')
                             binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'binary_w_{lid}_{mid}_{o_lid}_{o_mid}')
 
-                            eps = 0.001
+                            eps = 0.1
                             M = 10000
                             self.model.addConstr(pivot >= self._layer_f_offsets[o_lid][o_mid] + eps - M * (1 - binary_f) )
                             self.model.addConstr(pivot <= self._layer_f_offsets[o_lid][o_mid] + M * binary_f)
@@ -227,18 +228,22 @@ class LayerwiseSimulator:
                             recomp=self._layer_recomp_rate[lid],
                     )
 
-                    base_memory = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) + LAYER_MEMORY + required_memory
+                    base_memory = (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) + LAYER_MEMORY) * len(self._devices[did])
                     accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid)
                     accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid)
                     released_memory = self._get_released_memory(did=did, lid=lid, mid=mid)
+                    mw = self.model.addVar(name=f"mem_w_{lid}_{mid}",vtype=GRB.INTEGER)
+                    # mw = accumulated_activations + accumulated_input_gradients - released_memory + base_memory + required_memory
                     self.model.addConstr(
-                        accumulated_activations
+                        (accumulated_activations
                         + accumulated_input_gradients
                         - released_memory
                         + base_memory
-                        <= 
-                        GPU_MAX_MEM
+                        + required_memory) == mw
                     )   
+                    self.model.addConstr(
+                        mw <= GPU_MAX_MEM
+                    )
 
     def _get_accumulated_activations(self, did, lid, mid):
         accumulated_activations = 0
@@ -365,14 +370,14 @@ class LayerwiseSimulator:
                     )
                     y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{did}_{i}_{j}")
                     # when time increses, M also increases to ensure right answer
-                    M = 1e5
-                    self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M) 
-                    self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M)
+                    M = 1e4
+                    self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M, name=f"Do{did}_{i}_{j}1") 
+                    self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M, name=f"Do{did}_{i}_{j}2")
                     
         print_to_file(self._file_path, "Total Constraints within Device:{}, Redundant Constraints:{}.\n".format(total_constraints, same_mb_redundant_constraints))
 
     def _build_optimize_objectives(self) -> None:
-        max_var = self.model.addVar(vtype=GRB.CONTINUOUS, name="max_start_offset")
+        max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
         for lid in range(self._num_layer):
             if SPLIT_BACKPROP:
                 self.model.addConstr(max_var >= self._layer_w_offsets[lid][-1] + self._layer_w_length[lid])
@@ -386,6 +391,14 @@ class LayerwiseSimulator:
         for var in self.model.getVars():
             if var.VarName in self.pipeline_scheduler.results.keys():
                 var.Start = self.pipeline_scheduler.results[var.VarName]
+
+        for constrs in self.model.getConstrs():
+            if constrs.ConstrName == "R1078":
+                print("------------")
+                print(constrs.ConstrName, self.model.getConstrByName(constrs.ConstrName).Sense)
+                print("------------")
+                self.model.write("model.lp")
+                input()
 
     def run(self, draw=False) -> None:
         """run simulation"""
@@ -418,6 +431,7 @@ class LayerwiseSimulator:
             self._layer_f_length[i] = self._profiled_layer_f_length[i] + self._profiled_additional_layer_f_length[i]
             self._layer_b_length[i] = self._profiled_layer_b_length[i] + self._profiled_additional_layer_b_length[i]
             self._layer_w_length[i] = self._profiled_layer_w_length[i] + self._profiled_additional_layer_w_length[i]
+        self.show_solution_detail(prefixes=("mem_w",))
         if draw:
             # 4. draws the result.
             results = {str(key) : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}

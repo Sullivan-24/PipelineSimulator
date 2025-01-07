@@ -157,8 +157,8 @@ class LayerwiseSchedulingPainter:
             # 求余考虑virtual stage的情况
             bold_font = font.Font(
                 # family="Calibri Light", 
-                underline= pid // self._device_size % 2,
-                weight= tk.font.NORMAL if pid // self._device_size % 2 else tk.font.BOLD
+                underline= (max(0,pid-1)) // self._device_size % 2,
+                weight= tk.font.NORMAL if (max(0,pid-1)) // self._device_size % 2 else tk.font.BOLD
             )
             text = main_canvas.create_text(
                 (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font

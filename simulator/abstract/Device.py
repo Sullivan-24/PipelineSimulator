@@ -67,7 +67,8 @@ class Device:
         layer_per_stage = 1 if SchedulePriority.Layerwise else LAYER_NUM // STAGE_NUM
         stage = Stage(
                 device_id=self.device_id, 
-                stage_id=stage_id, 
+                stage_id=stage_id,
+                # memory_usage=0, 
                 memory_usage=OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) + LAYER_MEMORY * layer_per_stage, 
             )
         self.stages[stage.stage_id] = stage
@@ -124,12 +125,6 @@ class Device:
                     return proc_workload
             elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-                # now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
-                # if self.last_workload_type == WorkloadType.B:
-                #     now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
-                # elif self.last_workload_type == WorkloadType.F:
-                #     now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-                
                 for workload_type in now_workload_priority_order:
                     for mid in range(self.nmb):
                         for sid in self.stages:
@@ -172,13 +167,14 @@ class Device:
         return False
 
     def update_memory_usage(self) -> int:
-        if self.proc_workload.state == Workload.IN_PROGRESS and self.proc_workload.workload_type == WorkloadType.F:
+        if self.proc_workload.state == Workload.IN_PROGRESS and self.proc_workload.workload_type in (WorkloadType.F, WorkloadType.B):
             self.stages[self.proc_workload.stage_id].update_memory_usage(workload=self.proc_workload)
         elif self.proc_workload.state == Workload.COMPLETED and self.proc_workload.workload_type == WorkloadType.W:
             self.stages[self.proc_workload.stage_id].update_memory_usage(workload=self.proc_workload)
             
         self.current_mem_usage = sum(stage.memory_usage for stage in self.stages.values())
-        self.mem_usage_record[GET_TIME()] = self.current_mem_usage
+        self.mem_usage_record[(self.proc_workload.start_time,self.proc_workload.end_time)] = self.current_mem_usage
+        # self.mem_usage_record[GET_TIME()] = self.current_mem_usage
     
     def get_memory_usage(self) -> int:
         return self.current_mem_usage

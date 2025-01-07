@@ -41,6 +41,7 @@ def main():
     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
         config["forward_execution_time"] = [EMBEDDING_TIME] + [FPW_TIME for _ in range(LAYER_NUM)] + [LAST_FFN_F_TIME, LOSS_F_TIME]
         config["backward_execution_i_time"] = [0] + [IGW_TIME for _ in range(LAYER_NUM)] + [LAST_FFN_B_TIME, LOSS_B_TIME]
+        #TODO cross entropy does not need W
         config["backward_execution_g_time"] = [0] + [PGW_TIME for _ in range(LAYER_NUM)] + [LAST_FFN_W_TIME, LOSS_W_TIME]
         config["model_size"] = config["model_size"] + 3
     else:
@@ -78,7 +79,6 @@ def main():
             #     ]
         )
         simulator.run(draw=True)
-        simulator.show_solution_detail()
     elif config["run_mode"] == RunMode.GUROBI_SOLVE:
         simulator = GSimulator(config, 
             # device_stage_alignments=[
@@ -100,6 +100,7 @@ def main():
         simulator = Pipeline.PipelineScheduler()
         simulator.run_pipeline_parallelism()
         # simulator.show_detail_info()
+        simulator.show_mem_usage()
         simulator.draw()
     else:
         print("Unknown run mode.")

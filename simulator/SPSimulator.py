@@ -397,6 +397,8 @@ class SPSimulator:
         # 2. builds the solver optimize objectives.
         self._build_optimize_objectives()
         
+        z3.set_param("parallel.enable", True)
+
         # 3. runs the solver.
         start_time = time.time()
         print_to_file(self._file_path, "Z3 Solver Solving...\n")
