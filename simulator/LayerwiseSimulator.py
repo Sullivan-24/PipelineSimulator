@@ -38,11 +38,6 @@ class LayerwiseSimulator:
         self._profiled_additional_layer_b_length = [0 for _ in range(self._num_layer)]
         self._profiled_additional_layer_w_length = [0 for _ in range(self._num_layer)]
         
-        #TODO Embedding, Head, Loss should not be fused into another layer since it leads to large bubble
-        # self._profiled_additional_layer_f_length[0] += EMBEDDING_TIME
-        # self._profiled_additional_layer_f_length[self._num_layer-2] += LAST_FFN_F_TIME + LOSS_F_TIME 
-        # self._profiled_additional_layer_b_length[self._num_layer-2] += LAST_FFN_B_TIME + LOSS_B_TIME
-
         self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
         
         # 检查输入参数
@@ -50,8 +45,10 @@ class LayerwiseSimulator:
         assert isinstance(self._profiled_layer_b_length, (list, tuple))
         assert isinstance(self._profiled_layer_w_length, (list, tuple))
 
-        # TODO 估算总时间限定大M取值（须大于等于估算值）
-        self.estimated_time_cost = MICRO_BATCH_NUM * (F_TIME)
+        # 估算总时间限定大M取值（须大于等于估算值）
+        self.estimated_time_cost = self.estimate_time_cost()
+        self.M = self.set_M_value(self.estimated_time_cost)
+
         # 创建 Gurobi 模型
         self.model = Model("SPSimulator")
 
@@ -81,6 +78,23 @@ class LayerwiseSimulator:
         self.model_result = None
         additional_time = HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME
         print("Theoretical minimal time:{}.".format(EMBEDDING_TIME + COMM_TIME + MICRO_BATCH_NUM * (len(self._devices[0]) - 1) * (F_TIME + B_TIME + W_TIME) + MICRO_BATCH_NUM * additional_time))
+
+    def estimate_time_cost(self):
+        fbw_time = MICRO_BATCH_NUM * (F_TIME + B_TIME + W_TIME)
+        emb_time = EMBEDDING_TIME
+        head_time = MICRO_BATCH_NUM * (HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME)
+        ce_time = MICRO_BATCH_NUM * (CE_F_TIME + CE_B_TIME + CE_W_TIME)
+        comm_time = COMM_TIME
+        res = fbw_time + emb_time + head_time + ce_time + comm_time
+        assert res > 0, "Time cost should be greater than 0"
+        print_to_file(self._file_path, "Estimated time cost {}.\n".format(res))
+        return res
+
+    def set_M_value(self, estimated_cost):
+        import math
+        n = math.floor(math.log10(estimated_cost)) + 1  # 计算位数
+        print_to_file(self._file_path, "Set M to {}.\n".format(10 ** (n + 1)))
+        return 10 ** (n + 1)  # 返回 10 的 (n + 1) 次方
 
     def show_device_stage_mapping(self):
         for did, ds in enumerate(self._devices):
@@ -198,7 +212,8 @@ class LayerwiseSimulator:
                             binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'binary_w_{lid}_{mid}_{o_lid}_{o_mid}')
 
                             eps = 0.1
-                            M = 10000
+                            # M = 10000
+                            M = self.M
                             self.model.addConstr(pivot >= self._layer_f_offsets[o_lid][o_mid] + eps - M * (1 - binary_f) )
                             self.model.addConstr(pivot <= self._layer_f_offsets[o_lid][o_mid] + M * binary_f)
 
@@ -370,7 +385,8 @@ class LayerwiseSimulator:
                     )
                     y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{did}_{i}_{j}")
                     # when time increses, M also increases to ensure right answer
-                    M = 1e4
+                    # M = 1e4
+                    M = self.M
                     self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M, name=f"Do{did}_{i}_{j}1") 
                     self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M, name=f"Do{did}_{i}_{j}2")
                     
@@ -392,13 +408,14 @@ class LayerwiseSimulator:
             if var.VarName in self.pipeline_scheduler.results.keys():
                 var.Start = self.pipeline_scheduler.results[var.VarName]
 
-        for constrs in self.model.getConstrs():
-            if constrs.ConstrName == "R1078":
-                print("------------")
-                print(constrs.ConstrName, self.model.getConstrByName(constrs.ConstrName).Sense)
-                print("------------")
-                self.model.write("model.lp")
-                input()
+        # DEBUG
+        # for constrs in self.model.getConstrs():
+        #     if constrs.ConstrName == "R1078":
+        #         print("------------")
+        #         print(constrs.ConstrName, self.model.getConstrByName(constrs.ConstrName).Sense)
+        #         print("------------")
+        #         self.model.write("model.lp")
+        #         input()
 
     def run(self, draw=False) -> None:
         """run simulation"""
