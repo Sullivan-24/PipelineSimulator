@@ -9,7 +9,7 @@ FP32 = 4 # 4 Bytes
 FP16 = 2 # 2 Bytes
 
 # Known parameter settings
-DEVICE_NUM = 4
+DEVICE_NUM = 4 * 2
 GPU_MAX_MEM = 80 * G
 WORLD_SIZE = DEVICE_NUM
 PP_SIZE = DEVICE_NUM
@@ -17,11 +17,11 @@ TP_SIZE = WORLD_SIZE // PP_SIZE
 
 VOCAB_SIZE = 92544
 NUM_ATTENTION_HEAD = 32
-SEQ_LEN = 4096
+SEQ_LEN = 6144
 HIDDEN_SIZE = 4096
 MICRO_BATCH_SIZE = 1
-MICRO_BATCH_NUM = 14
-LAYER_NUM = 8
+MICRO_BATCH_NUM = 16
+LAYER_NUM = 8 * 2
 
 
 # Memory overhead calculation
@@ -43,12 +43,13 @@ class Activation:
     MLP_DROPOUT: int = b * s * h
     ATTENTION_PART: int = (5 * DATA_TYPE * b * s * h + 2 * DATA_TYPE * b * s * s * a) + MLP_DROPOUT + ATTN_DROPOUT + LAYER_NORM
     MLP_PART: int = 9 * DATA_TYPE * b * s * h + MLP_DROPOUT + LAYER_NORM
-    FULL_LAYER: int = ATTENTION_PART + MLP_PART
+    FULL_LAYER: int = 34*b*s*h + 5*b*s*s*a
     LOSS: int = 2 * FP32 * b * s * v
 
 LAYER_PARA_NUM = 12 * h * h + 13 * h
 HEAD_PARA_NUM = v * h
 LAYER_MEMORY = DATA_TYPE * LAYER_PARA_NUM
+HEAD_MEMORY = DATA_TYPE * HEAD_PARA_NUM
 @dataclass
 class Gradient:
     INPUT: int = DATA_TYPE * LAYER_PARA_NUM
@@ -80,4 +81,4 @@ CE_W_TIME = 0
 F_TIME = 12
 B_TIME = 20
 W_TIME = 8
-COMM_TIME = 1
+COMM_TIME = 0

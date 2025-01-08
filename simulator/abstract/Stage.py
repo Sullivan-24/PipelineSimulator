@@ -19,7 +19,6 @@ class Stage:
         self.device_id: int = device_id
         self.stage_id: int = stage_id
         self.memory_usage: int = memory_usage
-        self.model_mem: int = memory_usage
         self.workloads: dict[int, {WorkloadType, Workload}] = {}  
         self.stage_type: StageType = stage_type
         self._add_workload()

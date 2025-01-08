@@ -45,7 +45,8 @@ class Device:
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
         self.proc_workload: Workload = None
-        self.current_mem_usage: int = 0
+        self.optimizer_mem_usage: int = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)
+        self.current_mem_usage: int = self.optimizer_mem_usage
         self.nmb: int = nmb
         self.max_activation_counts: int = max_activation_counts
         self.mem_usage_record: dict[int, int] = {}
@@ -63,6 +64,7 @@ class Device:
         # mid = 0 F finish, preserved_memory = max(B + W, B, W)
         # mid = 0 B finish, preserved_memory = W
         # mid = 0 W finish, switch to monitor mid = 1
+        self.num_available_f_workloads = (GPU_MAX_MEM - Gradient.INPUT - Gradient.PARAMETER) // (Activation.FULL_LAYER * LAYER_NUM // DEVICE_NUM)
         self.executable_workloads = []
         self.released_workloads = []
         self.unreleased_workloads = []
@@ -87,21 +89,24 @@ class Device:
     def add_stage(self, stage_id: int) -> None:
         layer_per_stage = LAYER_NUM // STAGE_NUM
         stage_type = StageType.LAYERS
+        basic_memory = 0
         if SchedulePriority.Layerwise:
             layer_per_stage = 1 
             if stage_id == 0:
                 stage_type = StageType.EMBD
             elif stage_id == LAYER_NUM + 1:
                 stage_type = StageType.HEAD
+                basic_memory += HEAD_MEMORY
             elif stage_id == LAYER_NUM + 2:
                 stage_type = StageType.CE
             else:
                 stage_type = StageType.LAYER
+                basic_memory += LAYER_MEMORY
         stage = Stage(
                 device_id=self.device_id, 
                 stage_id=stage_id,
                 # memory_usage=0, 
-                memory_usage=OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) + LAYER_MEMORY * layer_per_stage, 
+                memory_usage=basic_memory, 
                 stage_type=stage_type,
             )
         self.stages[stage.stage_id] = stage
@@ -211,9 +216,8 @@ class Device:
         elif self.proc_workload.state == Workload.COMPLETED and self.proc_workload.workload_type == WorkloadType.W:
             self.stages[self.proc_workload.stage_id].update_memory_usage(workload=self.proc_workload)
             
-        self.current_mem_usage = sum(stage.memory_usage for stage in self.stages.values())
+        self.current_mem_usage = self.optimizer_mem_usage + sum(stage.memory_usage for stage in self.stages.values())
         self.mem_usage_record[(self.proc_workload.start_time,self.proc_workload.end_time)] = self.current_mem_usage
-        # self.mem_usage_record[GET_TIME()] = self.current_mem_usage
     
     def get_memory_usage(self) -> int:
         return self.current_mem_usage

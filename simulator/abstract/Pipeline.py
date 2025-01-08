@@ -11,7 +11,8 @@ class PipelineScheduler:
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
-        self.microbatch_schedule_range = range(0,min(8, MICRO_BATCH_NUM))
+        # self.microbatch_schedule_range = range(0,min(16, MICRO_BATCH_NUM))
+        self.microbatch_schedule_range = range(0,min(MICRO_BATCH_NUM, MICRO_BATCH_NUM))
         self.num_finished_microbatch = 0
         self._init_stage()
         self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
@@ -347,8 +348,8 @@ class PipelineScheduler:
 
         if self.num_finished_microbatch == (1 + LAYER_NUM // DEVICE_NUM * DEVICE_NUM) * len(self.microbatch_schedule_range):
             self.num_finished_microbatch = 0
-            self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range]
-            self.microbatch_schedule_range = [n for n in self.microbatch_schedule_range if n < MICRO_BATCH_NUM]
+            self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < MICRO_BATCH_NUM]
+            # self.microbatch_schedule_range = [n for n in self.microbatch_schedule_range if n < MICRO_BATCH_NUM]
             self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
 
     def execute_workload(self):
@@ -362,7 +363,7 @@ class PipelineScheduler:
             self.execute_workload()
             UPDATE_TIME()
 
-    def show_mem_usage(self, device_id=(1,)):
+    def show_mem_usage(self, device_id=(6,)):
         for device in self.devices:
             if device.device_id in device_id:
                 print("Device {} mem usage:".format(device.device_id))
