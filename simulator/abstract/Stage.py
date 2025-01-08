@@ -144,11 +144,16 @@ class Stage:
             if workload.workload_type == WorkloadType.F:
                 if self.stage_type == StageType.HEAD:
                     self.memory_usage += Activation.LOSS
+                # TODO
+                elif self.stage_type == StageType.CE:
+                    self.memory_usage += 0
                 else:
                     self.memory_usage += Activation.FULL_LAYER
             elif workload.workload_type == WorkloadType.B:
                 if self.stage_type == StageType.HEAD:                    
                     self.memory_usage -= Activation.LOSS
+                elif self.stage_type == StageType.CE:
+                    self.memory_usage += 0
                 else:
                     if SPLIT_BACKPROP:
                         self.memory_usage += Gradient.INPUT

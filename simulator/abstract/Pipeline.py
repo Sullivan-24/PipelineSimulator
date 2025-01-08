@@ -11,8 +11,10 @@ class PipelineScheduler:
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
+        self.microbatch_schedule_range = range(0,min(8, MICRO_BATCH_NUM))
+        self.num_finished_microbatch = 0
         self._init_stage()
-
+        self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
         self.schedule = [[] for _ in range(DEVICE_NUM)]
         self.generate_schedule()
         self.set_schedule()
@@ -22,6 +24,10 @@ class PipelineScheduler:
             print("Device ID:{}".format(device.device_id))
             if device.device_id == 7:
                 device.show_stages(detail_info=True)
+
+    def set_microbatch_schedule_range(self, microbatch_schedule_range):
+        for device in self.devices:
+            device.microbatch_schedule_range = microbatch_schedule_range
 
     def _init_stage(self):
         for did in range(DEVICE_NUM):
@@ -332,10 +338,18 @@ class PipelineScheduler:
     def check_workload_status(self):
         for device in self.devices:
             if device._finish_proc_workload():
+                if device.proc_workload.workload_type == WorkloadType.W:
+                    self.num_finished_microbatch += 1
                 device.proc_workload.complete()
                 self.update_constraints(constraint=device.proc_workload)
                 device.update_memory_usage()
                 device.state = Device.IDLE
+
+        if self.num_finished_microbatch == (1 + LAYER_NUM // DEVICE_NUM * DEVICE_NUM) * len(self.microbatch_schedule_range):
+            self.num_finished_microbatch = 0
+            self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range]
+            self.microbatch_schedule_range = [n for n in self.microbatch_schedule_range if n < MICRO_BATCH_NUM]
+            self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
 
     def execute_workload(self):
         for device in self.devices:
@@ -348,7 +362,7 @@ class PipelineScheduler:
             self.execute_workload()
             UPDATE_TIME()
 
-    def show_mem_usage(self, device_id=(0,)):
+    def show_mem_usage(self, device_id=(1,)):
         for device in self.devices:
             if device.device_id in device_id:
                 print("Device {} mem usage:".format(device.device_id))

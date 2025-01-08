@@ -31,7 +31,7 @@ def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 
                 raise Exception("Wrong workload_type_num")
 
         if layer_wise:
-            if stage_id == 0:
+            if stage_id == 0 or stage_id == LAYER_NUM - 1:
                 required_memory = 0
         return required_memory
 
@@ -53,6 +53,27 @@ class Device:
         self.next_workload_idx: int = 0
         self.workload_type_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
         self.last_workload_type = None
+        self.total_layers = 0
+        self.microbatch_schedule_range = range(0,self.nmb)
+        # To avoid simulator failure, memory need to be preserved.
+        # Record each mid, if mid already started, ensure the memory is 
+        # sufficient to complete the remaining workload.
+        # Example:
+        # mid = 0 begin, preserved_memory = max(F + B + W, F, B, W)
+        # mid = 0 F finish, preserved_memory = max(B + W, B, W)
+        # mid = 0 B finish, preserved_memory = W
+        # mid = 0 W finish, switch to monitor mid = 1
+        self.executable_workloads = []
+        self.released_workloads = []
+        self.unreleased_workloads = []
+
+    def exist_executable_workload(self, workload_type):
+        for stage_id in self.stages:
+            workloads = self.stages[stage_id].workloads
+            for mid in range(self.nmb):
+                if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
+                    return True
+        return False
 
     def show_stages(self, detail_info=False):
         for sid in self.stages:
@@ -76,7 +97,6 @@ class Device:
                 stage_type = StageType.CE
             else:
                 stage_type = StageType.LAYER
-                
         stage = Stage(
                 device_id=self.device_id, 
                 stage_id=stage_id,
@@ -85,6 +105,7 @@ class Device:
                 stage_type=stage_type,
             )
         self.stages[stage.stage_id] = stage
+        self.total_layers+=layer_per_stage
 
     def update_constraints(self, constraint):
         for sid in self.stages:
@@ -139,7 +160,8 @@ class Device:
             elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 for workload_type in now_workload_priority_order:
-                    for mid in range(self.nmb):
+                    # for mid in range(self.nmb):
+                    for mid in self.microbatch_schedule_range:
                         for sid in self.stages:
                             required_memory = get_required_memory(
                                 stage_id=sid, 
@@ -167,6 +189,10 @@ class Device:
 
     def _reset_workload_type(self, workload_type, required_memory, current_mem_usage, max_memory, workload_situations):
         if workload_type == WorkloadType.F:
+            # if current_mem_usage + required_memory >= max_memory - self.preserved_memory[self.proc_order.queue[0]]:
+            #     workload_type = WorkloadType.B
+            # if current_mem_usage + required_memory >= max_memory - Gradient.PARAMETER:
+            #     workload_type = WorkloadType.W
             if current_mem_usage + required_memory >= max_memory - Gradient.INPUT - Gradient.PARAMETER:
                 workload_type = WorkloadType.B
             if current_mem_usage + required_memory >= max_memory - Gradient.PARAMETER:

@@ -89,23 +89,31 @@ class Workload:
             # print(self.device_id, self.stage_id, self.workload_type, self.microbatch_id)
             self._generate_communication(constraint)
 
+    def is_executable(self):
+        return len(self.constraints) == 0 and self.ready_time <= GET_TIME()
+    
     def execute(self) -> bool:
         if self.state == Workload.NOT_STARTED:
-            if len(self.constraints) > 0:
-                pass
-                # print("T={},\tConstraints of S={},\tMB={} are not satisfied...".format(
-                #     GET_TIME(),
-                #     self.stage_id,
-                #     self.microbatch_id
-                # ))
-            # Add comm overhead
-            elif self.ready_time <= GET_TIME(): 
-                # print("T={},\tS={},\tMB={}-{} is in progress...".format(
-                #     GET_TIME(),
-                #     self.stage_id,
-                #     self.microbatch_id,
-                #     self.workload_type.value
-                # ))
+            # if len(self.constraints) > 0:
+            #     pass
+            #     # print("T={},\tConstraints of S={},\tMB={} are not satisfied...".format(
+            #     #     GET_TIME(),
+            #     #     self.stage_id,
+            #     #     self.microbatch_id
+            #     # ))
+            # # Add comm overhead
+            # elif self.ready_time <= GET_TIME(): 
+            #     # print("T={},\tS={},\tMB={}-{} is in progress...".format(
+            #     #     GET_TIME(),
+            #     #     self.stage_id,
+            #     #     self.microbatch_id,
+            #     #     self.workload_type.value
+            #     # ))
+            #     self.state = Workload.IN_PROGRESS
+            #     self.start_time = GET_TIME()
+            #     self.end_time = self.start_time + self.duration
+            #     return True
+            if self.is_executable():
                 self.state = Workload.IN_PROGRESS
                 self.start_time = GET_TIME()
                 self.end_time = self.start_time + self.duration
