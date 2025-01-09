@@ -242,13 +242,12 @@ class LayerwiseSimulator:
                         layer_wise=True,
                         recomp=self._layer_recomp_rate[lid],
                     )
-                    # All memory should be divided by G for stability
                     base_memory = (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + LAYER_MEMORY * len([l for l in self._devices[did] if l not in (0, LAYER_NUM - 1, LAYER_NUM - 2)])
                     accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid)
                     accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid)
                     released_memory = self._get_released_memory(did=did, lid=lid, mid=mid)
                     mw = self.model.addVar(name=f"mem_w_{lid}_{mid}",vtype=GRB.INTEGER)
-                    # mw = accumulated_activations + accumulated_input_gradients - released_memory + base_memory + required_memory
+
                     self.model.addConstr(
                         (accumulated_activations
                         + accumulated_input_gradients

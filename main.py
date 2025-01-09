@@ -33,7 +33,6 @@ def main():
         "schedule_method": SCHEDULE_METHOD,
     }
     print(Activation.FULL_LAYER)
-    print(Loss.OUTPUT)
     print(BASIC_MEMORY)
     print(GRADIENT_MEMORY / LAYER_NUM)
     print(GPU_MAX_MEM)
