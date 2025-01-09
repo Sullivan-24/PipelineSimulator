@@ -15,15 +15,16 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType):
+    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, recomp: bool = False):
         self.device_id: int = device_id
         self.stage_id: int = stage_id
         self.memory_usage: int = memory_usage
         self.workloads: dict[int, {WorkloadType, Workload}] = {}  
         self.stage_type: StageType = stage_type
+        self.recomp = recomp
         self._add_workload()
     
-    def _get_workload_duration(self, device_id, stage_id, stage_type, microbatch_id, workload_type):
+    def _get_workload_duration(self, device_id, stage_id, stage_type, microbatch_id, workload_type, recomp):
         if SchedulePriority.Layerwise == SCHEDULE_METHOD:
             if workload_type == WorkloadType.F:
                 duration = F_TIME
@@ -35,11 +36,11 @@ class Stage:
                     duration = HEAD_F_TIME
 
             elif workload_type == WorkloadType.B:
-                duration = B_TIME
+                duration = B_TIME if not recomp else B_TIME + F_TIME
                 if stage_type == StageType.CE:
-                    duration = CE_B_TIME
+                    duration = CE_B_TIME if not recomp else CE_B_TIME + CE_F_TIME
                 elif stage_type == StageType.HEAD:
-                    duration = HEAD_B_TIME
+                    duration = HEAD_B_TIME if not recomp else HEAD_B_TIME + HEAD_F_TIME
             elif workload_type == WorkloadType.W:
                 duration = W_TIME
                 if stage_type == StageType.CE:
@@ -47,6 +48,7 @@ class Stage:
                 elif stage_type == StageType.HEAD:
                     duration = HEAD_W_TIME
         else:
+            #TODO recomp
             layer_per_stage = LAYER_NUM // STAGE_NUM
             if workload_type == WorkloadType.F:
                 duration = F_TIME * layer_per_stage
@@ -79,6 +81,7 @@ class Stage:
                     stage_type=self.stage_type,
                     microbatch_id=mid,
                     workload_type=WorkloadType.F,
+                    recomp=self.recomp,
                 ),    
                 total_stages=LAYER_NUM+3 if SchedulePriority.Layerwise == SCHEDULE_METHOD else STAGE_NUM,
             )
@@ -99,6 +102,7 @@ class Stage:
                     stage_type=self.stage_type,
                     microbatch_id=mid,
                     workload_type=WorkloadType.B,
+                    recomp=self.recomp,
                 ),   
                 total_stages=LAYER_NUM+3 if SchedulePriority.Layerwise == SCHEDULE_METHOD else STAGE_NUM,   
             )
@@ -118,6 +122,7 @@ class Stage:
                         stage_type=self.stage_type,
                         microbatch_id=mid,
                         workload_type=WorkloadType.W,
+                        recomp=self.recomp,
                     ),     
                     total_stages=LAYER_NUM+3 if SchedulePriority.Layerwise == SCHEDULE_METHOD else STAGE_NUM,
                 )
@@ -143,10 +148,12 @@ class Stage:
             if workload.workload_type == WorkloadType.F:
                 if self.stage_type == StageType.HEAD:
                     self.memory_usage += Activation.LOSS
-                # TODO
+                # TODO CE memory cost
                 elif self.stage_type == StageType.CE:
                     self.memory_usage += 0
                 else:
+                    if self.recomp:
+                        return
                     self.memory_usage += Activation.FULL_LAYER
             elif workload.workload_type == WorkloadType.B:
                 if self.stage_type == StageType.HEAD:                    
@@ -156,6 +163,8 @@ class Stage:
                 else:
                     if SPLIT_BACKPROP:
                         self.memory_usage += Gradient.INPUT
+                        if self.recomp:
+                            self.memory_usage += Activation.FULL_LAYER
                     else:
                         self.memory_usage -= Activation.FULL_LAYER
             elif workload.workload_type == WorkloadType.W:

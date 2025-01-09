@@ -30,6 +30,10 @@ class PipelineScheduler:
         for device in self.devices:
             device.microbatch_schedule_range = microbatch_schedule_range
 
+    def set_layer_recomp(self, settings:list):
+        for idx, r in enumerate(settings):
+            self.recomp_set[idx] = True if r else False
+
     def _init_stage(self):
         for did in range(DEVICE_NUM):
             device = Device(device_id = did, 
@@ -44,15 +48,29 @@ class PipelineScheduler:
                 for pid in self.dsa[did]:
                     self.devices[did].add_stage(pid)
         elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
+            self.set_layer_recomp([0, #Embedding
+                                   1,1,1,1,1,1,1,1,
+                                   0,0,0,0,0,0,0,0,
+                                   0,0 # Head+CE
+                                ]
+                            )
+            # self.set_layer_recomp([0, #Embedding
+            #                        0,0,0,0,0,0,0,0,
+            #                        0,0,0,0,0,0,0,0,
+            #                        0,0 # Head+CE
+            #                     ]
+            #                 )
             for pid in range(LAYER_NUM):
                 if (pid // DEVICE_NUM) % 2 == 0:
-                    self.devices[pid % DEVICE_NUM].add_stage(pid + 1)
+                    self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
                 else:
-                    self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1)
+                    self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
             self.devices[-1].add_stage(0)
             self.devices[0].add_stage(LAYER_NUM+1)
             self.devices[1].add_stage(LAYER_NUM+2)
         else:
+            self.recomp_set = [0 for _ in range(STAGE_NUM)]
             if SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
                 for pid in range(STAGE_NUM):
                     self.devices[pid % DEVICE_NUM].add_stage(pid)
@@ -363,7 +381,7 @@ class PipelineScheduler:
             self.execute_workload()
             UPDATE_TIME()
 
-    def show_mem_usage(self, device_id=(6,)):
+    def show_mem_usage(self, device_id=(0,)):
         for device in self.devices:
             if device.device_id in device_id:
                 print("Device {} mem usage:".format(device.device_id))
@@ -371,23 +389,25 @@ class PipelineScheduler:
                 for t, mem_record in device.mem_usage_record.items():
                     print("Time {}, mem = {}, {}.".format(t, round(mem_record/G,2), round((mem_record - last_mem_record) / G, 2)))
                     last_mem_record = mem_record
-
+    
+    def get_workloadload_duration(self):
+        fwd_time = [F_TIME for _ in range(LAYER_NUM+3)]
+        iwd_time = [B_TIME for _ in range(LAYER_NUM+3)]
+        pwd_time = [W_TIME for _ in range(LAYER_NUM+3)]
+        for device in self.devices:
+            for sid in device.stages:
+                for mid in range(MICRO_BATCH_NUM):
+                    fwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.F].duration
+                    if WorkloadType.B in device.stages[sid].workloads[mid]:
+                        iwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.B].duration
+                    if WorkloadType.W in device.stages[sid].workloads[mid]:
+                        pwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.W].duration
+        return fwd_time, iwd_time, pwd_time
+    
     def draw(self) -> None:
         # 绘制结果的逻辑
         if SCHEDULE_METHOD == SchedulePriority.Layerwise:
-            fwd_time = [F_TIME for _ in range(LAYER_NUM+3)]
-            fwd_time[0] = EMBEDDING_TIME
-            fwd_time[-1] = CE_F_TIME
-            fwd_time[-2] = HEAD_F_TIME
-            iwd_time = [B_TIME for _ in range(LAYER_NUM+3)]
-            iwd_time[0] = 0
-            iwd_time[-1] = CE_B_TIME
-            iwd_time[-2] = HEAD_B_TIME
-            pwd_time = [W_TIME for _ in range(LAYER_NUM+3)]
-            pwd_time[0] = 0
-            pwd_time[-1] = CE_W_TIME
-            pwd_time[-2] = HEAD_W_TIME
-            
+            fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
             painter_conf = {
                 "device_size": DEVICE_NUM,
                 "devices": self.dsa,

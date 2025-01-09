@@ -1,4 +1,5 @@
 from .Stage import *
+import queue 
 
 def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True, recomp=None):
         assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type"
@@ -15,7 +16,7 @@ def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 
                 if workload_type == WorkloadType.B:
                     required_memory = Gradient.INPUT * layer_num 
                     if recomp:
-                        required_memory = Gradient.INPUT * layer_num + Activation.FULL_LAYER * recomp
+                        required_memory = Gradient.INPUT * layer_num + Activation.FULL_LAYER * layer_num * recomp
                 elif workload_type == WorkloadType.W:
                     required_memory = Gradient.PARAMETER * layer_num
                 else:
@@ -64,10 +65,12 @@ class Device:
         # mid = 0 F finish, preserved_memory = max(B + W, B, W)
         # mid = 0 B finish, preserved_memory = W
         # mid = 0 W finish, switch to monitor mid = 1
-        self.num_available_f_workloads = (GPU_MAX_MEM - Gradient.INPUT - Gradient.PARAMETER) // (Activation.FULL_LAYER * LAYER_NUM // DEVICE_NUM)
-        self.executable_workloads = []
+        self.next_mid = 0
         self.released_workloads = []
-        self.unreleased_workloads = []
+
+    def get_available_f_workloads(self):
+        current_mem_usage = self.get_memory_usage()
+        return (GPU_MAX_MEM - current_mem_usage - Gradient.INPUT - Gradient.PARAMETER) // Activation.FULL_LAYER - 2
 
     def exist_executable_workload(self, workload_type):
         for stage_id in self.stages:
@@ -79,14 +82,14 @@ class Device:
 
     def show_stages(self, detail_info=False):
         for sid in self.stages:
-            print("Stage {} on Device {}".format(sid, self.device_id))
+            print("Stage {} recomp={} on Device {}".format(sid, self.stages[sid].recomp, self.device_id))
             if detail_info:
                 for mid in self.stages[sid].workloads:
                     if mid == 10:
                         for wlt in self.stages[sid].workloads[mid]:
                             print(self.stages[sid].workloads[mid][wlt])
 
-    def add_stage(self, stage_id: int) -> None:
+    def add_stage(self, stage_id: int, recomp:bool = False) -> None:
         layer_per_stage = LAYER_NUM // STAGE_NUM
         stage_type = StageType.LAYERS
         basic_memory = 0
@@ -108,6 +111,7 @@ class Device:
                 # memory_usage=0, 
                 memory_usage=basic_memory, 
                 stage_type=stage_type,
+                recomp=recomp,
             )
         self.stages[stage.stage_id] = stage
         self.total_layers+=layer_per_stage
@@ -173,7 +177,8 @@ class Device:
                                 layer_num=1,
                                 workload_type=workload_type,
                                 workload_type_num=WORKLOAD_TYPE_NUM, 
-                                layer_wise=True
+                                layer_wise=True,
+                                recomp=self.stages[sid].recomp,
                             )
                             workload_type = self._reset_workload_type(
                                 workload_type=workload_type,
@@ -182,8 +187,22 @@ class Device:
                                 max_memory=GPU_MAX_MEM,
                                 workload_situations=None
                             )
+                            # if workload_type == WorkloadType.F:
+                            #     if self.get_available_f_workloads() == 0:
+                            #         mid = self.released_workloads[self.next_mid]
+
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
                             if proc_workload:
+                                # if workload_type == WorkloadType.F:
+                                #     if self.get_available_f_workloads() > 0:
+                                #         if mid not in self.released_workloads:
+                                #             self.released_workloads.append(mid)
+                                #             if self.device_id == 0: 
+                                #                 print("Add {}".format(mid))
+                                #     elif self.get_available_f_workloads() == 0:
+                                #         self.next_mid += 1
+                                #         if self.device_id == 0: 
+                                #             print("Exe {}".format(mid))
                                 self.proc_workload = proc_workload
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
@@ -194,10 +213,6 @@ class Device:
 
     def _reset_workload_type(self, workload_type, required_memory, current_mem_usage, max_memory, workload_situations):
         if workload_type == WorkloadType.F:
-            # if current_mem_usage + required_memory >= max_memory - self.preserved_memory[self.proc_order.queue[0]]:
-            #     workload_type = WorkloadType.B
-            # if current_mem_usage + required_memory >= max_memory - Gradient.PARAMETER:
-            #     workload_type = WorkloadType.W
             if current_mem_usage + required_memory >= max_memory - Gradient.INPUT - Gradient.PARAMETER:
                 workload_type = WorkloadType.B
             if current_mem_usage + required_memory >= max_memory - Gradient.PARAMETER:
