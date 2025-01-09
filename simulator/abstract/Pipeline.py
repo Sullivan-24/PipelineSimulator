@@ -12,7 +12,7 @@ class PipelineScheduler:
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
         # self.microbatch_schedule_range = range(0,min(16, MICRO_BATCH_NUM))
-        self.microbatch_schedule_range = range(0,min(MICRO_BATCH_NUM, MICRO_BATCH_NUM))
+        self.microbatch_schedule_range = range(0,min(24, MICRO_BATCH_NUM))
         self.num_finished_microbatch = 0
         self._init_stage()
         self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
@@ -49,12 +49,12 @@ class PipelineScheduler:
                     self.devices[did].add_stage(pid)
         elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
             self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
-            self.set_layer_recomp([0, #Embedding
-                                   1,1,1,1,1,1,1,1,
-                                   0,0,0,0,0,0,0,0,
-                                   0,0 # Head+CE
-                                ]
-                            )
+            # self.set_layer_recomp([0, #Embedding
+            #                        1,1,1,1,1,1,1,1,
+            #                     #    1,1,1,1,1,0,0,0,
+            #                        0,0 # Head+CE
+            #                     ]
+            #                 )
             # self.set_layer_recomp([0, #Embedding
             #                        0,0,0,0,0,0,0,0,
             #                        0,0,0,0,0,0,0,0,
@@ -367,7 +367,6 @@ class PipelineScheduler:
         if self.num_finished_microbatch == (1 + LAYER_NUM // DEVICE_NUM * DEVICE_NUM) * len(self.microbatch_schedule_range):
             self.num_finished_microbatch = 0
             self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < MICRO_BATCH_NUM]
-            # self.microbatch_schedule_range = [n for n in self.microbatch_schedule_range if n < MICRO_BATCH_NUM]
             self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
 
     def execute_workload(self):

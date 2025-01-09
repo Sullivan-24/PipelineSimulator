@@ -212,6 +212,7 @@ class Device:
         return None
 
     def _reset_workload_type(self, workload_type, required_memory, current_mem_usage, max_memory, workload_situations):
+        #TODO 不同个Wave情况下，处于Wave不同边上的memory预留的值应该不同
         if workload_type == WorkloadType.F:
             if current_mem_usage + required_memory >= max_memory - Gradient.INPUT - Gradient.PARAMETER:
                 workload_type = WorkloadType.B
