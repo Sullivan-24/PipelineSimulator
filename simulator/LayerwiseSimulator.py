@@ -193,11 +193,11 @@ class LayerwiseSimulator:
                     self._orders[did][lid][mid] = {}
                     for o_lid in self._devices[did]:
                         self._orders[did][lid][mid][o_lid] = {
-                            'f': [self.model.addVar(name=f'act_f_{did}_{lid}_{mid}_{o_lid}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)],
-                            'b': [self.model.addVar(name=f'act_b_{did}_{lid}_{mid}_{o_lid}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)],
+                            'f': [self.model.addVar(name=f'act_f_{did}_{lid}_{mid}_{o_lid}_{time.time()}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)],
+                            'b': [self.model.addVar(name=f'act_b_{did}_{lid}_{mid}_{o_lid}_{time.time()}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)],
                         }
                         if SPLIT_BACKPROP:
-                            self._orders[did][lid][mid][o_lid]['w'] = [self.model.addVar(name=f'act_w_{did}_{lid}_{mid}_{o_lid}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)]
+                            self._orders[did][lid][mid][o_lid]['w'] = [self.model.addVar(name=f'act_w_{did}_{lid}_{mid}_{o_lid}_{time.time()}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)]
 
         for did in range(self._num_device):
             for lid in self._devices[did]:
@@ -235,14 +235,14 @@ class LayerwiseSimulator:
                                 self.model.addConstr((binary_w == 0) >> (self._orders[did][lid][mid][o_lid]['w'][o_mid] == 0))
                     
                     required_memory = get_required_memory(
-                            stage_id=lid,
-                            layer_num=1,
-                            workload_type=workload_type_mapping['w' if SPLIT_BACKPROP else 'b'],
-                            workload_type_num=WORKLOAD_TYPE_NUM,
-                            layer_wise=True,
-                            recomp=self._layer_recomp_rate[lid],
+                        stage_id=lid,
+                        layer_num=1,
+                        workload_type=workload_type_mapping['w' if SPLIT_BACKPROP else 'b'],
+                        workload_type_num=WORKLOAD_TYPE_NUM,
+                        layer_wise=True,
+                        recomp=self._layer_recomp_rate[lid],
                     )
-
+                    # All memory should be divided by G for stability
                     base_memory = (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + LAYER_MEMORY * len([l for l in self._devices[did] if l not in (0, LAYER_NUM - 1, LAYER_NUM - 2)])
                     accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid)
                     accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid)
@@ -418,13 +418,7 @@ class LayerwiseSimulator:
                 var.Start = self.pipeline_scheduler.results[var.VarName]
 
         # DEBUG
-        # for constrs in self.model.getConstrs():
-        #     if constrs.ConstrName == "R1078":
-        #         print("------------")
-        #         print(constrs.ConstrName, self.model.getConstrByName(constrs.ConstrName).Sense)
-        #         print("------------")
-        #         self.model.write("model.lp")
-        #         input()
+        self.model.write("model.lp")
 
     def run(self, draw=False) -> None:
         """run simulation"""
@@ -454,19 +448,17 @@ class LayerwiseSimulator:
         self.model_result = results
         print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"]))
         for i in range(self._num_layer):
-            self._layer_f_length[i] = self._profiled_layer_f_length[i] + self._profiled_additional_layer_f_length[i]
-            self._layer_b_length[i] = self._profiled_layer_b_length[i] + self._profiled_additional_layer_b_length[i]
-            self._layer_w_length[i] = self._profiled_layer_w_length[i] + self._profiled_additional_layer_w_length[i]
-        self.show_solution_detail(prefixes=("mem_w",))
+            self._layer_f_length[i] = self.model_result[f"s{i}_f"]
+            self._layer_b_length[i] = self.model_result[f"s{i}_b"] 
+            self._layer_w_length[i] = self.model_result[f"s{i}_w"] 
+        self.show_solution_detail(prefixes=("theta","mem_w"))
         if draw:
             # 4. draws the result.
             results = {str(key) : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}
             self._draw(resort_microbatch_index(self._num_microbatches ,results))
 
-        # for s in self._de_st_mb.keys():
-        #     print(self._de_st_mb[s])
         return results
-
+    
     def _draw(self, results: dict) -> None:
         # 绘制结果的逻辑
         painter_conf = {

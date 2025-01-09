@@ -33,6 +33,7 @@ class PipelineScheduler:
     def set_layer_recomp(self, settings:list):
         for idx, r in enumerate(settings):
             self.recomp_set[idx] = True if r else False
+            self.results[f"theta_{idx}"] = r
 
     def _init_stage(self):
         for did in range(DEVICE_NUM):
@@ -46,15 +47,22 @@ class PipelineScheduler:
         if self.dsa:
             for did in range(DEVICE_NUM):
                 for pid in self.dsa[did]:
-                    self.devices[did].add_stage(pid)
+                    self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
+                    self.set_layer_recomp([0, #Embedding
+                                        1,1,1,1,1,1,1,1,
+                                        #    1,1,1,1,1,0,0,0,
+                                        0,0 # Head+CE
+                                        ]
+                                    )
+                    self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
         elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
             self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
-            # self.set_layer_recomp([0, #Embedding
-            #                        1,1,1,1,1,1,1,1,
-            #                     #    1,1,1,1,1,0,0,0,
-            #                        0,0 # Head+CE
-            #                     ]
-            #                 )
+            self.set_layer_recomp([0, #Embedding
+                                   1,1,1,1,1,1,1,1,
+                                #    1,1,1,1,1,0,0,0,
+                                   0,0 # Head+CE
+                                ]
+                            )
             # self.set_layer_recomp([0, #Embedding
             #                        0,0,0,0,0,0,0,0,
             #                        0,0,0,0,0,0,0,0,

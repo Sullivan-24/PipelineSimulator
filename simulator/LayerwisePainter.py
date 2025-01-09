@@ -137,6 +137,8 @@ class LayerwiseSchedulingPainter:
 
         # 3. Draw execution block for each microbatch according to start and end time
         for microbatch_key, offset in data.items():
+            if not microbatch_key.startswith(("f_","b_","w_",)):
+                continue
             k, pid, mid = parse_microbatch_key(microbatch_key)
 
             x0 = self._pp_align + offset

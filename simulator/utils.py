@@ -36,9 +36,10 @@ def resort_microbatch_index(num_microbatches: int, model_res: Dict[str, int]) ->
     only_forward_starts = {mb: max_value for mb in range(num_microbatches)}
 
     for key, value in model_res.items():
-        if key.startswith("b_"):
+        # if key.startswith("b_"):
+        #     continue
+        if not key.startswith("f_"):
             continue
-
         _, _, mid = parse_microbatch_key(key)
 
         if only_forward_starts[mid] > value:
