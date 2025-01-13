@@ -166,10 +166,14 @@ class Device:
                     self.state = Device.BUSY
                     self.next_workload_idx += 1
                     return proc_workload
-            elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            elif SCHEDULE_METHOD == SchedulePriority.Layerwise:            
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
+                if self.last_workload_type == WorkloadType.B:
+                    now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
+                elif self.last_workload_type == WorkloadType.F:
+                    now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
+                
                 for workload_type in now_workload_priority_order:
-                    # for mid in range(self.nmb):
                     for mid in self.microbatch_schedule_range:
                         for sid in self.stages:
                             required_memory = get_required_memory(
@@ -180,29 +184,17 @@ class Device:
                                 layer_wise=True,
                                 recomp=self.stages[sid].recomp,
                             )
+
                             workload_type = self._reset_workload_type(
                                 workload_type=workload_type,
                                 required_memory=required_memory,
                                 current_mem_usage=self.current_mem_usage,
                                 max_memory=GPU_MAX_MEM,
-                                workload_situations=None
                             )
-                            # if workload_type == WorkloadType.F:
-                            #     if self.get_available_f_workloads() == 0:
-                            #         mid = self.released_workloads[self.next_mid]
 
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
                             if proc_workload:
-                                # if workload_type == WorkloadType.F:
-                                #     if self.get_available_f_workloads() > 0:
-                                #         if mid not in self.released_workloads:
-                                #             self.released_workloads.append(mid)
-                                #             if self.device_id == 0: 
-                                #                 print("Add {}".format(mid))
-                                #     elif self.get_available_f_workloads() == 0:
-                                #         self.next_mid += 1
-                                #         if self.device_id == 0: 
-                                #             print("Exe {}".format(mid))
+                                self.last_workload_type = workload_type
                                 self.proc_workload = proc_workload
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
@@ -211,7 +203,7 @@ class Device:
                 print("Schedule Not Supported")
         return None
 
-    def _reset_workload_type(self, workload_type, required_memory, current_mem_usage, max_memory, workload_situations):
+    def _reset_workload_type(self, workload_type, required_memory, current_mem_usage, max_memory):
         #TODO 不同个Wave情况下，处于Wave不同边上的memory预留的值应该不同
         if current_mem_usage + required_memory >= max_memory - Gradient.INPUT - Gradient.PARAMETER:
             workload_type = WorkloadType.B

@@ -32,10 +32,9 @@ def main():
         "base_solution" : BASE_SOLUTION,
         "schedule_method": SCHEDULE_METHOD,
     }
-    print(Activation.FULL_LAYER)
-    print(BASIC_MEMORY)
-    print(GRADIENT_MEMORY / LAYER_NUM)
-    print(GPU_MAX_MEM)
+    print(MEMORY(Activation.FULL_LAYER))
+    print(MEMORY(OPTIMIZER_MEMORY))
+    print(MEMORY(GPU_MAX_MEM))
 
     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
         config["forward_execution_time"] = [EMBEDDING_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]

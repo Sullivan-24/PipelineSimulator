@@ -4,6 +4,7 @@ from .Workload import Workload
 from .mutils import *
 from ..painter import SchedulingPainter as SP
 from ..LayerwisePainter import LayerwiseSchedulingPainter as LSP
+from ..utils import print_to_file
 
 class PipelineScheduler:
 
@@ -12,7 +13,7 @@ class PipelineScheduler:
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
         # self.microbatch_schedule_range = range(0,min(16, MICRO_BATCH_NUM))
-        self.microbatch_schedule_range = range(0,min(24, MICRO_BATCH_NUM))
+        self.microbatch_schedule_range = range(0,min(32, MICRO_BATCH_NUM))
         self.num_finished_microbatch = 0
         self._init_stage()
         self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
@@ -20,6 +21,24 @@ class PipelineScheduler:
         self.generate_schedule()
         self.set_schedule()
     
+    # NOTE _reset_workload_type is efficient but 
+    # lead to random order of W in some cases
+    # which will break solver constraint (not affect the correctness)
+    def resort_w(self):
+        w_times = [[] for _ in range(LAYER_NUM + 3)]
+        for res in self.results:
+            if res.startswith("w"):
+                w,mid,sid = res.split("_")
+                sid = int(sid)
+                w_times[sid].append(self.results[res])
+
+        for sid in range(LAYER_NUM + 3):
+            w_times_in_sid = sorted(w_times[sid])
+            for mid in range(len(w_times_in_sid)):
+                w_key = f"w_{mid}_{sid}"
+                self.results[w_key] = w_times_in_sid[mid]
+
+
     def show_detail_info(self):
         for device in self.devices:
             print("Device ID:{}".format(device.device_id))
@@ -48,27 +67,34 @@ class PipelineScheduler:
             for did in range(DEVICE_NUM):
                 for pid in self.dsa[did]:
                     self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
-                    self.set_layer_recomp([0, #Embedding
-                                        1,1,1,1,1,1,1,1,
-                                        #    1,1,1,1,1,0,0,0,
-                                        0,0 # Head+CE
-                                        ]
-                                    )
+                    if SEQ_LEN > 4*K:
+                        self.set_layer_recomp(
+                            [
+                                0, #Embedding
+                                # 0,0,0,0,0,0,0,0,
+                                1,1,1,1,1,1,1,1,
+                                1,1,1,1,1,1,1,1,
+                                0,0 # Head+CE
+                            ]
+                        )
                     self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
         elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
             self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
-            self.set_layer_recomp([0, #Embedding
-                                   1,1,1,1,1,1,1,1,
-                                #    1,1,1,1,1,0,0,0,
-                                   0,0 # Head+CE
-                                ]
-                            )
-            # self.set_layer_recomp([0, #Embedding
-            #                        0,0,0,0,0,0,0,0,
-            #                        0,0,0,0,0,0,0,0,
-            #                        0,0 # Head+CE
-            #                     ]
-            #                 )
+            if SEQ_LEN > 4*K:
+
+                self.set_layer_recomp([0, #Embedding
+                                    # 0,0,0,0,0,0,0,0,
+                                    1,1,1,1,1,1,1,1,
+                                    1,1,1,1,1,1,1,1,
+                                    0,0 # Head+CE
+                                    ]
+                                )
+                # self.set_layer_recomp([0, #Embedding
+                #                        0,0,0,0,0,0,0,0,
+                #                        0,0,0,0,0,0,0,0,
+                #                        0,0 # Head+CE
+                #                     ]
+                #                 )
             for pid in range(LAYER_NUM):
                 if (pid // DEVICE_NUM) % 2 == 0:
                     self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
@@ -372,7 +398,7 @@ class PipelineScheduler:
                 device.update_memory_usage()
                 device.state = Device.IDLE
 
-        if self.num_finished_microbatch == (1 + LAYER_NUM // DEVICE_NUM * DEVICE_NUM) * len(self.microbatch_schedule_range):
+        if self.num_finished_microbatch == (1 + LAYER_NUM) * len(self.microbatch_schedule_range):
             self.num_finished_microbatch = 0
             self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < MICRO_BATCH_NUM]
             self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
@@ -381,6 +407,9 @@ class PipelineScheduler:
         for device in self.devices:
             processing_workload = device.execute_workload()
             self.record_workload(processing_workload)
+        # if GET_TIME()==302:
+        #     print(self.devices[1].stages[15].workloads[0])
+            
             
     def run_pipeline_parallelism(self, time_limit = 10000):
         while GET_TIME() <= time_limit:
@@ -389,13 +418,17 @@ class PipelineScheduler:
             UPDATE_TIME()
 
     def show_mem_usage(self, device_id=(0,)):
+        max_mem_usage = -1
         for device in self.devices:
             if device.device_id in device_id:
                 print("Device {} mem usage:".format(device.device_id))
                 last_mem_record = 0
                 for t, mem_record in device.mem_usage_record.items():
-                    print("Time {}, mem = {}, {}.".format(t, round(mem_record/G,2), round((mem_record - last_mem_record) / G, 2)))
+                    print("Time {}, mem = {}, {}.".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2)))
                     last_mem_record = mem_record
+                    max_mem_usage = max(max_mem_usage, mem_record)
+        if max_mem_usage > GPU_MAX_MEM and SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            raise ValueError("Error: Out of Memory.")
     
     def get_workloadload_duration(self):
         fwd_time = [F_TIME for _ in range(LAYER_NUM+3)]
@@ -411,8 +444,15 @@ class PipelineScheduler:
                         pwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.W].duration
         return fwd_time, iwd_time, pwd_time
     
+    def write_fbw_to_file(self):
+        for key in self.results:
+            if key.startswith(("f_","b_","w_")):
+                print_to_file(f"sim_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key},{self.results[key]}\n")
+
     def draw(self) -> None:
         # 绘制结果的逻辑
+        self.resort_w()
+        # self.write_fbw_to_file()
         if SCHEDULE_METHOD == SchedulePriority.Layerwise:
             fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
             painter_conf = {

@@ -74,6 +74,8 @@ class LayerwiseSimulator:
         if self._base_solution:
             self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
             self.pipeline_scheduler.run_pipeline_parallelism()
+            # NOTE should follow the order rule
+            self.pipeline_scheduler.resort_w()
             # self.pipeline_scheduler.draw()
         self.model_result = None
         additional_time = HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME
@@ -246,17 +248,25 @@ class LayerwiseSimulator:
                     accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid)
                     accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid)
                     released_memory = self._get_released_memory(did=did, lid=lid, mid=mid)
-                    mw = self.model.addVar(name=f"mem_w_{lid}_{mid}",vtype=GRB.INTEGER)
+                    # mw = self.model.addVar(name=f"mem_w_{lid}_{mid}",vtype=GRB.CONTINUOUS)
+
+                    # self.model.addConstr(
+                    #     (accumulated_activations
+                    #     + accumulated_input_gradients
+                    #     - released_memory
+                    #     + base_memory
+                    #     + required_memory) == mw
+                    # )   
+                    # self.model.addConstr(
+                    #     mw <= GPU_MAX_MEM
+                    # )
 
                     self.model.addConstr(
                         (accumulated_activations
                         + accumulated_input_gradients
                         - released_memory
                         + base_memory
-                        + required_memory) == mw
-                    )   
-                    self.model.addConstr(
-                        mw <= GPU_MAX_MEM
+                        + required_memory) <= GPU_MAX_MEM,name=f"mem_w_{lid}_{mid}"
                     )
 
     def _get_accumulated_activations(self, did, lid, mid):
@@ -292,7 +302,7 @@ class LayerwiseSimulator:
             for o_mid in range(self._num_microbatches):
                 if o_lid == lid and o_mid == mid: # necessary
                     continue
-                released_memory += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER)
+                released_memory += orders[o_lid]['w'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER)
         return released_memory
 
     def _build_constraints(self) -> None:
@@ -450,7 +460,7 @@ class LayerwiseSimulator:
             self._layer_f_length[i] = self.model_result[f"s{i}_f"]
             self._layer_b_length[i] = self.model_result[f"s{i}_b"] 
             self._layer_w_length[i] = self.model_result[f"s{i}_w"] 
-        self.show_solution_detail(prefixes=("theta","mem_w"))
+        self.show_solution_detail(prefixes=("theta","mem_w_1"))
         if draw:
             # 4. draws the result.
             results = {str(key) : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}

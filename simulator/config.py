@@ -1,4 +1,9 @@
 from dataclasses import dataclass
+def MEMORY(mem):
+    #TODO not always work
+    if mem > G:
+        return round(mem / G, 2)
+    return mem
 
 G = 1024 * 1024 * 1024
 M = 1024 * 1024
@@ -9,18 +14,18 @@ FP32 = 4 # 4 Bytes
 FP16 = 2 # 2 Bytes
 
 # Known parameter settings
-DEVICE_NUM = 4 * 1
-GPU_MAX_MEM = 80 * G
+DEVICE_NUM = 4 * 2
+GPU_MAX_MEM = 80 * G / G
 WORLD_SIZE = DEVICE_NUM
 PP_SIZE = DEVICE_NUM
 TP_SIZE = WORLD_SIZE // PP_SIZE
 
 VOCAB_SIZE = 92544
 NUM_ATTENTION_HEAD = 32
-SEQ_LEN = 12 * K
+SEQ_LEN = 4 * K
 HIDDEN_SIZE = 4 * K
 MICRO_BATCH_SIZE = 1
-MICRO_BATCH_NUM = 8
+MICRO_BATCH_NUM = 4 * 8
 LAYER_NUM = 8 * 1
 
 
@@ -37,32 +42,22 @@ DATA_TYPE: int = FP16 if MIX_TRAINING else FP32
 
 @dataclass
 class Activation:
-    INPUT: int = DATA_TYPE * b * s * h
-    LAYER_NORM: int = DATA_TYPE * b * s * h
-    ATTN_DROPOUT: int = b * s * s * a
-    MLP_DROPOUT: int = b * s * h
-    ATTENTION_PART: int = (5 * DATA_TYPE * b * s * h + 2 * DATA_TYPE * b * s * s * a) + MLP_DROPOUT + ATTN_DROPOUT + LAYER_NORM
-    MLP_PART: int = 9 * DATA_TYPE * b * s * h + MLP_DROPOUT + LAYER_NORM
-    FULL_LAYER: int = 34*b*s*h + 5*b*s*s*a
-    LOSS: int = 2 * FP32 * b * s * v
+    FULL_LAYER: int = (34*b*s*h + 5*b*s*s*a)/G
+    LOSS: int = (2*FP32*b*s*v)/G
 
 LAYER_PARA_NUM = 12 * h * h + 13 * h
 HEAD_PARA_NUM = v * h
-LAYER_MEMORY = DATA_TYPE * LAYER_PARA_NUM
-HEAD_MEMORY = DATA_TYPE * HEAD_PARA_NUM
+LAYER_MEMORY = DATA_TYPE * LAYER_PARA_NUM / G
+HEAD_MEMORY = DATA_TYPE * HEAD_PARA_NUM / G
 @dataclass
 class Gradient:
-    INPUT: int = DATA_TYPE * LAYER_PARA_NUM
-    PARAMETER: int = DATA_TYPE * LAYER_PARA_NUM
-    HEAD: int = DATA_TYPE * HEAD_PARA_NUM
+    INPUT: int = DATA_TYPE * LAYER_PARA_NUM / G
+    PARAMETER: int = DATA_TYPE * LAYER_PARA_NUM / G
+    HEAD: int = DATA_TYPE * HEAD_PARA_NUM / G
 
 # Memory Overhead
 PARAMETER_NUM = LAYER_PARA_NUM * LAYER_NUM + HEAD_PARA_NUM
-MODEL_MEMORY = PARAMETER_NUM * FP16 if MIX_TRAINING else PARAMETER_NUM * FP32
-GRADIENT_MEMORY = PARAMETER_NUM * FP16 if MIX_TRAINING else PARAMETER_NUM * FP32
-OPTIMIZER_MEMORY = PARAMETER_NUM * FP32 * 3 # Optimizer status * 2, gradients * 1, model parameters * 1
-
-BASIC_MEMORY = (MODEL_MEMORY + OPTIMIZER_MEMORY) / (PP_SIZE * TP_SIZE)
+OPTIMIZER_MEMORY = PARAMETER_NUM * FP32 * 3 / G # Optimizer status * 2, gradients * 1, model parameters * 1
 
 # Profiled time overhead
 EMBEDDING_TIME = 1
