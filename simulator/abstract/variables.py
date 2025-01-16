@@ -29,6 +29,7 @@ class RunMode(Enum):
     GUROBI_SOLVE = "gurobi"
     SIM_SOLVE = "sim"
     LAYERWISE_GUROBI_SOLVE = "layer"
+    CHIMERA = "chimera"
 
 class WorkloadConstraint:
 

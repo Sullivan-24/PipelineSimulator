@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from simulator.DSASimulator import DSASimulator
 from simulator.LayerwiseSimulator import LayerwiseSimulator
+from simulator.ChimeraSimulator import ChimeraSimulator
 from simulator.GSimulator import GSimulator
 from simulator.SPSimulator import SPSimulator
 from simulator.abstract import Pipeline
@@ -58,7 +59,7 @@ def main():
         gwd_time = config["backward_execution_g_time"]
         gwd_time[-1] += CE_W_TIME + HEAD_W_TIME
         config["backward_execution_g_time"] = gwd_time
-        
+    
     if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
         config["file_path"] = os.path.join("results", filename)
         s_time = time.time()
@@ -75,6 +76,9 @@ def main():
             #     [4, 5],
             #     ]
         )
+        simulator.run(draw=True)
+    elif config["run_mode"] == RunMode.CHIMERA:
+        simulator = ChimeraSimulator(config)
         simulator.run(draw=True)
     elif config["run_mode"] == RunMode.GUROBI_SOLVE:
         simulator = GSimulator(config, 

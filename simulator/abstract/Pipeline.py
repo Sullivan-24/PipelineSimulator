@@ -12,8 +12,8 @@ class PipelineScheduler:
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
-        # self.microbatch_schedule_range = range(0,min(16, MICRO_BATCH_NUM))
-        self.microbatch_schedule_range = range(0,min(32, MICRO_BATCH_NUM))
+        self.microbatch_schedule_range = range(0,min(MICRO_BATCH_NUM//1, MICRO_BATCH_NUM))
+        # self.microbatch_schedule_range = range(0,min(8, MICRO_BATCH_NUM))
         self.num_finished_microbatch = 0
         self._init_stage()
         self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
