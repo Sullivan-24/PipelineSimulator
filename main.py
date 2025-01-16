@@ -32,6 +32,7 @@ def main():
         "file_path": None,
         "base_solution" : BASE_SOLUTION,
         "schedule_method": SCHEDULE_METHOD,
+        "emb_head_ce": SPLIT_EMB_HEAD_CE,
     }
     print(MEMORY(Activation.FULL_LAYER))
     print(MEMORY(OPTIMIZER_MEMORY))
@@ -67,17 +68,12 @@ def main():
         e_time = simulator.traverse_run()
         print(f"Traverse Run Total time: {e_time - s_time}")
     elif config["run_mode"] == RunMode.LAYERWISE_GUROBI_SOLVE:
-        simulator = LayerwiseSimulator(config, 
-            # device_stage_alignments=[
-            #     [0, 9],
-            #     [1, 8],
-            #     [2, 7],
-            #     [3, 6],
-            #     [4, 5],
-            #     ]
-        )
+        simulator = LayerwiseSimulator(config=config)
         simulator.run(draw=True)
     elif config["run_mode"] == RunMode.CHIMERA:
+        config["forward_execution_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
+        config["backward_execution_i_time"] = [B_TIME for _ in range(LAYER_NUM)] 
+        config["backward_execution_g_time"] = [W_TIME for _ in range(LAYER_NUM)]
         simulator = ChimeraSimulator(config)
         simulator.run(draw=True)
     elif config["run_mode"] == RunMode.GUROBI_SOLVE:

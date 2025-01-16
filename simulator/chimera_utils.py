@@ -13,18 +13,18 @@ from .z3_config import *
 
 def parse_microbatch_key(key: str) -> Tuple[bool, int, int]:
     "parse microbatch key"
-    cwi, cwi_idx, k, mid, pid = key.split("_")
+    cwi, stream_idx, k, mid, pid = key.split("_")
 
-    return cwi, int(cwi_idx), k, int(pid), int(mid)
+    return cwi, int(stream_idx), k, int(pid), int(mid)
 
 # def _replace_mid_in_key(key: str, new_mid: int) -> str:
 #     is_forward, pid, _ = parse_microbatch_key(key)
 
 #     return f"{'f' if is_forward else 'b'}_{new_mid}_{pid}"
 def _replace_mid_in_key(key: str, new_mid: int) -> str:
-    cwi, cwi_idx, k, pid, _ = parse_microbatch_key(key)
+    cwi, stream_idx, k, pid, _ = parse_microbatch_key(key)
 
-    return f"{cwi}_{cwi_idx}_{k}_{new_mid}_{pid}"
+    return f"{cwi}_{stream_idx}_{k}_{new_mid}_{pid}"
 
 def resort_microbatch_index(num_microbatches: int, model_res: Dict[str, int]) -> dict:
     "resort microbatch index"
@@ -40,7 +40,7 @@ def resort_microbatch_index(num_microbatches: int, model_res: Dict[str, int]) ->
         #     continue
         if not key[6:].startswith("f_"):
             continue
-        _, cidx, _, _, mid = parse_microbatch_key(key)
+        _, _, _, _, mid = parse_microbatch_key(key)
 
         if only_forward_starts[mid] > value:
             only_forward_starts[mid] = value

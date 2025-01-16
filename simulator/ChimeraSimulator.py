@@ -14,7 +14,7 @@ workload_type_mapping = {
 
 class ChimeraSimulator:
 
-    def __init__(self, config: dict, device_layer_alignments=None, new_comm_length=None) -> None:
+    def __init__(self, config: dict) -> None:
         self._base_solution = config['base_solution']
         self._schedule_method = config['schedule_method']
         self._file_path = config["file_path"]
@@ -24,6 +24,9 @@ class ChimeraSimulator:
         self._num_layer = config["model_size"]
         self.total_stream = 2
         self._num_microbatches = config["num_microbatches"]
+        self._emb_head_ce = config["emb_head_ce"]
+        if self._emb_head_ce:
+            self._num_layer += 3
 
         # 估算总时间限定大M取值（须大于等于估算值）
         self.estimated_time_cost = self.estimate_time_cost()
@@ -31,17 +34,15 @@ class ChimeraSimulator:
 
         self.model = Model("ChimeraSimulator")
         self.streams = [
-            ChimeraOneWaySimulator(
+            ChimeraStream(
                 config=config, 
-                order=False,
-                new_comm_length=new_comm_length,
+                order=True,
                 model=self.model,
                 chimera_way_idx=idx,
                 total_stream=self.total_stream,
-            ) if idx % 2 else ChimeraOneWaySimulator(
+            ) if idx % 2 else ChimeraStream(
                 config=config, 
-                order=True,
-                new_comm_length=new_comm_length,
+                order=False,
                 model=self.model,
                 chimera_way_idx=idx,
                 total_stream=self.total_stream,
@@ -51,30 +52,6 @@ class ChimeraSimulator:
         self.model_result = None
 
     def _add_memory_constraints(self):
-        """
-            self._orders = {
-                device_id:{
-                    lid:{
-                        mid:{
-                            lid1:{
-                                f:[],
-                                b:[],
-                                w:[],
-                            },
-                            lid2:{
-                                f:[],
-                                b:[],
-                                w:[],
-                            },
-                            ...
-                        },
-                        ...
-                    }
-                    ...
-                }
-                ...
-            }
-        """
         self._orders = {}
         for stream_idx, stream in enumerate(self.streams):
             self._orders[stream_idx] = {}
@@ -138,7 +115,9 @@ class ChimeraSimulator:
                             layer_wise=True,
                             recomp=stream._layer_recomp_rate[lid],
                         )
-                        base_memory = (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + LAYER_MEMORY * len([l for l in stream._devices[did] if l not in (0, LAYER_NUM - 1, LAYER_NUM - 2)])
+                        base_memory = 0
+                        for s in self.streams:
+                            base_memory += (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + LAYER_MEMORY * len([l for l in s._devices[did] if l not in (0, LAYER_NUM - 1, LAYER_NUM - 2)])
                         accumulated_activations = self._get_accumulated_activations(stream_idx=stream_idx, did=did, lid=lid, mid=mid)
                         accumulated_input_gradients = self._get_accumulated_input_gradients(stream_idx=stream_idx, did=did, lid=lid, mid=mid)
                         released_memory = self._get_released_memory(stream_idx=stream_idx, did=did, lid=lid, mid=mid)
@@ -272,7 +251,7 @@ class ChimeraSimulator:
     def _build_optimize_objectives(self) -> None:
         max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
         for stream in self.streams:
-            for lid in range(self._pp_size):
+            for lid in range(self._num_layer):
                 if SPLIT_BACKPROP:
                     self.model.addConstr(max_var >= stream._layer_w_offsets[lid][-1] + stream._layer_w_length[lid])
                 else:
@@ -304,7 +283,7 @@ class ChimeraSimulator:
         results = {var.varName: var.x for var in self.model.getVars()}
         self.model_result = results
         print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"]))
-        for i in range(self._pp_size):
+        for i in range(self._num_layer):
             self.streams[0]._layer_f_length[i] = self.model_result[f"cwi_0_s{i}_f"]
             self.streams[0]._layer_b_length[i] = self.model_result[f"cwi_0_s{i}_b"] 
             self.streams[0]._layer_w_length[i] = self.model_result[f"cwi_0_s{i}_w"] 
@@ -359,12 +338,13 @@ class ChimeraSimulator:
             "file_path": self.streams[0]._file_path,
             "max_time": self.model_result['max_start_offset'],
             "num_layer": self.streams[0]._num_layer,
+            "emb_head_ce": self._emb_head_ce,
         }
 
         LayerwiseSchedulingPainter(painter_conf).draw(results)
 
 
-class ChimeraOneWaySimulator:
+class ChimeraStream:
     def __init__(self, config: dict, model:Model, chimera_way_idx:int, total_stream:int, order=None, new_comm_length=None) -> None:
         self._base_solution = config['base_solution']
         self._schedule_method = config['schedule_method']
@@ -374,13 +354,25 @@ class ChimeraOneWaySimulator:
         self._num_device = config["device_size"]
         self._num_layer = config["model_size"]
         self._num_microbatches = config["num_microbatches"]
+        self._emb_head_ce = config["emb_head_ce"]
         self._chimera_way_idx = chimera_way_idx
         self._total_stream = total_stream
-        # obtained by profiling
-        self._profiled_layer_f_length = [ i * self._num_layer // self._pp_size for i in config["forward_execution_time"]]
-        self._profiled_layer_b_length = [ i * self._num_layer // self._pp_size for i in config["backward_execution_i_time"]]
-        self._profiled_layer_w_length = [ i * self._num_layer // self._pp_size for i in config["backward_execution_g_time"]]
-        
+
+        self._profiled_layer_f_length = config["forward_execution_time"]
+        self._profiled_layer_b_length = config["backward_execution_i_time"]
+        self._profiled_layer_w_length = config["backward_execution_g_time"]
+
+        if self._emb_head_ce:
+            self._profiled_layer_f_length = [EMBEDDING_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
+            self._profiled_layer_b_length = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
+            self._profiled_layer_w_length = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
+            self._num_layer += 3
+        else:        
+            self._profiled_layer_f_length[0] += EMBEDDING_TIME
+            self._profiled_layer_f_length[-1] += CE_F_TIME + HEAD_F_TIME
+            self._profiled_layer_b_length[-1] += CE_B_TIME + HEAD_B_TIME
+            self._profiled_layer_w_length[-1] += CE_W_TIME + HEAD_W_TIME
+
         self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
         
         # 检查输入参数
@@ -398,19 +390,42 @@ class ChimeraOneWaySimulator:
         self._layer_recomp_rate = []
         self._device_layers_mapping = [[] for _ in range(self._num_device)]
 
-        self._layer_f_offsets = [[] for _ in range(self._pp_size)]
-        self._layer_b_offsets = [[] for _ in range(self._pp_size)]
-        self._layer_w_offsets = [[] for _ in range(self._pp_size)]
-        self._devices = [[i] for i in range(self._num_device)]
-        if not order:
-            self._devices = list(reversed(self._devices))
+        self._layer_f_offsets = [[] for _ in range(self._num_layer)]
+        self._layer_b_offsets = [[] for _ in range(self._num_layer)]
+        self._layer_w_offsets = [[] for _ in range(self._num_layer)]
+        self._devices = self.split_layers_into_stages(layer_num=self._num_layer if not self._emb_head_ce else self._num_layer-3, stage_num=self._pp_size, reverse=order)
+        print(self._devices)
+
+    def split_layers_into_stages(self, layer_num, stage_num, reverse=False):
+        result = []
+        increment = layer_num // stage_num
+        for i in range(stage_num):
+            start = i * increment
+            if reverse:
+                start = layer_num - (i + 1) * increment
+            end = start + increment
+            result.append(list(range(max(0, start), min(end, layer_num))))
+        
+        if self._emb_head_ce:
+            for did, _ in enumerate(result):
+                for lid, _ in enumerate(result[did]):
+                    result[did][lid] += 1
+            if reverse:
+                result[self._num_device // 2].append(0)
+                result[-1].append(self._num_layer-2)
+                result[-2].append(self._num_layer-1)
+            else:
+                result[self._num_device // 2 - 1].append(0)
+                result[0].append(self._num_layer-2)
+                result[1].append(self._num_layer-1)
+        return result
 
     def show_device_stage_mapping(self):
         for did, ds in enumerate(self._devices):
             print_to_file(self._file_path, "Device {}: {}.\n".format(did, ds))
 
     def _reset_comm_length(self, dsa):
-        new_comm_length = [[COMM_TIME if i != j else 0 for j in range(self._pp_size)] for i in range(self._pp_size)]
+        new_comm_length = [[COMM_TIME if i != j else 0 for j in range(self._num_layer)] for i in range(self._num_layer)]
         for d in dsa:
             for i in range(len(d)):
                 for j in range(i+1, len(d)):
@@ -419,7 +434,7 @@ class ChimeraOneWaySimulator:
         return new_comm_length
     
     def _generate_variables(self):
-        for lid in range(self._pp_size):
+        for lid in range(self._num_layer):
             self._layer_recomp_rate.append(self.model.addVar(vtype=GRB.BINARY, name=f"cwi_{self._chimera_way_idx}_theta_{lid}"))
             for mid in range(self._num_microbatches):
                 
@@ -448,35 +463,80 @@ class ChimeraOneWaySimulator:
                 var.start = 1  # 设置初始值为 1
 
         self._comm_length = self._reset_comm_length(self._devices)
-        self._real_pipeline_modeling_constraint_strict()
+        self._real_pipeline_modeling_constraint_strict(split=self._emb_head_ce)
 
-    def _real_pipeline_modeling_constraint_strict(self):
-        for mb in range(self._num_microbatches):
-            for i in range(1, self._pp_size):
-                self.model.addConstr(self._layer_f_offsets[i][mb] >= self._layer_f_offsets[i - 1][mb] +
-                                     self._layer_f_length[i - 1] + self._comm_length[i - 1][i])
+    def _real_pipeline_modeling_constraint_strict(self, split=False):
+        if split:
+            for mb in range(self._num_microbatches):
+                for i in range(1, self._num_layer):
+                    self.model.addConstr(self._layer_f_offsets[i][mb] >= self._layer_f_offsets[i - 1][mb] +
+                                        self._layer_f_length[i - 1] + self._comm_length[i - 1][i])
 
-            for i in range(self._pp_size - 1, 0, -1):
-                self.model.addConstr(self._layer_b_offsets[i - 1][mb] >= self._layer_b_offsets[i][mb] +
-                                     self._layer_b_length[i] + self._comm_length[i][i - 1])
-
-            self.model.addConstr(self._layer_b_offsets[self._pp_size - 1][mb] >= self._layer_f_offsets[self._pp_size - 1][mb] +
-                                 self._layer_f_length[self._pp_size - 1])
-
-            if SPLIT_BACKPROP:
-                for i in range(0, self._pp_size):
-                    self.model.addConstr(self._layer_w_offsets[i][mb] >= self._layer_b_offsets[i][mb] +
-                                        self._layer_b_length[i])
+                for i in range(self._num_layer - 1, 1, -1):
+                    self.model.addConstr(self._layer_b_offsets[i - 1][mb] >= self._layer_b_offsets[i][mb] +
+                                        self._layer_b_length[i] + self._comm_length[i][i - 1])
+                # NOTE: Embedding layer has no B
+                self.model.addConstr(self._layer_b_offsets[0][mb] == self._layer_f_offsets[0][mb] + self._layer_f_length[0])
                 
-            if mb > 0:
-                for i in range(0, self._pp_size):
-                    self.model.addConstr(self._layer_f_offsets[i][mb] >= self._layer_f_offsets[i][mb - 1] +
-                                         self._layer_f_length[i])
-                    self.model.addConstr(self._layer_b_offsets[i][mb] >= self._layer_b_offsets[i][mb - 1] +
-                                         self._layer_b_length[i])
-                    if SPLIT_BACKPROP:
-                        self.model.addConstr(self._layer_w_offsets[i][mb] >= self._layer_w_offsets[i][mb - 1] +
-                                            self._layer_w_length[i])
+
+                self.model.addConstr(self._layer_b_offsets[self._num_layer - 1][mb] >= self._layer_f_offsets[self._num_layer - 1][mb] +
+                                    self._layer_f_length[self._num_layer - 1])
+
+                if SPLIT_BACKPROP:
+                    # NOTE: Embedding layer has no W
+                    self.model.addConstr(self._layer_w_offsets[0][mb] == self._layer_f_offsets[0][mb] + self._layer_f_length[0])
+                    for i in range(1, self._num_layer - 1):
+                        self.model.addConstr(self._layer_w_offsets[i][mb] >= self._layer_b_offsets[i][mb] +
+                                            self._layer_b_length[i])
+                    # NOTE: CE layer has no W
+                    self.model.addConstr(self._layer_w_offsets[self._num_layer - 1][mb] == self._layer_b_offsets[self._num_layer - 1][mb] +
+                                            self._layer_b_length[self._num_layer - 1])
+
+                if mb > 0:
+                    # NOTE: Embedding layer has no B and W
+                    self.model.addConstr(self._layer_f_offsets[0][mb] >= self._layer_f_offsets[0][mb - 1] +
+                                            self._layer_f_length[0])
+                    # Transformer layer + Head layer
+                    for i in range(1, self._num_layer - 1):
+                        self.model.addConstr(self._layer_f_offsets[i][mb] >= self._layer_f_offsets[i][mb - 1] +
+                                            self._layer_f_length[i])
+                        self.model.addConstr(self._layer_b_offsets[i][mb] >= self._layer_b_offsets[i][mb - 1] +
+                                            self._layer_b_length[i])
+                        if SPLIT_BACKPROP:
+                            self.model.addConstr(self._layer_w_offsets[i][mb] >= self._layer_w_offsets[i][mb - 1] +
+                                                self._layer_w_length[i])
+                    # NOTE: CE layer has no W
+                    self.model.addConstr(self._layer_f_offsets[self._num_layer - 1][mb] >= self._layer_f_offsets[self._num_layer - 1][mb - 1] +
+                                            self._layer_f_length[self._num_layer - 1])
+                    self.model.addConstr(self._layer_b_offsets[self._num_layer - 1][mb] >= self._layer_b_offsets[self._num_layer - 1][mb - 1] +
+                                            self._layer_b_length[self._num_layer - 1])
+        else:
+            for mb in range(self._num_microbatches):
+                for i in range(1, self._num_layer):
+                    self.model.addConstr(self._layer_f_offsets[i][mb] >= self._layer_f_offsets[i - 1][mb] +
+                                        self._layer_f_length[i - 1] + self._comm_length[i - 1][i])
+
+                for i in range(self._num_layer - 1, 0, -1):
+                    self.model.addConstr(self._layer_b_offsets[i - 1][mb] >= self._layer_b_offsets[i][mb] +
+                                        self._layer_b_length[i] + self._comm_length[i][i - 1])
+
+                self.model.addConstr(self._layer_b_offsets[self._num_layer - 1][mb] >= self._layer_f_offsets[self._num_layer - 1][mb] +
+                                    self._layer_f_length[self._num_layer - 1])
+
+                if SPLIT_BACKPROP:
+                    for i in range(0, self._num_layer):
+                        self.model.addConstr(self._layer_w_offsets[i][mb] >= self._layer_b_offsets[i][mb] +
+                                            self._layer_b_length[i])
+                    
+                if mb > 0:
+                    for i in range(0, self._num_layer):
+                        self.model.addConstr(self._layer_f_offsets[i][mb] >= self._layer_f_offsets[i][mb - 1] +
+                                            self._layer_f_length[i])
+                        self.model.addConstr(self._layer_b_offsets[i][mb] >= self._layer_b_offsets[i][mb - 1] +
+                                            self._layer_b_length[i])
+                        if SPLIT_BACKPROP:
+                            self.model.addConstr(self._layer_w_offsets[i][mb] >= self._layer_w_offsets[i][mb - 1] +
+                                                self._layer_w_length[i])
         
         self.model.addConstr(self._layer_f_offsets[0][0] == 0)
 

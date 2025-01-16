@@ -16,6 +16,7 @@ class LayerwiseSchedulingPainter:
         self._pp_align      = config["pp_align"]
         self._pixel_base    = config["pixel_base"]
         self._max_time      = config["max_time"] if 'max_time' in config else -1
+        self._emb_head_ce   = config["emb_head_ce"]
         
         self._num_microbatches = config["num_microbatches"]
         self._num_layer = config["num_layer"]
@@ -57,7 +58,7 @@ class LayerwiseSchedulingPainter:
         else:
             color = "#00FF6F"
 
-        if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE or SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        if self._emb_head_ce:
             if pid == 0:
                 color = "#FF0000" # 红色: #FF0000
             elif pid == self._num_layer - 2:
@@ -83,10 +84,10 @@ class LayerwiseSchedulingPainter:
         data = {key: val * self._pixel_base for key, val in data.items()}
 
         max_key = max(data, key=data.get)
-        cwi, cwi_idx, _, max_key_pid, _ = parse_microbatch_key(max_key)
+        # stream_idx 为 Chimera stream 的序号
+        chimera_flag, stream_idx, _, max_key_pid, _ = parse_microbatch_key(max_key)
 
-        canvas_width = data[max_key] + self._backward_b_length[cwi_idx][max_key_pid] + 2 * self._pp_align
-        # canvas_height = (self._pp_height + self._pp_align) * self._pp_size
+        canvas_width = data[max_key] + self._backward_b_length[stream_idx][max_key_pid] + 2 * self._pp_align
         # 按照 Device 画示意图
         canvas_height = (self._pp_height + self._pp_align) * self._device_size
 
@@ -100,9 +101,9 @@ class LayerwiseSchedulingPainter:
             else:
                 self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
 
-        label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Layers:{}(+3), F:{}, B:{}, W:{}, C:{}".format(
+        label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Layers:{}, F:{}, B:{}, W:{}, C:{}".format(
                 round(self._max_time),
-                self._num_layer-3,
+                self._num_layer,
                 self._forward_length[0][1], 
                 self._backward_b_length[0][1], 
                 self._backward_w_length[0][1], 
@@ -110,9 +111,6 @@ class LayerwiseSchedulingPainter:
             ),
         )
 
-        # label_canvas.create_text(
-        #     canvas_width - self._pp_align - 120, y_label, text="Selected:"
-        # )
         coords_label = label_canvas.create_text(
             canvas_width - self._pp_align - 40, y_label, text="(start,end)"
         )
@@ -123,8 +121,6 @@ class LayerwiseSchedulingPainter:
         main_canvas.pack()
 
         # 2. Add timeline for each pipeline
-        # for pid in range(self._pp_size):
-        # 按照 Device 画示意图
         for pid in range(self._device_size):
             x0 = self._pp_align
             y0 = (self._pp_height + self._pp_align) * pid + 5
@@ -136,19 +132,17 @@ class LayerwiseSchedulingPainter:
         for microbatch_key, offset in data.items():
             if not microbatch_key[6:].startswith(("f_","b_","w_",)):
                 continue
-            cwi, cwi_idx, k, pid, mid = parse_microbatch_key(microbatch_key)
+            chimera_flag, stream_idx, k, pid, mid = parse_microbatch_key(microbatch_key)
 
             x0 = self._pp_align + offset
-            did = self._pid2did(pid=pid,cwi_idx=cwi_idx) # 获取对应的device id，把每个stage画在对应的device上
-            # y0 = (self._pp_height + self._pp_align) * pid + 5
+            did = self._pid2did(pid=pid,cwi_idx=stream_idx) # 获取对应的device id，把每个stage画在对应的device上
             y0 = (self._pp_height + self._pp_align) * did + 5
             #修改画图中每个block的宽度
-            block_width = self._forward_length[cwi_idx][pid] if k == 'f' else (self._backward_b_length[cwi_idx][pid] if k == 'b' else self._backward_w_length[cwi_idx][pid])
+            block_width = self._forward_length[stream_idx][pid] if k == 'f' else (self._backward_b_length[stream_idx][pid] if k == 'b' else self._backward_w_length[stream_idx][pid])
             x1 = x0 + block_width
-            # y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
             y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
             
-            mid = mid + cwi_idx * self._num_microbatches
+            mid = mid + stream_idx * self._num_microbatches
             tag = f"p_{pid}_m_{mid}_{k}"
             color = self._set_color(pid=pid, k=k)
             if x0 == x1:
@@ -156,7 +150,6 @@ class LayerwiseSchedulingPainter:
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况
             bold_font = font.Font(
-                # family="Calibri Light", 
                 underline= (max(0,pid-1)) // self._device_size % 2,
                 weight= tk.font.NORMAL if (max(0,pid-1)) // self._device_size % 2 else tk.font.BOLD
             )
@@ -192,16 +185,9 @@ class LayerwiseSchedulingPainter:
 
             tags = [
                 f"p_{pid}_m_{self._item2mid[current_item]}_{fb}"
-                for pid in range(self._pp_size)
+                for pid in range(self._num_layer)
                 for fb in ("f", "b", "w") #点击后的效果，加上w的判断
             ]
-
-            if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
-                tags = [
-                    f"p_{pid}_m_{self._item2mid[current_item]}_{fb}"
-                    for pid in range(self._num_layer)
-                    for fb in ("f", "b", "w") #点击后的效果，加上w的判断
-                ]
             
             items_same_microbatch = []
             for tag in tags:
