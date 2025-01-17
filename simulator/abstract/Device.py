@@ -4,9 +4,9 @@ import queue
 def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True, recomp=None):
         assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type"
         if workload_type ==WorkloadType.F:
-            required_memory = Activation.FULL_LAYER * layer_num 
+            required_memory = Activation.FULL * layer_num 
             if recomp: 
-                required_memory = Activation.FULL_LAYER * layer_num * (1 - recomp)
+                required_memory = Activation.FULL * layer_num * (1 - recomp)
             if layer_wise and stage_id == LAYER_NUM - 2:
                 required_memory = Activation.LOSS
             elif not layer_wise and stage_id == STAGE_NUM - 1:
@@ -16,7 +16,7 @@ def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 
                 if workload_type == WorkloadType.B:
                     required_memory = Gradient.INPUT * layer_num 
                     if recomp:
-                        required_memory = Gradient.INPUT * layer_num + Activation.FULL_LAYER * layer_num * recomp
+                        required_memory = Gradient.INPUT * layer_num + Activation.FULL * layer_num * recomp
                 elif workload_type == WorkloadType.W:
                     required_memory = Gradient.PARAMETER * layer_num
                 else:
@@ -25,7 +25,7 @@ def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 
                 if workload_type == WorkloadType.B:
                     required_memory = (Gradient.INPUT + Gradient.PARAMETER) * layer_num
                     if recomp:
-                        required_memory = (Gradient.INPUT + Gradient.PARAMETER) * layer_num + Activation.FULL_LAYER * recomp
+                        required_memory = (Gradient.INPUT + Gradient.PARAMETER) * layer_num + Activation.FULL * recomp
                 else:
                     raise Exception("Unsupported workload type {}".format(workload_type))
             else:
@@ -70,7 +70,7 @@ class Device:
 
     def get_available_f_workloads(self):
         current_mem_usage = self.get_memory_usage()
-        return (GPU_MAX_MEM - current_mem_usage - Gradient.INPUT - Gradient.PARAMETER) // Activation.FULL_LAYER - 2
+        return (GPU_MAX_MEM - current_mem_usage - Gradient.INPUT - Gradient.PARAMETER) // Activation.FULL - 2
 
     def exist_executable_workload(self, workload_type):
         for stage_id in self.stages:

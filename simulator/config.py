@@ -22,11 +22,11 @@ TP_SIZE = WORLD_SIZE // PP_SIZE
 
 VOCAB_SIZE = 92544
 NUM_ATTENTION_HEAD = 32
-SEQ_LEN = 12 * K
+SEQ_LEN = 4 * K
 HIDDEN_SIZE = 4 * K
 MICRO_BATCH_SIZE = 1
-MICRO_BATCH_NUM = 4 * 1 * 1
-LAYER_NUM = 4
+MICRO_BATCH_NUM = 4 * 2 * 1
+LAYER_NUM = 8
 SPLIT_EMB_HEAD_CE = True
 
 # Memory overhead calculation
@@ -42,7 +42,8 @@ DATA_TYPE: int = FP16 if MIX_TRAINING else FP32
 
 @dataclass
 class Activation:
-    FULL_LAYER: int = (34*b*s*h + 5*b*s*s*a)/G
+    INPUT: int = (2*b*s*h)/G
+    FULL: int = (34*b*s*h + 5*b*s*s*a)/G
     LOSS: int = (2*FP32*b*s*v)/G
 
 LAYER_PARA_NUM = 12 * h * h + 13 * h

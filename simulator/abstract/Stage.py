@@ -15,16 +15,17 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, recomp: bool = False):
+    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False):
         self.device_id: int = device_id
         self.stage_id: int = stage_id
+        self.microbatch_num: int = microbatch_num
         self.memory_usage: int = memory_usage
         self.workloads: dict[int, {WorkloadType, Workload}] = {}  
         self.stage_type: StageType = stage_type
         self.recomp = recomp
         self._add_workload()
     
-    def _get_workload_duration(self, device_id, stage_id, stage_type, microbatch_id, workload_type, recomp):
+    def _get_workload_duration(self, stage_id, stage_type, workload_type, recomp):
         if SchedulePriority.Layerwise == SCHEDULE_METHOD:
             if workload_type == WorkloadType.F:
                 duration = F_TIME
@@ -47,6 +48,8 @@ class Stage:
                     duration = CE_W_TIME
                 elif stage_type == StageType.HEAD:
                     duration = HEAD_W_TIME
+            else:
+                raise Exception("Wrong workload type!")
         else:
             #TODO recomp
             layer_per_stage = LAYER_NUM // STAGE_NUM
@@ -69,17 +72,15 @@ class Stage:
         return duration
         
     def _add_workload(self) -> None:
-        for mid in range(MICRO_BATCH_NUM):
+        for mid in range(self.microbatch_num):
             fpw = Workload(
                 device_id=self.device_id,
                 stage_id=self.stage_id,
                 microbatch_id=mid,
                 workload_type=WorkloadType.F,
                 duration=self._get_workload_duration(
-                    device_id=self.device_id,
                     stage_id=self.stage_id,
                     stage_type=self.stage_type,
-                    microbatch_id=mid,
                     workload_type=WorkloadType.F,
                     recomp=self.recomp,
                 ),    
@@ -97,10 +98,8 @@ class Stage:
                 microbatch_id=mid,
                 workload_type=WorkloadType.B,
                 duration=self._get_workload_duration(
-                    device_id=self.device_id,
                     stage_id=self.stage_id,
                     stage_type=self.stage_type,
-                    microbatch_id=mid,
                     workload_type=WorkloadType.B,
                     recomp=self.recomp,
                 ),   
@@ -117,10 +116,8 @@ class Stage:
                     microbatch_id=mid,
                     workload_type=WorkloadType.W,
                     duration=self._get_workload_duration(
-                        device_id=self.device_id,
                         stage_id=self.stage_id,
                         stage_type=self.stage_type,
-                        microbatch_id=mid,
                         workload_type=WorkloadType.W,
                         recomp=self.recomp,
                     ),     
@@ -154,7 +151,7 @@ class Stage:
                 else:
                     if self.recomp:
                         return
-                    self.memory_usage += Activation.FULL_LAYER
+                    self.memory_usage += Activation.FULL
             elif workload.workload_type == WorkloadType.B:
                 if self.stage_type == StageType.HEAD:                    
                     self.memory_usage -= Activation.LOSS
@@ -164,26 +161,26 @@ class Stage:
                     if SPLIT_BACKPROP:
                         self.memory_usage += Gradient.INPUT
                         if self.recomp:
-                            self.memory_usage += Activation.FULL_LAYER
+                            self.memory_usage += Activation.FULL
                     else:
-                        self.memory_usage -= Activation.FULL_LAYER
+                        self.memory_usage -= Activation.FULL
             elif workload.workload_type == WorkloadType.W:
                 if self.stage_type in (StageType.HEAD, StageType.CE):
                     return
                 if SPLIT_BACKPROP:
-                    self.memory_usage -= Gradient.INPUT + Activation.FULL_LAYER
+                    self.memory_usage -= Gradient.INPUT + Activation.FULL
         else:
             layers_per_stage = LAYER_NUM // STAGE_NUM
             if workload.workload_type == WorkloadType.F:
-                self.memory_usage += Activation.FULL_LAYER * layers_per_stage
+                self.memory_usage += Activation.FULL * layers_per_stage
                 if self.stage_id == STAGE_NUM - 1:
                     self.memory_usage += Activation.LOSS
             elif workload.workload_type == WorkloadType.W:
-                self.memory_usage -= (Activation.FULL_LAYER + Gradient.INPUT) * layers_per_stage
+                self.memory_usage -= (Activation.FULL + Gradient.INPUT) * layers_per_stage
             elif SPLIT_BACKPROP and workload.workload_type == WorkloadType.B:
                 self.memory_usage += Gradient.INPUT * layers_per_stage
             elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.B:
-                self.memory_usage -= Activation.FULL_LAYER * layers_per_stage
+                self.memory_usage -= Activation.FULL * layers_per_stage
         
     def execute_workload(self, mid=None, workload_type=None):
         if mid is not None and workload_type is not None and workload_type in self.workloads[mid]:

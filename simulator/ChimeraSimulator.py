@@ -140,7 +140,7 @@ class ChimeraSimulator:
                 for o_mid in range(self._num_microbatches):
                     if o_lid == lid and o_mid == mid: # necessary
                         continue
-                    accumulated_activations += orders[o_lid]['f'][o_mid] * Activation.FULL_LAYER * (1 - stream._layer_recomp_rate[o_lid])
+                    accumulated_activations += orders[o_lid]['f'][o_mid] * Activation.FULL * (1 - stream._layer_recomp_rate[o_lid])
         return accumulated_activations
 
     def _get_accumulated_input_gradients(self, stream_idx, did, lid, mid):
@@ -153,7 +153,7 @@ class ChimeraSimulator:
                 for o_mid in range(self._num_microbatches):
                     if o_lid == lid and o_mid == mid: # necessary
                         continue
-                    accumulated_input_gradients += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER * stream._layer_recomp_rate[o_lid])
+                    accumulated_input_gradients += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + Activation.FULL * stream._layer_recomp_rate[o_lid])
         return accumulated_input_gradients
     
     def _get_released_memory(self, stream_idx, did, lid, mid):
@@ -166,7 +166,7 @@ class ChimeraSimulator:
                 for o_mid in range(self._num_microbatches):
                     if o_lid == lid and o_mid == mid: # necessary
                         continue
-                    released_memory += orders[o_lid]['w'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER)
+                    released_memory += orders[o_lid]['w'][o_mid] * (Gradient.INPUT + Activation.FULL)
         return released_memory
 
     def _serial_computation_within_device_constraint(self):

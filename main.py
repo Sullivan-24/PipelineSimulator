@@ -34,7 +34,7 @@ def main():
         "schedule_method": SCHEDULE_METHOD,
         "emb_head_ce": SPLIT_EMB_HEAD_CE,
     }
-    print(MEMORY(Activation.FULL_LAYER))
+    print(MEMORY(Activation.FULL))
     print(MEMORY(OPTIMIZER_MEMORY))
     print(MEMORY(GPU_MAX_MEM))
 

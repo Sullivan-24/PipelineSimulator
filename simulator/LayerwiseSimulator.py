@@ -278,7 +278,7 @@ class LayerwiseSimulator:
             for o_mid in range(self._num_microbatches):
                 if o_lid == lid and o_mid == mid: # necessary
                     continue
-                accumulated_activations += orders[o_lid]['f'][o_mid] * Activation.FULL_LAYER * (1 - self._layer_recomp_rate[o_lid])
+                accumulated_activations += orders[o_lid]['f'][o_mid] * Activation.FULL * (1 - self._layer_recomp_rate[o_lid])
         return accumulated_activations
 
     def _get_accumulated_input_gradients(self, did, lid, mid):
@@ -290,7 +290,7 @@ class LayerwiseSimulator:
             for o_mid in range(self._num_microbatches):
                 if o_lid == lid and o_mid == mid: # necessary
                     continue
-                accumulated_input_gradients += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER * self._layer_recomp_rate[o_lid])
+                accumulated_input_gradients += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + Activation.FULL * self._layer_recomp_rate[o_lid])
         return accumulated_input_gradients
     
     def _get_released_memory(self, did, lid, mid):
@@ -302,7 +302,7 @@ class LayerwiseSimulator:
             for o_mid in range(self._num_microbatches):
                 if o_lid == lid and o_mid == mid: # necessary
                     continue
-                released_memory += orders[o_lid]['w'][o_mid] * (Gradient.INPUT + Activation.FULL_LAYER)
+                released_memory += orders[o_lid]['w'][o_mid] * (Gradient.INPUT + Activation.FULL)
         return released_memory
 
     def _build_constraints(self) -> None:
