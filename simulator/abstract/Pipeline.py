@@ -59,7 +59,6 @@ class PipelineScheduler:
             device = Device(device_id = did, 
                             max_activation_counts=MAX_ACTIVATION_COUNTS, 
                             nmb=MICRO_BATCH_NUM,
-                            # static_schedule=self.schedule[did],
                             )
             self.devices.append(device)
 
@@ -68,27 +67,14 @@ class PipelineScheduler:
                 for pid in self.dsa[did]:
                     self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
                     if SEQ_LEN > 4*K:
-                        self.set_layer_recomp(
-                            [
-                                0, #Embedding
-                                # 0,0,0,0,0,0,0,0,
-                                1,1,1,1,1,1,1,1,
-                                1,1,1,1,1,1,1,1,
-                                0,0 # Head+CE
-                            ]
-                        )
+                        recomp_list = [0] + [1 for _ in range(LAYER_NUM)] + [0,0]
+                        self.set_layer_recomp(recomp_list)
                     self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
         elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
             self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
             if SEQ_LEN > 4*K:
-
-                self.set_layer_recomp([0, #Embedding
-                                    # 0,0,0,0,0,0,0,0,
-                                    1,1,1,1,1,1,1,1,
-                                    1,1,1,1,1,1,1,1,
-                                    0,0 # Head+CE
-                                    ]
-                                )
+                recomp_list = [0] + [1 for _ in range(LAYER_NUM)] + [0,0]
+                self.set_layer_recomp(recomp_list)
                 # self.set_layer_recomp([0, #Embedding
                 #                        0,0,0,0,0,0,0,0,
                 #                        0,0,0,0,0,0,0,0,

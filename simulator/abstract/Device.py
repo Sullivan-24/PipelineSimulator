@@ -2,39 +2,72 @@ from .Stage import *
 import queue 
 
 def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True, recomp=None):
-        assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type"
+        assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type!"
         if workload_type ==WorkloadType.F:
             required_memory = Activation.FULL * layer_num 
-            if recomp: 
+            if recomp:
                 required_memory = Activation.FULL * layer_num * (1 - recomp)
             if layer_wise and stage_id == LAYER_NUM - 2:
                 required_memory = Activation.LOSS
             elif not layer_wise and stage_id == STAGE_NUM - 1:
                     required_memory += Activation.LOSS
+        elif workload_type == WorkloadType.B:
+            required_memory = Gradient.INPUT * layer_num
+            if recomp:
+                required_memory += Activation.FULL * layer_num * recomp
+            if workload_type_num == 2:
+                required_memory += Gradient.PARAMETER * layer_num
+        elif workload_type == WorkloadType.W:
+            assert workload_type_num == 3, "Workload number error!"
+            required_memory = Gradient.PARAMETER * layer_num
         else:
-            if workload_type_num == 3:
-                if workload_type == WorkloadType.B:
-                    required_memory = Gradient.INPUT * layer_num 
-                    if recomp:
-                        required_memory = Gradient.INPUT * layer_num + Activation.FULL * layer_num * recomp
-                elif workload_type == WorkloadType.W:
-                    required_memory = Gradient.PARAMETER * layer_num
-                else:
-                    raise Exception("Unsupported workload type {}".format(workload_type))
-            elif workload_type_num == 2:
-                if workload_type == WorkloadType.B:
-                    required_memory = (Gradient.INPUT + Gradient.PARAMETER) * layer_num
-                    if recomp:
-                        required_memory = (Gradient.INPUT + Gradient.PARAMETER) * layer_num + Activation.FULL * recomp
-                else:
-                    raise Exception("Unsupported workload type {}".format(workload_type))
-            else:
-                raise Exception("Wrong workload_type_num")
+            raise Exception("Unsupported workload type!")
 
-        if layer_wise:
-            if stage_id == 0 or stage_id == LAYER_NUM - 1:
-                required_memory = 0
+        if layer_wise and (stage_id == 0 or stage_id == LAYER_NUM - 1):
+            required_memory = 0
         return required_memory
+
+def get_stagewise_required_memory(stage_id, layer_num, workload_type, workload_type_num = 3, recomp=None, total_stages=STAGE_NUM):
+    assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type"
+    if workload_type ==WorkloadType.F:
+        required_memory = Activation.FULL * layer_num 
+        if recomp: 
+            required_memory = Activation.FULL * layer_num * (1 - recomp)
+        if stage_id == STAGE_NUM - 1:  # Head layer is combined with the last stage and will generate loss
+            required_memory += Activation.LOSS
+    elif workload_type == WorkloadType.B:
+        required_memory = Gradient.INPUT * layer_num
+        if workload_type_num == 2:
+            required_memory += Gradient.PARAMETER * layer_num
+        if recomp:
+            required_memory += Activation.FULL * layer_num * recomp
+    elif workload_type == WorkloadType.W:
+        required_memory = Gradient.PARAMETER * layer_num
+    return required_memory
+
+def get_layerwise_required_memory(lid, workload_type, recomp=None, workload_type_num=3, total_layers=LAYER_NUM):
+    assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type"
+    if workload_type ==WorkloadType.F:
+        required_memory = Activation.FULL 
+        if recomp: 
+            required_memory = Activation.FULL * (1 - recomp)
+        if lid == total_layers - 2: # Head layer generates loss
+            required_memory = Activation.LOSS
+    elif workload_type == WorkloadType.B:
+        required_memory = Gradient.INPUT
+        if workload_type_num == 3:
+            required_memory += Gradient.PARAMETER
+        if recomp:
+            required_memory += Activation.FULL * recomp
+    elif workload_type == WorkloadType.W:
+        required_memory = Gradient.PARAMETER
+    else:
+        raise Exception("Unsupported workload type {}".format(workload_type))
+
+    # Embedding and CE layer does not generate memory 
+    if lid == 0 or lid == LAYER_NUM - 1:
+        required_memory = 0
+    return required_memory
 
 class Device:
     
