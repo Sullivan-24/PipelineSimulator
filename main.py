@@ -8,6 +8,7 @@ from simulator.ChimeraSimulator import ChimeraSimulator
 from simulator.GSimulator import GSimulator
 from simulator.SPSimulator import SPSimulator
 from simulator.abstract import Pipeline
+from simulator.abstract import ChimeraScheduler
 from simulator.abstract.mutils import *
 
 def main():
@@ -77,15 +78,7 @@ def main():
         simulator = ChimeraSimulator(config)
         simulator.run(draw=True)
     elif config["run_mode"] == RunMode.GUROBI_SOLVE:
-        simulator = GSimulator(config, 
-            # device_stage_alignments=[
-            #     [0, 9],
-            #     [1, 8],
-            #     [2, 7],
-            #     [3, 6],
-            #     [4, 5],
-            #     ]
-        )
+        simulator = GSimulator(config)
         simulator.run(draw=True)
         simulator.show_solution_detail()
     elif config["run_mode"] == RunMode.Z3_SOLVE:
@@ -94,7 +87,10 @@ def main():
         simulator.run(base_solution=True, draw=True)
         simulator.show_solution_detail()
     elif config['run_mode'] == RunMode.SIM_SOLVE:
-        simulator = Pipeline.PipelineScheduler()
+        if SchedulePriority.Chimera == SCHEDULE_METHOD:
+            simulator = ChimeraScheduler.ChimeraPipelineScheduler()
+        else:
+            simulator = Pipeline.PipelineScheduler()
         simulator.run_pipeline_parallelism()
         # simulator.show_detail_info()
         simulator.show_mem_usage()

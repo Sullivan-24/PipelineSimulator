@@ -18,6 +18,7 @@ class SchedulePriority(Enum):
     BFW = 6
     GREEDY_v2 = 7
     Layerwise = 8
+    Chimera = 9
 
 class StageSearchOrder(Enum):
     Random = "Random"

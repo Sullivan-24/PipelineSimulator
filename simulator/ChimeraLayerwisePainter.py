@@ -97,9 +97,9 @@ class LayerwiseSchedulingPainter:
 
         if self._max_time == -1:
             if SPLIT_BACKPROP:
-                self._max_time = (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base
+                self._max_time = (data[max_key])//self._pixel_base
             else:
-                self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
+                self._max_time = (data[max_key])//self._pixel_base
 
         label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Layers:{}, F:{}, B:{}, W:{}, C:{}".format(
                 round(self._max_time),

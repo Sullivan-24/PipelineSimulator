@@ -14,7 +14,7 @@ FP32 = 4 # 4 Bytes
 FP16 = 2 # 2 Bytes
 
 # Known parameter settings
-DEVICE_NUM = 4 * 1
+DEVICE_NUM = 4 * 2
 GPU_MAX_MEM = 80 * G / G
 WORLD_SIZE = DEVICE_NUM
 PP_SIZE = DEVICE_NUM
@@ -22,11 +22,11 @@ TP_SIZE = WORLD_SIZE // PP_SIZE
 
 VOCAB_SIZE = 92544
 NUM_ATTENTION_HEAD = 32
-SEQ_LEN = 12 * K
+SEQ_LEN = 4 * K
 HIDDEN_SIZE = 4 * K
 MICRO_BATCH_SIZE = 1
-MICRO_BATCH_NUM = 4 * 1 * 1
-LAYER_NUM = 8
+MICRO_BATCH_NUM = 4 * 2 * 2
+LAYER_NUM = 16
 SPLIT_EMB_HEAD_CE = True
 
 # Memory overhead calculation

@@ -1,4 +1,4 @@
-from .Device import Device, SchedulePriority
+from .Device import Device, SchedulePriority, RunMode
 from .Stage import Stage
 from .Workload import Workload
 from .mutils import *
@@ -91,6 +91,7 @@ class PipelineScheduler:
             self.devices[1].add_stage(LAYER_NUM+2)
         else:
             self.recomp_set = [0 for _ in range(STAGE_NUM)]
+            self.set_layer_recomp(self.recomp_set)
             if SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
                 for pid in range(STAGE_NUM):
                     self.devices[pid % DEVICE_NUM].add_stage(pid)
@@ -430,15 +431,64 @@ class PipelineScheduler:
                         pwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.W].duration
         return fwd_time, iwd_time, pwd_time
     
+    def get_workload_len(self, key):
+        workload_type, mid, lid = key.split("_")
+        mid = int(mid)
+        lid = int(lid)
+        if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            layers = 1
+        else:
+            layers = LAYER_NUM // STAGE_NUM
+
+        if workload_type == "f":
+            workload_len = F_TIME * layers
+            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+                if lid == 0:
+                    workload_len = EMBEDDING_TIME
+                elif lid == LAYER_NUM - 1:
+                    workload_len = CE_F_TIME
+                elif lid == LAYER_NUM - 2:
+                    workload_len = HEAD_F_TIME
+            else:
+                if lid == 0:
+                    workload_len += EMBEDDING_TIME
+                elif lid == STAGE_NUM - 1:
+                    workload_len += CE_F_TIME + HEAD_F_TIME
+        elif workload_type == "b":
+            workload_len = B_TIME * layers
+            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+                if lid == LAYER_NUM - 1:
+                    workload_len = CE_B_TIME
+                elif lid == LAYER_NUM - 2:
+                    workload_len = HEAD_B_TIME
+            else:
+                if lid == STAGE_NUM - 1:
+                    workload_len += CE_B_TIME + HEAD_B_TIME
+        elif workload_type == "w":
+            workload_len = W_TIME * layers
+            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+                if lid == LAYER_NUM - 1:
+                    workload_len = CE_W_TIME
+                elif lid == LAYER_NUM - 2:
+                    workload_len = HEAD_W_TIME
+            else:
+                if lid == STAGE_NUM - 1:
+                    workload_len += CE_W_TIME + HEAD_W_TIME
+        return workload_len 
+
+
     def write_fbw_to_file(self):
         for key in self.results:
             if key.startswith(("f_","b_","w_")):
                 print_to_file(f"sim_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key},{self.results[key]}\n")
 
+                workload_len = self.get_workload_len(key=key)
+                print_to_file(f"sim_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key}_e,{self.results[key] + workload_len}\n")
+
     def draw(self) -> None:
         # 绘制结果的逻辑
         self.resort_w()
-        # self.write_fbw_to_file()
+        self.write_fbw_to_file()
         if SCHEDULE_METHOD == SchedulePriority.Layerwise:
             fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
             painter_conf = {
@@ -457,6 +507,11 @@ class PipelineScheduler:
             }
             LSP(painter_conf).draw(self.results)
         else:
+            res = {}
+            for key in self.results:
+                if key.startswith(("f_","b_","w_")):
+                    res[key] = self.results[key]
+            
             layers_per_stage = LAYER_NUM // STAGE_NUM
             base_f = F_TIME * layers_per_stage
             base_b = B_TIME * layers_per_stage
@@ -476,4 +531,4 @@ class PipelineScheduler:
                 # "backward_length2": [PGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
                 "comm_length": [COMM_TIME for _ in range(STAGE_NUM)],
             }
-            SP(painter_conf).draw(self.results)
+            SP(painter_conf).draw(res)

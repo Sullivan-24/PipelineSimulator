@@ -15,7 +15,7 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False):
+    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False):
         self.device_id: int = device_id
         self.stage_id: int = stage_id
         self.microbatch_num: int = microbatch_num
@@ -23,10 +23,11 @@ class Stage:
         self.workloads: dict[int, {WorkloadType, Workload}] = {}  
         self.stage_type: StageType = stage_type
         self.recomp = recomp
+        self.layerwise = layerwise
         self._add_workload()
     
     def _get_workload_duration(self, stage_id, stage_type, workload_type, recomp):
-        if SchedulePriority.Layerwise == SCHEDULE_METHOD:
+        if self.layerwise:
             if workload_type == WorkloadType.F:
                 duration = F_TIME
                 if stage_type == StageType.EMBD:

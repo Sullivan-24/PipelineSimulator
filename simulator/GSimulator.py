@@ -356,9 +356,63 @@ class GSimulator:
         # for s in self._de_st_mb.keys():
         #     print(self._de_st_mb[s])
         return results
+    
+    def get_workload_len(self, key):
+        workload_type, mid, lid = key.split("_")
+        mid = int(mid)
+        lid = int(lid)
+        if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            layers = 1
+        else:
+            layers = LAYER_NUM // STAGE_NUM
+
+        if workload_type == "f":
+            workload_len = F_TIME * layers
+            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+                if lid == 0:
+                    workload_len = EMBEDDING_TIME
+                elif lid == LAYER_NUM - 1:
+                    workload_len = CE_F_TIME
+                elif lid == LAYER_NUM - 2:
+                    workload_len = HEAD_F_TIME
+            else:
+                if lid == 0:
+                    workload_len += EMBEDDING_TIME
+                elif lid == STAGE_NUM - 1:
+                    workload_len += CE_F_TIME + HEAD_F_TIME
+        elif workload_type == "b":
+            workload_len = B_TIME * layers
+            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+                if lid == LAYER_NUM - 1:
+                    workload_len = CE_B_TIME
+                elif lid == LAYER_NUM - 2:
+                    workload_len = HEAD_B_TIME
+            else:
+                if lid == STAGE_NUM - 1:
+                    workload_len += CE_B_TIME + HEAD_B_TIME
+        elif workload_type == "w":
+            workload_len = W_TIME * layers
+            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+                if lid == LAYER_NUM - 1:
+                    workload_len = CE_W_TIME
+                elif lid == LAYER_NUM - 2:
+                    workload_len = HEAD_W_TIME
+            else:
+                if lid == STAGE_NUM - 1:
+                    workload_len += CE_W_TIME + HEAD_W_TIME
+        return workload_len 
+    
+    def write_fbw_to_file(self):
+        for key in self.model_result:
+            if key.startswith(("f_","b_","w_")):
+                print_to_file(f"gurobi_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key},{self.model_result[key]}\n")
+
+                workload_len = self.get_workload_len(key=key)
+                print_to_file(f"gurobi_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key}_e,{self.model_result[key] + workload_len}\n")
 
     def _draw(self, results: dict) -> None:
         # 绘制结果的逻辑
+        self.write_fbw_to_file()
         painter_conf = {
             "device_size": self._device_size,
             "devices": self._devices,
