@@ -42,10 +42,6 @@ class GSimulator:
         self._stage_b_length = []
         self._stage_w_length = []
 
-        self._layer_f_length  = []
-        self._layer_b_length = []
-        self._layer_w_length = []
-
         self._layer_recomp_rate = []
         self._layers = []
 
@@ -101,15 +97,6 @@ class GSimulator:
                     new_comm_length[d[i]][d[j]] = 0
                     new_comm_length[d[j]][d[i]] = 0
         return new_comm_length
-    
-    def _generate_unsolved_parameters(self):
-        for i in range(self._model_layer_num):
-            layer_var = self.model.addVar(vtype=GRB.INTEGER, name=f"l_{i}", lb=1, ub=self._model_layer_num)
-            self._layers.append(layer_var)
-
-            recompute_var = self.model.addVar(vtype=GRB.BINARY, name=f"theta_{i}")
-            self._layer_recomp_rate.append(recompute_var)
-        pass
 
     def _build_constraints(self) -> None:
         for i in range(self._pp_size):
@@ -122,33 +109,38 @@ class GSimulator:
 
             for mb in range(self._num_microbatches):
                 
-                f_offset = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"f_{mb}_{i}", lb=0)
+                f_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mb}_{i}", lb=0)
                 self._stage_f_offsets[i].append(f_offset)
 
-                b_offset = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"b_{mb}_{i}", lb=0)
+                b_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mb}_{i}", lb=0)
                 self._stage_b_offsets[i].append(b_offset)
 
                 if SPLIT_BACKPROP:
-                    w_offset = self.model.addVar(vtype=GRB.CONTINUOUS, name=f"w_{mb}_{i}", lb=0)
+                    w_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mb}_{i}", lb=0)
                     self._stage_w_offsets[i].append(w_offset)
             # Set length per stage
-            self._stage_f_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{i}_f"))
-            self.model.addConstr(self._stage_f_length[i] == self._layers[i] * self._profiled_layer_f_length[i])
-            self._stage_b_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{i}_b"))
-            self.model.addConstr(self._stage_b_length[i] == (self._layers[i] * self._profiled_layer_b_length[i] + self._layer_recomp_rate[i] * self._stage_f_length[i]))
-            self._stage_w_length.append(self.model.addVar(vtype=GRB.CONTINUOUS, name=f"s{i}_w"))
-            self.model.addConstr(self._stage_w_length[i] == (self._layers[i] * self._profiled_layer_w_length[i] + self._layer_recomp_rate[i] * self._stage_f_length[i]))
-
+            # self._stage_f_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_f"))
+            # self.model.addConstr(self._stage_f_length[i] == self._layers[i] * self._profiled_layer_f_length[i])
+            # self._stage_b_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_b"))
+            # self.model.addConstr(self._stage_b_length[i] == self._layers[i] * (self._profiled_layer_b_length[i] + self._layer_recomp_rate[i] * self._stage_f_length[i]))
+            # self._stage_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_w"))
+            # self.model.addConstr(self._stage_w_length[i] == self._layers[i] * self._profiled_layer_w_length[i])
+            self._stage_f_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_f"))
+            self.model.addConstr(self._stage_f_length[i] == self._profiled_layer_f_length[i])
+            self._stage_b_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_b"))
+            self.model.addConstr(self._stage_b_length[i] == (self._profiled_layer_b_length[i] + self._layer_recomp_rate[i] * self._stage_f_length[i]))
+            self._stage_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_w"))
+            self.model.addConstr(self._stage_w_length[i] == self._profiled_layer_w_length[i])
 
         self._get_device_stage_microbatch_alignment()
 
         # 添加约束
-        self.model.addConstr(quicksum(self._layers) == self._model_layer_num)
+        # self.model.addConstr(quicksum(self._layers) == self._model_layer_num)
         self._comm_length = self._reset_comm_length(self._devices)
 
         self._real_pipeline_modeling_constraint_strict()
         self._serial_computation_within_device_constraint()
-        self._pipeline_activation_accumulation_constraint()
+        # self._pipeline_activation_accumulation_constraint()
 
     def _real_pipeline_modeling_constraint_strict(self):
         for mb in range(self._num_microbatches):
@@ -270,7 +262,7 @@ class GSimulator:
             print("ACTIVATION LIMIT FREE")
             return
         #对每个Device上的所有W或B Microbatch进行检查：保证当前Device上的activation积累不超过上限 MAX_ACTIVATION_COUNTS * CHUNK_NUM
-        mt = 'w' if SPLIT_BACKPROP else 'b' 
+        mt = 'w' if SPLIT_BACKPROP else 'b'
         for did in self._de_st_mb:
             for sid in self._de_st_mb[did]:
                 for mid in range(self._num_microbatches):
@@ -302,7 +294,7 @@ class GSimulator:
                     )
 
     def _build_optimize_objectives(self) -> None:
-        max_var = self.model.addVar(vtype=GRB.CONTINUOUS, name="max_start_offset")
+        max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
         for pp in range(self._pp_size):
             if SPLIT_BACKPROP:
                 self.model.addConstr(max_var >= self._stage_w_offsets[pp][-1] + self._stage_w_length[pp])
@@ -348,6 +340,7 @@ class GSimulator:
             self._stage_f_length[i] = self.model_result[self._stage_f_length[i].varName]
             self._stage_b_length[i] = self.model_result[self._stage_b_length[i].varName] 
             self._stage_w_length[i] = self.model_result[self._stage_w_length[i].varName]
+        
         if draw:
             # 4. draws the result.
             results = {str(key) : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}
@@ -412,7 +405,7 @@ class GSimulator:
 
     def _draw(self, results: dict) -> None:
         # 绘制结果的逻辑
-        self.write_fbw_to_file()
+        # self.write_fbw_to_file()
         painter_conf = {
             "device_size": self._device_size,
             "devices": self._devices,

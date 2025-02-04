@@ -90,6 +90,9 @@ class Device:
         self.last_workload_type = None
         self.total_layers = 0
         self.microbatch_schedule_range = range(0,self.nmb)
+        self.warmup_num_f = 0
+        self.warmup_num_b = 0
+        self.warmup_num_w = 0
         # To avoid simulator failure, memory need to be preserved.
         # Record each mid, if mid already started, ensure the memory is 
         # sufficient to complete the remaining workload.
@@ -189,7 +192,7 @@ class Device:
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
                                 return proc_workload
-            elif SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1, SchedulePriority.ZBV, SchedulePriority.INTERLEAVED):
+            elif SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1, SchedulePriority.INTERLEAVED):
                 if self.next_workload_idx == len(self.stages) * self.nmb * WORKLOAD_TYPE_NUM:
                     return None
                 if self.next_workload_idx == len(self.static_schedule):
@@ -202,6 +205,90 @@ class Device:
                     self.state = Device.BUSY
                     self.next_workload_idx += 1
                     return proc_workload
+            elif SCHEDULE_METHOD == SchedulePriority.ZBV:
+                if self.last_workload_type == WorkloadType.F:
+                    workload_type = WorkloadType.B
+                elif self.last_workload_type == WorkloadType.B:
+                    workload_type = WorkloadType.W
+                elif self.last_workload_type == WorkloadType.W:
+                    workload_type = WorkloadType.F
+                else:
+                    workload_type = WorkloadType.F
+
+                if self.warmup_num_f < DEVICE_NUM * 2:
+                    workload_type = WorkloadType.F
+                elif self.warmup_num_f == MICRO_BATCH_NUM * 2:
+                    workload_type = WorkloadType.B
+                if self.warmup_num_b == MICRO_BATCH_NUM * 2:
+                    workload_type = WorkloadType.W
+
+                for mid in self.microbatch_schedule_range:
+                    for sid in self.stages:
+                        required_memory = get_required_memory(
+                            stage_id=sid, 
+                            layer_num=1,
+                            workload_type=workload_type,
+                            workload_type_num=WORKLOAD_TYPE_NUM, 
+                            layer_wise=True,
+                            recomp=self.stages[sid].recomp,
+                        )
+
+                        workload_type = self._reset_workload_type(
+                            workload_type=workload_type,
+                            required_memory=required_memory,
+                            current_mem_usage=self.current_mem_usage,
+                            max_memory=GPU_MAX_MEM,
+                        )
+
+                        proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                        if proc_workload:
+                            if workload_type == WorkloadType.F:
+                                self.warmup_num_f += 1
+                            elif workload_type == WorkloadType.B:
+                                self.warmup_num_b += 1
+                            elif workload_type == WorkloadType.W:
+                                self.warmup_num_w += 1
+                            self.last_workload_type = workload_type
+                            self.proc_workload = proc_workload
+                            self.update_memory_usage()
+                            self.state = Device.BUSY
+                            return proc_workload
+                        
+                now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
+                for workload_type in now_workload_priority_order:
+                    for mid in self.microbatch_schedule_range:
+                        for sid in self.stages:
+                            required_memory = get_required_memory(
+                                stage_id=sid, 
+                                layer_num=1,
+                                workload_type=workload_type,
+                                workload_type_num=WORKLOAD_TYPE_NUM, 
+                                layer_wise=True,
+                                recomp=self.stages[sid].recomp,
+                            )
+
+                            workload_type = self._reset_workload_type(
+                                workload_type=workload_type,
+                                required_memory=required_memory,
+                                current_mem_usage=self.current_mem_usage,
+                                max_memory=GPU_MAX_MEM,
+                            )
+
+                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            if proc_workload:
+                                if workload_type == WorkloadType.F:
+                                    self.warmup_num_f += 1
+                                elif workload_type == WorkloadType.B:
+                                    self.warmup_num_b += 1
+                                elif workload_type == WorkloadType.W:
+                                    self.warmup_num_w += 1
+                                self.last_workload_type = workload_type
+                                self.proc_workload = proc_workload
+                                self.update_memory_usage()
+                                self.state = Device.BUSY
+                                return proc_workload
+                
+                            
             elif SCHEDULE_METHOD == SchedulePriority.Layerwise:            
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 if self.last_workload_type == WorkloadType.B:
@@ -282,8 +369,9 @@ class Device:
 
 
     def _finish_proc_workload(self) -> bool: 
-        if self.state == Device.BUSY and GET_TIME() >= self.proc_workload.end_time:
-            return True
+        if self.state == Device.BUSY:
+            if self.proc_workload and GET_TIME() >= self.proc_workload.end_time:
+                return True
         return False
 
     def update_memory_usage(self) -> int:
@@ -299,4 +387,4 @@ class Device:
         return self.current_mem_usage
 
     def __repr__(self) -> str:
-        return f"DeviceClass(stages={self.stages.keys()}, current_stage={self.current_stage_id}, current_microbatch={self.current_microbatch_id})"
+        return f"DeviceClass(stages={self.stages.keys()}),state={self.state}"

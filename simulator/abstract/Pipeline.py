@@ -116,8 +116,8 @@ class PipelineScheduler:
             self.generate_1f1b_schedule()
         elif SCHEDULE_METHOD == SchedulePriority.ZBH1:
             self.generate_zbh1_schedule()
-        elif SCHEDULE_METHOD == SchedulePriority.ZBV:
-            self.generate_zbv_schedule()
+        # elif SCHEDULE_METHOD == SchedulePriority.ZBV:
+        #     self.generate_zbv_schedule()
         elif SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
             self.generate_interleaved_1f1b_schedule()
         else:
