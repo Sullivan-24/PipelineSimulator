@@ -1,4 +1,5 @@
 import time
+import json
 from gurobipy import Model, GRB, quicksum
 from .LayerwisePainter import LayerwiseSchedulingPainter
 from .abstract.mutils import *
@@ -80,6 +81,12 @@ class LayerwiseSimulator:
         self.model_result = None
         additional_time = HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME
         print("Theoretical minimal time:{}.".format(EMBEDDING_TIME + COMM_TIME + MICRO_BATCH_NUM * (len(self._devices[0]) - 1) * (F_TIME + B_TIME + W_TIME) + MICRO_BATCH_NUM * additional_time))
+
+    def result2file(self, filepath=None):
+        if filepath is None:
+            filepath = 'data.txt'
+        with open(filepath, 'w') as file:
+            json.dump(self.model_result, file)
 
     def estimate_time_cost(self):
         fbw_time = (MICRO_BATCH_NUM + DEVICE_NUM) * (F_TIME + B_TIME + W_TIME)
@@ -461,6 +468,7 @@ class LayerwiseSimulator:
             self._layer_b_length[i] = self.model_result[f"s{i}_b"] 
             self._layer_w_length[i] = self.model_result[f"s{i}_w"] 
         self.show_solution_detail(prefixes=("theta","mem_w_1"))
+        self.result2file()
         if draw:
             # 4. draws the result.
             results = {str(key) : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}

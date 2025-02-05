@@ -107,10 +107,13 @@ def main():
         if SchedulePriority.Chimera == SCHEDULE_METHOD:
             simulator = ChimeraScheduler.ChimeraPipelineScheduler()
         else:
-            simulator = Pipeline.PipelineScheduler()
+            simulator = Pipeline.PipelineScheduler(run_schedule=RUN_SCHEDULE)
         simulator.run_pipeline_parallelism()
+        if SCHEDULE_METHOD == SchedulePriority.ZBV:
+            simulator.result2file()
+        # simulator.result2schedule()
         # simulator.show_detail_info()
-        simulator.show_mem_usage()
+        simulator.show_mem_usage(show_all=True)
         simulator.draw()
     else:
         print("Unknown run mode.")

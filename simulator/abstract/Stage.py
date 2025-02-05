@@ -178,10 +178,14 @@ class Stage:
                     self.memory_usage += Activation.LOSS
             elif workload.workload_type == WorkloadType.W:
                 self.memory_usage -= (Activation.FULL + Gradient.INPUT) * layers_per_stage
+                if self.stage_id == STAGE_NUM - 1:
+                    self.memory_usage -= Activation.LOSS
             elif SPLIT_BACKPROP and workload.workload_type == WorkloadType.B:
                 self.memory_usage += Gradient.INPUT * layers_per_stage
             elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.B:
                 self.memory_usage -= Activation.FULL * layers_per_stage
+                if self.stage_id == STAGE_NUM - 1:
+                    self.memory_usage -= Activation.LOSS
         
     def execute_workload(self, mid=None, workload_type=None):
         if mid is not None and workload_type is not None and workload_type in self.workloads[mid]:

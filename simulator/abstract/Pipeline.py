@@ -5,22 +5,63 @@ from .mutils import *
 from ..painter import SchedulingPainter as SP
 from ..LayerwisePainter import LayerwiseSchedulingPainter as LSP
 from ..utils import print_to_file
+import json
+
+workload_type_mapping = {
+    'f':WorkloadType.F,
+    'b':WorkloadType.B,
+    'w':WorkloadType.W,
+}
 
 class PipelineScheduler:
 
-    def __init__(self, dsa = None) -> None:
+    def __init__(self, dsa = None, run_schedule=False) -> None:
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
         self.microbatch_schedule_range = range(0,min(MICRO_BATCH_NUM//1, MICRO_BATCH_NUM))
         # self.microbatch_schedule_range = range(0,min(8, MICRO_BATCH_NUM))
         self.num_finished_microbatch = 0
+        self.run_schedule = run_schedule
         self._init_stage()
         self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
         self.schedule = [[] for _ in range(DEVICE_NUM)]
         self.generate_schedule()
         self.set_schedule()
-    
+
+        if run_schedule:
+            print("Read schedule generated before...")
+            self.file2result()
+            self.result2schedule()
+            self.set_schedule()
+
+    def _sid2did(self, sid):
+        for did, sids in enumerate(self.dsa):
+            if sid in sids:
+                return did
+            
+    def result2schedule(self):
+        for key in self.results.keys():
+            if not key.startswith(("f_","b_","w_",)):
+                continue
+            k, mid, sid = key.split("_")
+            sid = int(sid)
+            mid = int(mid)
+            did = self._sid2did(sid=sid)
+            self.schedule[did].append((workload_type_mapping[k], mid, sid))
+
+    def result2file(self, filepath=None):
+        if filepath is None:
+            filepath = 'data.txt'
+        with open(filepath, 'w') as file:
+            json.dump(self.results, file)
+
+    def file2result(self, filepath=None):
+        if filepath is None:
+            filepath = 'data.txt'
+        with open(filepath, 'r') as file:
+            self.results = json.load(file)
+
     # NOTE _reset_workload_type is efficient but 
     # lead to random order of W in some cases
     # which will break solver constraint (not affect the correctness)
@@ -94,18 +135,18 @@ class PipelineScheduler:
             self.set_layer_recomp(self.recomp_set)
             if SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
                 for pid in range(STAGE_NUM):
-                    self.devices[pid % DEVICE_NUM].add_stage(pid)
+                    self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid + 1])
             else:
                 for pid in range(STAGE_NUM):
                     if (pid // DEVICE_NUM) % 2 == 0:
-                        self.devices[pid % DEVICE_NUM].add_stage(pid)
+                        self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid + 1])
                     else:
-                        self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid)
+                        self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid + 1])
 
         for did in range(DEVICE_NUM):
             self.devices[did].show_stages()
             if len(self.dsa) < DEVICE_NUM:
-                self.dsa.append(self.devices[did].stages.keys())
+                self.dsa.append(list(self.devices[did].stages.keys()))
 
     def set_schedule(self):
         for did in range(DEVICE_NUM):
@@ -116,8 +157,6 @@ class PipelineScheduler:
             self.generate_1f1b_schedule()
         elif SCHEDULE_METHOD == SchedulePriority.ZBH1:
             self.generate_zbh1_schedule()
-        # elif SCHEDULE_METHOD == SchedulePriority.ZBV:
-        #     self.generate_zbv_schedule()
         elif SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
             self.generate_interleaved_1f1b_schedule()
         else:
@@ -206,94 +245,6 @@ class PipelineScheduler:
         # for did in range(DEVICE_NUM):
         #     for (wt, mid, sid) in self.schedule[did]:
         #         print(wt.value, mid, end=" ")
-        #     print()
-
-    def generate_zbv_schedule(self):
-        assert WORKLOAD_TYPE_NUM == 3
-        layers_per_stage = LAYER_NUM // STAGE_NUM
-        real_f_len = F_TIME * layers_per_stage
-        comm_time  = COMM_TIME
-        workload_type_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F]
-        workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1, WorkloadType.W : 2}
-        warmup_f_num_in_first_device = -1
-        for did in range(DEVICE_NUM):
-            [sid_1, sid_2] = self.dsa[did]
-            mids = [0 for _ in range(WORKLOAD_TYPE_NUM * CHUNK_NUM)]
-            # warmup, should not be simplified
-            warmup_start_time = did * (real_f_len + comm_time)
-            warmup_endup_time = (DEVICE_NUM * (comm_time + real_f_len) - comm_time) * 2 - real_f_len - did * (real_f_len + comm_time)
-            injectable_time_len = warmup_endup_time - warmup_start_time
-            additional_f_num = injectable_time_len // real_f_len
-            while mids[0] < MICRO_BATCH_NUM and mids[0] < MAX_ACTIVATION_COUNTS - 1 and additional_f_num:
-                self.schedule[did].append((WorkloadType.F ,mids[0], did))
-                mids[0] += 1
-                additional_f_num -= 1
-            
-            if did == 0:
-                warmup_f_num_in_first_device = mids[0] + 1
-
-            last_sid = sid_1
-            while (mids[0] < MICRO_BATCH_NUM or mids[0 + WORKLOAD_TYPE_NUM] < MICRO_BATCH_NUM) and mids[0] + mids[0 + WORKLOAD_TYPE_NUM] < warmup_f_num_in_first_device:
-                if last_sid == sid_1:
-                    next_mid = mids[0 + WORKLOAD_TYPE_NUM]
-                    if next_mid < MICRO_BATCH_NUM and next_mid < did + 1:
-                        self.schedule[did].append((WorkloadType.F, next_mid, sid_2))
-                        mids[0 + WORKLOAD_TYPE_NUM] += 1
-                    last_sid = sid_2
-                elif last_sid == sid_2:
-                    next_mid = mids[0]
-                    if next_mid < MICRO_BATCH_NUM and next_mid < warmup_f_num_in_first_device - did - 1:
-                        self.schedule[did].append((WorkloadType.F, next_mid, sid_1))
-                        mids[0] += 1
-                    last_sid = sid_1
-
-            previous_sid2_f_num = mids[0 + WORKLOAD_TYPE_NUM]
-            iter = 0
-            now_sid = sid_2
-            while mids[0 + WORKLOAD_TYPE_NUM] < previous_sid2_f_num + DEVICE_NUM - did:
-                next_workload_type = workload_type_order[iter % WORKLOAD_TYPE_NUM]
-                next_mid = mids[workload_idx_in_mids[next_workload_type] + WORKLOAD_TYPE_NUM]
-                
-                if mids[0] + mids[0 + WORKLOAD_TYPE_NUM] < MAX_ACTIVATION_COUNTS :
-                    if next_workload_type == WorkloadType.W:
-                        iter += 1
-                        continue
-                if next_mid < MICRO_BATCH_NUM:
-                    # Special situation
-                    if mids[0 + WORKLOAD_TYPE_NUM] == previous_sid2_f_num + DEVICE_NUM - did - 1 and next_workload_type == WorkloadType.F:
-                        break
-                    self.schedule[did].append((next_workload_type, next_mid, now_sid))
-                    mids[workload_idx_in_mids[next_workload_type] + WORKLOAD_TYPE_NUM] += 1
-                iter+=1
-
-            # steady + cooldown
-            iter = 2
-            last_sid = sid_2
-            finish_flag = [0 for _ in range(WORKLOAD_TYPE_NUM * CHUNK_NUM)]
-            while sum(finish_flag) < WORKLOAD_TYPE_NUM * CHUNK_NUM:
-            # while finish_flag[0] + finish_flag[WORKLOAD_TYPE_NUM] < 2:
-                next_workload_type = workload_type_order[iter % WORKLOAD_TYPE_NUM]
-                next_sid = sid_1 if last_sid == sid_2 else sid_2
-                mids_sid_offset = 0 if next_sid == sid_1 else WORKLOAD_TYPE_NUM
-                next_mid = mids[workload_idx_in_mids[next_workload_type] + mids_sid_offset]
-                if next_workload_type == WorkloadType.W:
-                    last_sid = next_sid
-                
-                if mids[0] + mids[0 + WORKLOAD_TYPE_NUM] < MAX_ACTIVATION_COUNTS :
-                    if next_workload_type == WorkloadType.W:
-                        iter += 1
-                        continue 
-                if next_mid < MICRO_BATCH_NUM:
-                    self.schedule[did].append((next_workload_type, next_mid, next_sid))
-                    mids[workload_idx_in_mids[next_workload_type] + mids_sid_offset] += 1
-                    if next_mid == MICRO_BATCH_NUM - 1:
-                        finish_flag[workload_idx_in_mids[next_workload_type] + mids_sid_offset] = 1
-                iter+=1
-
-        # for did in range(DEVICE_NUM):
-        #     for (wt, mid, sid) in self.schedule[did]:
-        #         print((wt.value, mid, sid), end=" ")
-        #     print()
         #     print()
 
     def generate_interleaved_1f1b_schedule(self):
@@ -392,7 +343,7 @@ class PipelineScheduler:
 
     def execute_workload(self):
         for device in self.devices:
-            processing_workload = device.execute_workload()
+            processing_workload = device.execute_workload(run_schedule=self.run_schedule)
             self.record_workload(processing_workload)
         # if GET_TIME()==302:
         #     print(self.devices[1].stages[15].workloads[0])
@@ -404,7 +355,7 @@ class PipelineScheduler:
             self.execute_workload()
             UPDATE_TIME()
 
-    def show_mem_usage(self, device_id=(0,)):
+    def show_mem_usage(self, device_id=(0,), show_all=False):
         max_mem_usage = -1
         for device in self.devices:
             if device.device_id in device_id:
@@ -416,6 +367,13 @@ class PipelineScheduler:
                     max_mem_usage = max(max_mem_usage, mem_record)
         if max_mem_usage > GPU_MAX_MEM and SCHEDULE_METHOD == SchedulePriority.Layerwise:
             raise ValueError("Error: Out of Memory.")
+        
+        if show_all:
+            max_mem_usage = [0 for _ in range(len(self.devices))]
+            for did, device in enumerate(self.devices):
+                for t, mem_record in device.mem_usage_record.items():
+                    max_mem_usage[did] = max(max_mem_usage[did], mem_record)
+            print(max_mem_usage)
     
     def get_workloadload_duration(self):
         fwd_time = [F_TIME for _ in range(LAYER_NUM+3)]
@@ -481,10 +439,7 @@ class PipelineScheduler:
         for key in self.results:
             if key.startswith(("f_","b_","w_")):
                 print_to_file(f"sim_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key},{self.results[key]}\n")
-
-                workload_len = self.get_workload_len(key=key)
-                print_to_file(f"sim_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key}_e,{self.results[key] + workload_len}\n")
-
+                
     def draw(self) -> None:
         # 绘制结果的逻辑
         self.resort_w()

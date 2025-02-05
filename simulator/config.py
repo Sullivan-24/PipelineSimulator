@@ -13,6 +13,7 @@ B = G
 FP32 = 4 # 4 Bytes
 FP16 = 2 # 2 Bytes
 
+PIXEL_BASE = 0.5
 # Known parameter settings
 DEVICE_NUM = 4 * 1
 GPU_MAX_MEM = 80 * G / G
@@ -75,15 +76,15 @@ B_TIME = 20
 W_TIME = 8
 COMM_TIME = 0
 
-EMBEDDING_TIME = 0
-HEAD_F_TIME = 0
-HEAD_B_TIME = 0
-HEAD_W_TIME = 0
+# EMBEDDING_TIME = 0
+# HEAD_F_TIME = 0
+# HEAD_B_TIME = 0
+# HEAD_W_TIME = 0
 
-CE_F_TIME = 0
-CE_B_TIME = 0
-CE_W_TIME = 0
+# CE_F_TIME = 0
+# CE_B_TIME = 0
+# CE_W_TIME = 0
 
-F_TIME = 12
-B_TIME = 12
-W_TIME = 12
+# F_TIME = 12
+# B_TIME = 12
+# W_TIME = 12

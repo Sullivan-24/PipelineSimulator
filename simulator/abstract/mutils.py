@@ -1,18 +1,18 @@
 from .variables import *
 from ..config import *
-PIXEL_BASE = 1
-BASE_SOLUTION = False
+BASE_SOLUTION = True
+RUN_SCHEDULE = False
 RUN_MODE = RunMode.LAYERWISE_GUROBI_SOLVE
-RUN_MODE = RunMode.GUROBI_SOLVE
+# RUN_MODE = RunMode.GUROBI_SOLVE
 RUN_MODE = RunMode.SIM_SOLVE
 # RUN_MODE = RunMode.CHIMERA
 SOLVING_TIME_LIMIT = 60 * 30
 GLOBAL_TIME = 0
 CHUNK_NUM = 2
 MAX_ACTIVATION_TIMES_OF_STAGE_NUM = 3
-SPLIT_BACKPROP = False
+SPLIT_BACKPROP = True
 SCHEDULE_METHOD = SchedulePriority.ZBV
-# SCHEDULE_METHOD = SchedulePriority.Layerwise
+SCHEDULE_METHOD = SchedulePriority.Layerwise
 # SCHEDULE_METHOD = SchedulePriority.Chimera
 if RUN_MODE == RunMode.CHIMERA:
     SCHEDULE_METHOD = SchedulePriority.ZBH1

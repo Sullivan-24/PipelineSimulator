@@ -159,9 +159,22 @@ class Device:
         for sid in self.stages:
             self.stages[sid].update_constraints(constraint=constraint)
     
-    def execute_workload(self) -> None:
+    def execute_workload(self, run_schedule=False) -> None:
         if self.state == Device.IDLE:
-            if SCHEDULE_METHOD == SchedulePriority.GREEDY_v1:
+            if run_schedule or SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1, SchedulePriority.INTERLEAVED):
+                if self.next_workload_idx == len(self.stages) * self.nmb * WORKLOAD_TYPE_NUM:
+                    return None
+                if self.next_workload_idx == len(self.static_schedule):
+                    return None
+                (workload_type, workload_mid, workload_sid) = self.static_schedule[self.next_workload_idx]
+                proc_workload = self.stages[workload_sid].execute_workload(mid=workload_mid,workload_type=workload_type)
+                if proc_workload:
+                    self.proc_workload = proc_workload
+                    self.update_memory_usage()
+                    self.state = Device.BUSY
+                    self.next_workload_idx += 1
+                    return proc_workload
+            elif SCHEDULE_METHOD == SchedulePriority.GREEDY_v1:
                 for workload_type in self.workload_type_priority_order:
                     if self.current_mem_usage == self.max_activation_counts and workload_type == WorkloadType.F:
                         workload_type = WorkloadType.W
@@ -192,19 +205,6 @@ class Device:
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
                                 return proc_workload
-            elif SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1, SchedulePriority.INTERLEAVED):
-                if self.next_workload_idx == len(self.stages) * self.nmb * WORKLOAD_TYPE_NUM:
-                    return None
-                if self.next_workload_idx == len(self.static_schedule):
-                    return None
-                (workload_type, workload_mid, workload_sid) = self.static_schedule[self.next_workload_idx]
-                proc_workload = self.stages[workload_sid].execute_workload(mid=workload_mid,workload_type=workload_type)
-                if proc_workload:
-                    self.proc_workload = proc_workload
-                    self.update_memory_usage()
-                    self.state = Device.BUSY
-                    self.next_workload_idx += 1
-                    return proc_workload
             elif SCHEDULE_METHOD == SchedulePriority.ZBV:
                 if self.last_workload_type == WorkloadType.F:
                     workload_type = WorkloadType.B
@@ -217,7 +217,7 @@ class Device:
 
                 if self.warmup_num_f < DEVICE_NUM * 2:
                     workload_type = WorkloadType.F
-                elif self.warmup_num_f == MICRO_BATCH_NUM * 2:
+                if self.warmup_num_f == MICRO_BATCH_NUM * 2:
                     workload_type = WorkloadType.B
                 if self.warmup_num_b == MICRO_BATCH_NUM * 2:
                     workload_type = WorkloadType.W
@@ -254,6 +254,9 @@ class Device:
                             self.state = Device.BUSY
                             return proc_workload
                         
+                # if self.warmup_num_f < DEVICE_NUM * 2:
+                #     return None
+                
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 for workload_type in now_workload_priority_order:
                     for mid in self.microbatch_schedule_range:

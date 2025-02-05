@@ -62,4 +62,5 @@ def print_to_file(filename: str, content: str) -> None:
         with open(filename, "a") as f:
             f.write(content)
             f.flush()
-    print(content, end="")
+    if not filename:
+        print(content, end="")
