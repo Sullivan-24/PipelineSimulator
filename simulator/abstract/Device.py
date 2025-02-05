@@ -289,9 +289,7 @@ class Device:
                                 self.proc_workload = proc_workload
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
-                                return proc_workload
-                
-                            
+                                return proc_workload             
             elif SCHEDULE_METHOD == SchedulePriority.Layerwise:            
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 if self.last_workload_type == WorkloadType.B:

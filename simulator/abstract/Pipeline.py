@@ -135,13 +135,13 @@ class PipelineScheduler:
             self.set_layer_recomp(self.recomp_set)
             if SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
                 for pid in range(STAGE_NUM):
-                    self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid + 1])
+                    self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
             else:
                 for pid in range(STAGE_NUM):
                     if (pid // DEVICE_NUM) % 2 == 0:
-                        self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid + 1])
+                        self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
                     else:
-                        self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid + 1])
+                        self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
 
         for did in range(DEVICE_NUM):
             self.devices[did].show_stages()

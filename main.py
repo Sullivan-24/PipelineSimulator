@@ -6,6 +6,7 @@ from simulator.DSASimulator import DSASimulator
 from simulator.LayerwiseSimulator import LayerwiseSimulator
 from simulator.ChimeraSimulator import ChimeraSimulator
 from simulator.GSimulator import GSimulator
+from simulator.CompCommSimulator import CompCommSimulator
 from simulator.SPSimulator import SPSimulator
 from simulator.abstract import Pipeline
 from simulator.abstract import ChimeraScheduler
@@ -35,9 +36,6 @@ def main():
         "schedule_method": SCHEDULE_METHOD,
         "emb_head_ce": SPLIT_EMB_HEAD_CE,
     }
-    print(MEMORY(Activation.FULL))
-    print(MEMORY(OPTIMIZER_MEMORY))
-    print(MEMORY(GPU_MAX_MEM))
 
     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
         config["forward_execution_time"] = [EMBEDDING_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
@@ -119,6 +117,35 @@ def main():
         print("Unknown run mode.")
 
 if __name__ == "__main__":
+    # config = {
+    #     "run_mode": RUN_MODE,
+    #     "device_size": int(DEVICE_NUM),
+    #     "time_limit": int(SOLVING_TIME_LIMIT),
+    #     "stage_order_search": STAGE_SEARCH_METHOD,
+    #     "pp_size": int(STAGE_NUM),
+    #     "model_size": int(LAYER_NUM),
+    #     "num_microbatches": int(MICRO_BATCH_NUM),
+    #     "forward_execution_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+    #     "backward_execution_i_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+    #     "backward_execution_g_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+    #     "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
+    #     "mix_training": MIX_TRAINING,
+    #     "model_para_num": PARAMETER_NUM,
+    #     "communication_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
+    #     "sequential_order_constraint_strategy": "strict",
+    #     "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
+    #     # "file_path": filename,
+    #     "file_path": None,
+    #     "base_solution" : BASE_SOLUTION,
+    #     "schedule_method": SCHEDULE_METHOD,
+    #     "emb_head_ce": SPLIT_EMB_HEAD_CE,
+    #     "split_backprop": True,
+    #     "pixel_base":1,
+    # }
+    # sim = CompCommSimulator(config=config)
+    # sim.run(draw=True)
+    # input("WAIT")
+
     current_time = datetime.now()
     timestamp = current_time.strftime("%Y%m%d%H%M%S")
     filename = f"{timestamp}-{DEVICE_NUM}-{MICRO_BATCH_NUM}-{int(F_TIME)}-{int(B_TIME)}-{int(W_TIME)}.txt"

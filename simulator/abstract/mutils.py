@@ -2,9 +2,10 @@ from .variables import *
 from ..config import *
 BASE_SOLUTION = True
 RUN_SCHEDULE = False
+# RUN_SCHEDULE=True时，会从指定文件中（默认为data.txt）将先前生成好的调度结果读取并执行（Device.py中execute_workload的run_schedule=True时执行的语句，如果要执行ZBV时，需要将F=B=W以获得和官方一样的调度）
 RUN_MODE = RunMode.LAYERWISE_GUROBI_SOLVE
 # RUN_MODE = RunMode.GUROBI_SOLVE
-RUN_MODE = RunMode.SIM_SOLVE
+# RUN_MODE = RunMode.SIM_SOLVE
 # RUN_MODE = RunMode.CHIMERA
 SOLVING_TIME_LIMIT = 60 * 30
 GLOBAL_TIME = 0
