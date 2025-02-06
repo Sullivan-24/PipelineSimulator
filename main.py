@@ -12,6 +12,45 @@ from simulator.abstract import Pipeline
 from simulator.abstract import ChimeraScheduler
 from simulator.abstract.mutils import *
 
+def set_workload_length(config):
+    if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
+        config["forward_execution_time"] = [EMBEDDING_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
+        config["backward_execution_i_time"] = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
+        config["backward_execution_g_time"] = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
+        config["model_size"] = config["model_size"] + 3
+    else:
+        config["forward_execution_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
+        config["backward_execution_i_time"] = [B_TIME for _ in range(LAYER_NUM)] 
+        config["backward_execution_g_time"] = [W_TIME for _ in range(LAYER_NUM)]
+        
+        fwd_time = config["forward_execution_time"]
+        fwd_time[0] += EMBEDDING_TIME
+        fwd_time[-1] += CE_F_TIME + HEAD_F_TIME
+        config["forward_execution_time"] = fwd_time
+
+        iwd_time = config["backward_execution_i_time"]
+        iwd_time[-1] += CE_B_TIME + HEAD_B_TIME
+        config["backward_execution_i_time"] = iwd_time
+
+        gwd_time = config["backward_execution_g_time"]
+        gwd_time[-1] += CE_W_TIME + HEAD_W_TIME
+        config["backward_execution_g_time"] = gwd_time
+
+def check_standard_zbv_conditions():
+    if EMBEDDING_TIME!=0:
+        print("Required to ignore EMB layers.")
+        return False
+    if HEAD_B_TIME!=0 or HEAD_F_TIME!=0 or HEAD_W_TIME!=0:
+        print("Required to ignore HEAD layers.")
+        return False
+    if CE_B_TIME!=0 or CE_F_TIME!=0 or CE_W_TIME!=0:
+        print("Required to ignore CE layers.")
+    if F_TIME==B_TIME==W_TIME:
+        return True
+    else:
+        print("Required F=B=W")
+        return False
+                    
 def main():
     config = {
         "run_mode": RUN_MODE,
@@ -36,29 +75,7 @@ def main():
         "schedule_method": SCHEDULE_METHOD,
         "emb_head_ce": SPLIT_EMB_HEAD_CE,
     }
-
-    if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
-        config["forward_execution_time"] = [EMBEDDING_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
-        config["backward_execution_i_time"] = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
-        config["backward_execution_g_time"] = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
-        config["model_size"] = config["model_size"] + 3
-    else:
-        config["forward_execution_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
-        config["backward_execution_i_time"] = [B_TIME for _ in range(LAYER_NUM)] 
-        config["backward_execution_g_time"] = [W_TIME for _ in range(LAYER_NUM)]
-        
-        fwd_time = config["forward_execution_time"]
-        fwd_time[0] += EMBEDDING_TIME
-        fwd_time[-1] += CE_F_TIME + HEAD_F_TIME
-        config["forward_execution_time"] = fwd_time
-
-        iwd_time = config["backward_execution_i_time"]
-        iwd_time[-1] += CE_B_TIME + HEAD_B_TIME
-        config["backward_execution_i_time"] = iwd_time
-
-        gwd_time = config["backward_execution_g_time"]
-        gwd_time[-1] += CE_W_TIME + HEAD_W_TIME
-        config["backward_execution_g_time"] = gwd_time
+    set_workload_length(config=config)
     
     if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
         config["file_path"] = os.path.join("results", filename)
@@ -106,10 +123,14 @@ def main():
             simulator = ChimeraScheduler.ChimeraPipelineScheduler()
         else:
             simulator = Pipeline.PipelineScheduler(run_schedule=RUN_SCHEDULE)
+            
+            if RUN_STANDARD_ZBV and not RUN_SCHEDULE and SCHEDULE_METHOD == SchedulePriority.ZBV:
+                if check_standard_zbv_conditions():
+                    simulator.run_pipeline_parallelism()
+                    simulator.result2file()
+                    print("ZBV F=B=W Schedule saved to data.txt.")
+                    return
         simulator.run_pipeline_parallelism()
-        if SCHEDULE_METHOD == SchedulePriority.ZBV:
-            simulator.result2file()
-        # simulator.result2schedule()
         # simulator.show_detail_info()
         simulator.show_mem_usage(show_all=True)
         simulator.draw()

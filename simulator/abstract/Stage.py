@@ -151,6 +151,7 @@ class Stage:
                     self.memory_usage += 0
                 else:
                     if self.recomp:
+                        self.memory_usage += Activation.INPUT
                         return
                     self.memory_usage += Activation.FULL
             elif workload.workload_type == WorkloadType.B:
@@ -162,7 +163,7 @@ class Stage:
                     if SPLIT_BACKPROP:
                         self.memory_usage += Gradient.INPUT
                         if self.recomp:
-                            self.memory_usage += Activation.FULL
+                            self.memory_usage += (Activation.FULL - Activation.INPUT)
                     else:
                         self.memory_usage -= Activation.FULL
             elif workload.workload_type == WorkloadType.W:

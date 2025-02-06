@@ -155,6 +155,9 @@ class LayerwiseSchedulingPainter:
             color = self._set_color(pid=pid, k=k)
             if x0 == x1:
                 continue
+
+            print_to_file(f"{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况
             bold_font = font.Font(
@@ -162,9 +165,10 @@ class LayerwiseSchedulingPainter:
                 underline= (max(0,pid-1)) // self._device_size % 2,
                 weight= tk.font.NORMAL if (max(0,pid-1)) // self._device_size % 2 else tk.font.BOLD
             )
-            text = main_canvas.create_text(
-                (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
-            )
+            if SHOW_WORKLOAD_TEXT:
+                text = main_canvas.create_text(
+                    (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
+                )
             # if pid + 1 >= self._num_microbatches:
             #     bold_font = font.Font(size= pid // (self._pp_size // self._device_size), weight=tk.font.BOLD)
             #     text = main_canvas.create_text(
@@ -179,7 +183,8 @@ class LayerwiseSchedulingPainter:
             self._highlight_state[block] = False
             self._item2color[block] = color
             self._item2block[block] = block
-            self._item2block[text] = block
+            if SHOW_WORKLOAD_TEXT:
+                self._item2block[text] = block
             # 求余考虑virtual stage的情况
             self._item2mid[block] = mid
 

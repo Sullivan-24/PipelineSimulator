@@ -1,22 +1,8 @@
-from .variables import *
 from ..config import *
-BASE_SOLUTION = True
-RUN_SCHEDULE = False
-# RUN_SCHEDULE=True时，会从指定文件中（默认为data.txt）将先前生成好的调度结果读取并执行（Device.py中execute_workload的run_schedule=True时执行的语句，如果要执行ZBV时，需要将F=B=W以获得和官方一样的调度）
-RUN_MODE = RunMode.LAYERWISE_GUROBI_SOLVE
-# RUN_MODE = RunMode.GUROBI_SOLVE
-# RUN_MODE = RunMode.SIM_SOLVE
-# RUN_MODE = RunMode.CHIMERA
-SOLVING_TIME_LIMIT = 60 * 30
-GLOBAL_TIME = 0
-CHUNK_NUM = 2
-MAX_ACTIVATION_TIMES_OF_STAGE_NUM = 3
-SPLIT_BACKPROP = True
-SCHEDULE_METHOD = SchedulePriority.ZBV
-SCHEDULE_METHOD = SchedulePriority.Layerwise
-# SCHEDULE_METHOD = SchedulePriority.Chimera
+
 if RUN_MODE == RunMode.CHIMERA:
     SCHEDULE_METHOD = SchedulePriority.ZBH1
+    CHUNK_NUM=1
 if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
     SCHEDULE_METHOD = SchedulePriority.Layerwise
 if RUN_MODE == RunMode.GUROBI_SOLVE:

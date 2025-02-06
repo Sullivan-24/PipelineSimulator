@@ -141,7 +141,14 @@ class LayerwiseSchedulingPainter:
             block_width = self._forward_length[stream_idx][pid] if k == 'f' else (self._backward_b_length[stream_idx][pid] if k == 'b' else self._backward_w_length[stream_idx][pid])
             x1 = x0 + block_width
             y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
-            
+            filename = f"{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}"
+            if RUN_MODE == RunMode.CHIMERA:
+                filename += f"_{SPLIT_EMB_HEAD_CE}"
+            elif RunMode == RunMode.LAYERWISE_GUROBI_SOLVE:
+                filename += f"_{True}"
+
+            print_to_file(f"{filename}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+
             mid = mid + stream_idx * self._num_microbatches
             tag = f"p_{pid}_m_{mid}_{k}"
             color = self._set_color(pid=pid, k=k)

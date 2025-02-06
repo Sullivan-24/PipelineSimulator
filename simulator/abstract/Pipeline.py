@@ -132,6 +132,8 @@ class PipelineScheduler:
             self.devices[1].add_stage(LAYER_NUM+2)
         else:
             self.recomp_set = [0 for _ in range(STAGE_NUM)]
+            if SEQ_LEN > 4*K:
+                self.recomp_set = [1 for _ in range(STAGE_NUM)]
             self.set_layer_recomp(self.recomp_set)
             if SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
                 for pid in range(STAGE_NUM):
@@ -349,7 +351,7 @@ class PipelineScheduler:
         #     print(self.devices[1].stages[15].workloads[0])
             
             
-    def run_pipeline_parallelism(self, time_limit = 10000):
+    def run_pipeline_parallelism(self, time_limit = TIME_LIMIT):
         while GET_TIME() <= time_limit:
             self.check_workload_status()
             self.execute_workload()
@@ -438,12 +440,12 @@ class PipelineScheduler:
     def write_fbw_to_file(self):
         for key in self.results:
             if key.startswith(("f_","b_","w_")):
-                print_to_file(f"sim_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key},{self.results[key]}\n")
+                print_to_file(f"sim_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key},{self.results[key]}\n")
                 
     def draw(self) -> None:
         # 绘制结果的逻辑
         self.resort_w()
-        self.write_fbw_to_file()
+        # self.write_fbw_to_file()
         if SCHEDULE_METHOD == SchedulePriority.Layerwise:
             fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
             painter_conf = {
@@ -451,8 +453,8 @@ class PipelineScheduler:
                 "devices": self.dsa,
                 "num_layer": LAYER_NUM+3,
                 "pp_size": LAYER_NUM+3,
-                "pp_height": 50,
-                "pp_align": 10,
+                "pp_height": PP_HEIGHT,
+                "pp_align": PP_ALIGN,
                 "pixel_base": PIXEL_BASE,
                 "num_microbatches": MICRO_BATCH_NUM,
                 "forward_length": fwd_time,
@@ -466,7 +468,6 @@ class PipelineScheduler:
             for key in self.results:
                 if key.startswith(("f_","b_","w_")):
                     res[key] = self.results[key]
-            
             layers_per_stage = LAYER_NUM // STAGE_NUM
             base_f = F_TIME * layers_per_stage
             base_b = B_TIME * layers_per_stage
@@ -475,15 +476,13 @@ class PipelineScheduler:
                 "device_size": DEVICE_NUM,
                 "devices": self.dsa,
                 "pp_size": STAGE_NUM,
-                "pp_height": 50,
-                "pp_align": 10,
+                "pp_height": PP_HEIGHT,
+                "pp_align": PP_ALIGN,
                 "pixel_base": PIXEL_BASE,
                 "num_microbatches": MICRO_BATCH_NUM,
                 "forward_length": [base_f + EMBEDDING_TIME if _ == 0 else (base_f + HEAD_F_TIME + CE_F_TIME if _ == STAGE_NUM - 1 else base_f) for _ in range(STAGE_NUM)],
-                "backward_length": [base_b + EMBEDDING_TIME if _ == 0 else (base_b + HEAD_B_TIME + CE_B_TIME if _ == STAGE_NUM - 1 else base_b) for _ in range(STAGE_NUM)],
-                "backward_length2": [base_w + EMBEDDING_TIME if _ == 0 else (base_w + HEAD_W_TIME + CE_W_TIME if _ == STAGE_NUM - 1 else base_w) for _ in range(STAGE_NUM)],
-                # "backward_length": [IGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
-                # "backward_length2": [PGW_TIME // CHUNK_NUM for _ in range(STAGE_NUM)],
+                "backward_length": [base_b if _ == 0 else (base_b + HEAD_B_TIME + CE_B_TIME if _ == STAGE_NUM - 1 else base_b) for _ in range(STAGE_NUM)],
+                "backward_length2": [base_w if _ == 0 else (base_w + HEAD_W_TIME + CE_W_TIME if _ == STAGE_NUM - 1 else base_w) for _ in range(STAGE_NUM)],
                 "comm_length": [COMM_TIME for _ in range(STAGE_NUM)],
             }
             SP(painter_conf).draw(res)

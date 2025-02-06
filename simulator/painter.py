@@ -4,7 +4,7 @@ painter package
 import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
-from .abstract.mutils import COMM_TIME, SPLIT_BACKPROP, MICRO_BATCH_NUM, DEVICE_NUM
+from .abstract.mutils import COMM_TIME, SPLIT_BACKPROP, MICRO_BATCH_NUM, DEVICE_NUM,SCHEDULE_METHOD,RUN_MODE,LAYER_NUM
 class SchedulingPainter:
     """Scheduling Painter"""
 
@@ -121,7 +121,7 @@ class SchedulingPainter:
             # y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
             y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
 
-            print_to_file(f"gurobi_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+            print_to_file(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
 
             tag = f"p_{pid}_m_{mid}_{k}"
             if k == 'f':    #颜色设置，加上w的情况

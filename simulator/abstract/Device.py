@@ -6,7 +6,7 @@ def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 
         if workload_type ==WorkloadType.F:
             required_memory = Activation.FULL * layer_num 
             if recomp:
-                required_memory = Activation.FULL * layer_num * (1 - recomp)
+                required_memory = layer_num * (Activation.FULL * (1 - recomp) + Activation.INPUT * recomp)
             if layer_wise and stage_id == LAYER_NUM - 2:
                 required_memory = Activation.LOSS
             elif not layer_wise and stage_id == STAGE_NUM - 1:
@@ -14,7 +14,7 @@ def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 
         elif workload_type == WorkloadType.B:
             required_memory = Gradient.INPUT * layer_num
             if recomp:
-                required_memory += Activation.FULL * layer_num * recomp
+                required_memory += layer_num * (Activation.FULL - Activation.INPUT) * recomp 
             if workload_type_num == 2:
                 required_memory += Gradient.PARAMETER * layer_num
         elif workload_type == WorkloadType.W:
