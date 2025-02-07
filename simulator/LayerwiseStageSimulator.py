@@ -87,13 +87,13 @@ class LayerwiseSimulator:
                 print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
 
     def _fix_stages(self):
-        if self._schedule_method in (SchedulePriority.ZBV, SchedulePriority.GREEDY_v1, SchedulePriority.GREEDY_v2):
+        if self._schedule_method in (Schedule.ZBV, Schedule.GREEDY_v1, Schedule.GREEDY_v2):
             for pid in range(self._pp_size):
                 if (pid // self._device_size) % 2 == 0:
                     self._devices[pid % self._device_size].append(pid)
                 else:
                     self._devices[self._device_size - 1 - pid % self._device_size].append(pid)
-        elif self._schedule_method in (SchedulePriority.ZBH1, SchedulePriority.ONE_F_ONE_B, SchedulePriority.INTERLEAVED):
+        elif self._schedule_method in (Schedule.ZBH1, Schedule.ONE_F_ONE_B, Schedule.INTERLEAVED):
             for pid in range(self._pp_size):
                 self._devices[pid % self._device_size].append(pid)
         else:

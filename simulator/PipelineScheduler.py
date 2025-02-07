@@ -104,7 +104,7 @@ class PipelineSchedulerSolver:
     def _fix_stages(self):
         idx_offset = 1 if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE else 0
         lid_range = range(idx_offset, self._num_layer - 2) if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE else range(self._num_layer)
-        if self._schedule_method in (SchedulePriority.ZBH1, SchedulePriority.ONE_F_ONE_B, SchedulePriority.INTERLEAVED):
+        if self._schedule_method in (Schedule.ZBH1, Schedule.ONE_F_ONE_B, Schedule.INTERLEAVED):
             for lid in lid_range:
                 self._devices[(lid-1) % self._num_device].append(lid-idx_offset)
         else:

@@ -119,12 +119,12 @@ def main():
         simulator.run(base_solution=True, draw=True)
         simulator.show_solution_detail()
     elif config['run_mode'] == RunMode.SIM_SOLVE:
-        if SchedulePriority.Chimera == SCHEDULE_METHOD:
+        if Schedule.Chimera == SCHEDULE_METHOD:
             simulator = ChimeraScheduler.ChimeraPipelineScheduler()
         else:
             simulator = Pipeline.PipelineScheduler(run_schedule=RUN_SCHEDULE)
             
-            if RUN_STANDARD_ZBV and not RUN_SCHEDULE and SCHEDULE_METHOD == SchedulePriority.ZBV:
+            if RUN_STANDARD_ZBV and not RUN_SCHEDULE and SCHEDULE_METHOD == Schedule.ZBV:
                 if check_standard_zbv_conditions():
                     simulator.run_pipeline_parallelism()
                     simulator.result2file()

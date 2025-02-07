@@ -60,7 +60,7 @@ class LayerwiseSchedulingPainter:
         else:
             color = "#00FF6F"
 
-        if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE or SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE or LAYERWISE:
             if pid == 0:
                 color = "#FF0000" # 红色: #FF0000
             elif pid == self._num_layer - 2:
@@ -156,7 +156,7 @@ class LayerwiseSchedulingPainter:
             if x0 == x1:
                 continue
 
-            print_to_file(f"{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+            print_to_file(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
 
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况

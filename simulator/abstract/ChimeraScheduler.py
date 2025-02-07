@@ -1,4 +1,4 @@
-from .Device import Device, SchedulePriority, get_required_memory
+from .Device import Device, Schedule, get_required_memory
 from .Stage import Stage
 from .Workload import Workload
 from .mutils import *
@@ -197,7 +197,7 @@ class ChimeraPipelineScheduler:
                     print("Time {}, mem = {}, {}.".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2)))
                     last_mem_record = mem_record
                     max_mem_usage = max(max_mem_usage, mem_record)
-        if max_mem_usage > GPU_MAX_MEM and SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        if max_mem_usage > GPU_MAX_MEM and LAYERWISE:
             raise ValueError("Error: Out of Memory.")
     
     def get_workloadload_duration(self):

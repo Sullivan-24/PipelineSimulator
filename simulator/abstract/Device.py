@@ -129,7 +129,7 @@ class Device:
         layer_per_stage = LAYER_NUM // STAGE_NUM
         stage_type = StageType.LAYERS
         basic_memory = 0
-        if SchedulePriority.Layerwise == SCHEDULE_METHOD:
+        if LAYERWISE:
             layerwise = True
         if layerwise:
             layer_per_stage = 1 
@@ -161,7 +161,41 @@ class Device:
     
     def execute_workload(self, run_schedule=False) -> None:
         if self.state == Device.IDLE:
-            if run_schedule or SCHEDULE_METHOD in (SchedulePriority.ONE_F_ONE_B, SchedulePriority.ZBH1, SchedulePriority.INTERLEAVED):
+            # if SCHEDULE_METHOD == Schedule.Layerwise:
+            if LAYERWISE or SCHEDULE_METHOD in (Schedule.ONE_F_ONE_B, Schedule.ZBH1, Schedule.INTERLEAVED):            
+                now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
+                if self.last_workload_type == WorkloadType.B:
+                    now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
+                elif self.last_workload_type == WorkloadType.F:
+                    now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
+                
+                for workload_type in now_workload_priority_order:
+                    for mid in self.microbatch_schedule_range:
+                        for sid in self.stages:
+                            required_memory = get_required_memory(
+                                stage_id=sid, 
+                                layer_num=1,
+                                workload_type=workload_type,
+                                workload_type_num=WORKLOAD_TYPE_NUM, 
+                                layer_wise=True,
+                                recomp=self.stages[sid].recomp,
+                            )
+
+                            workload_type = self._reset_workload_type(
+                                workload_type=workload_type,
+                                required_memory=required_memory,
+                                current_mem_usage=self.current_mem_usage,
+                                max_memory=GPU_MAX_MEM,
+                            )
+
+                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            if proc_workload:
+                                self.last_workload_type = workload_type
+                                self.proc_workload = proc_workload
+                                self.update_memory_usage()
+                                self.state = Device.BUSY
+                                return proc_workload
+            elif run_schedule or SCHEDULE_METHOD in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH1, Schedule.STANDARD_INTERLEAVED):
                 if self.next_workload_idx == len(self.stages) * self.nmb * WORKLOAD_TYPE_NUM:
                     return None
                 if self.next_workload_idx == len(self.static_schedule):
@@ -174,7 +208,7 @@ class Device:
                     self.state = Device.BUSY
                     self.next_workload_idx += 1
                     return proc_workload
-            elif SCHEDULE_METHOD == SchedulePriority.GREEDY_v1:
+            elif SCHEDULE_METHOD == Schedule.GREEDY_v1:
                 for workload_type in self.workload_type_priority_order:
                     if self.current_mem_usage == self.max_activation_counts and workload_type == WorkloadType.F:
                         workload_type = WorkloadType.W
@@ -186,7 +220,7 @@ class Device:
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
                                 return proc_workload
-            elif SCHEDULE_METHOD == SchedulePriority.GREEDY_v2:
+            elif SCHEDULE_METHOD == Schedule.GREEDY_v2:
                 now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
                 if self.last_workload_type == WorkloadType.B:
                     now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
@@ -205,7 +239,7 @@ class Device:
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
                                 return proc_workload
-            elif SCHEDULE_METHOD == SchedulePriority.ZBV:
+            elif SCHEDULE_METHOD == Schedule.ZBV:
                 if self.last_workload_type == WorkloadType.F:
                     workload_type = WorkloadType.B
                 elif self.last_workload_type == WorkloadType.B:
@@ -290,40 +324,7 @@ class Device:
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
                                 return proc_workload             
-            elif SCHEDULE_METHOD == SchedulePriority.Layerwise:            
-                now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-                if self.last_workload_type == WorkloadType.B:
-                    now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
-                elif self.last_workload_type == WorkloadType.F:
-                    now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-                
-                for workload_type in now_workload_priority_order:
-                    for mid in self.microbatch_schedule_range:
-                        for sid in self.stages:
-                            required_memory = get_required_memory(
-                                stage_id=sid, 
-                                layer_num=1,
-                                workload_type=workload_type,
-                                workload_type_num=WORKLOAD_TYPE_NUM, 
-                                layer_wise=True,
-                                recomp=self.stages[sid].recomp,
-                            )
-
-                            workload_type = self._reset_workload_type(
-                                workload_type=workload_type,
-                                required_memory=required_memory,
-                                current_mem_usage=self.current_mem_usage,
-                                max_memory=GPU_MAX_MEM,
-                            )
-
-                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
-                            if proc_workload:
-                                self.last_workload_type = workload_type
-                                self.proc_workload = proc_workload
-                                self.update_memory_usage()
-                                self.state = Device.BUSY
-                                return proc_workload
-            elif SCHEDULE_METHOD == SchedulePriority.Chimera:
+            elif SCHEDULE_METHOD == Schedule.Chimera:
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 if self.last_workload_type == WorkloadType.B:
                     now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]

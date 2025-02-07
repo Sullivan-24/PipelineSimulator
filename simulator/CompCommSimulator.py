@@ -232,14 +232,14 @@ class CompCommSimulator:
         workload_type, mid, lid = key.split("_")
         mid = int(mid)
         lid = int(lid)
-        if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        if SCHEDULE_METHOD == Schedule.Layerwise:
             layers = 1
         else:
             layers = LAYER_NUM // STAGE_NUM
 
         if workload_type == "f":
             workload_len = F_TIME * layers
-            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if SCHEDULE_METHOD == Schedule.Layerwise:
                 if lid == 0:
                     workload_len = EMBEDDING_TIME
                 elif lid == LAYER_NUM - 1:
@@ -253,7 +253,7 @@ class CompCommSimulator:
                     workload_len += CE_F_TIME + HEAD_F_TIME
         elif workload_type == "b":
             workload_len = B_TIME * layers
-            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if SCHEDULE_METHOD == Schedule.Layerwise:
                 if lid == LAYER_NUM - 1:
                     workload_len = CE_B_TIME
                 elif lid == LAYER_NUM - 2:
@@ -263,7 +263,7 @@ class CompCommSimulator:
                     workload_len += CE_B_TIME + HEAD_B_TIME
         elif workload_type == "w":
             workload_len = W_TIME * layers
-            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if SCHEDULE_METHOD == Schedule.Layerwise:
                 if lid == LAYER_NUM - 1:
                     workload_len = CE_W_TIME
                 elif lid == LAYER_NUM - 2:

@@ -9,7 +9,7 @@ class WorkloadType(Enum):
     W = "W"
 
 
-class SchedulePriority(Enum):
+class Schedule(Enum):
     GREEDY_v1 = 1
     INTERLEAVED = 2
     ONE_F_ONE_B = 3
@@ -19,6 +19,11 @@ class SchedulePriority(Enum):
     GREEDY_v2 = 7
     Layerwise = 8
     Chimera = 9
+
+    STANDARD_1F1B = 10
+    STANDARD_INTERLEAVED = 11
+    STANDARD_ZBH1 = 12
+    STANDARD_ZBV = 13
 
 class StageSearchOrder(Enum):
     Random = "Random"

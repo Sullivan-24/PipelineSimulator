@@ -77,13 +77,13 @@ class GSimulator:
                 print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
 
     def _fix_stages(self):
-        if self._schedule_method in (SchedulePriority.ZBV, SchedulePriority.GREEDY_v1, SchedulePriority.GREEDY_v2):
+        if self._schedule_method in (Schedule.ZBV, Schedule.GREEDY_v1, Schedule.GREEDY_v2):
             for pid in range(self._pp_size):
                 if (pid // self._device_size) % 2 == 0:
                     self._devices[pid % self._device_size].append(pid)
                 else:
                     self._devices[self._device_size - 1 - pid % self._device_size].append(pid)
-        elif self._schedule_method in (SchedulePriority.ZBH1, SchedulePriority.ONE_F_ONE_B, SchedulePriority.INTERLEAVED):
+        elif self._schedule_method in (Schedule.ZBH1, Schedule.ONE_F_ONE_B, Schedule.INTERLEAVED):
             for pid in range(self._pp_size):
                 self._devices[pid % self._device_size].append(pid)
         else:
@@ -354,14 +354,14 @@ class GSimulator:
         workload_type, mid, lid = key.split("_")
         mid = int(mid)
         lid = int(lid)
-        if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        if SCHEDULE_METHOD == Schedule.Layerwise:
             layers = 1
         else:
             layers = LAYER_NUM // STAGE_NUM
 
         if workload_type == "f":
             workload_len = F_TIME * layers
-            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if SCHEDULE_METHOD == Schedule.Layerwise:
                 if lid == 0:
                     workload_len = EMBEDDING_TIME
                 elif lid == LAYER_NUM - 1:
@@ -375,7 +375,7 @@ class GSimulator:
                     workload_len += CE_F_TIME + HEAD_F_TIME
         elif workload_type == "b":
             workload_len = B_TIME * layers
-            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if SCHEDULE_METHOD == Schedule.Layerwise:
                 if lid == LAYER_NUM - 1:
                     workload_len = CE_B_TIME
                 elif lid == LAYER_NUM - 2:
@@ -385,7 +385,7 @@ class GSimulator:
                     workload_len += CE_B_TIME + HEAD_B_TIME
         elif workload_type == "w":
             workload_len = W_TIME * layers
-            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if SCHEDULE_METHOD == Schedule.Layerwise:
                 if lid == LAYER_NUM - 1:
                     workload_len = CE_W_TIME
                 elif lid == LAYER_NUM - 2:

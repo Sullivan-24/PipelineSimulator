@@ -1,4 +1,4 @@
-from .Device import Device, SchedulePriority, RunMode
+from .Device import Device, Schedule, RunMode
 from .Stage import Stage
 from .Workload import Workload
 from .mutils import *
@@ -111,7 +111,7 @@ class PipelineScheduler:
                         recomp_list = [0] + [1 for _ in range(LAYER_NUM)] + [0,0]
                         self.set_layer_recomp(recomp_list)
                     self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
-        elif SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        elif LAYERWISE:
             self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
             if SEQ_LEN > 4*K:
                 recomp_list = [0] + [1 for _ in range(LAYER_NUM)] + [0,0]
@@ -122,11 +122,18 @@ class PipelineScheduler:
                 #                        0,0 # Head+CE
                 #                     ]
                 #                 )
-            for pid in range(LAYER_NUM):
-                if (pid // DEVICE_NUM) % 2 == 0:
-                    self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
-                else:
-                    self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+            if SCHEDULE_METHOD == Schedule.INTERLEAVED:
+                print("Use Interleaved placement")
+                for pid in range(LAYER_NUM):
+                    self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
+            else:
+                print("Use Wavelike placement")
+                for pid in range(LAYER_NUM):
+                    if (pid // DEVICE_NUM) % 2 == 0:
+                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                    else:
+                        self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+            
             self.devices[-1].add_stage(0)
             self.devices[0].add_stage(LAYER_NUM+1)
             self.devices[1].add_stage(LAYER_NUM+2)
@@ -135,7 +142,7 @@ class PipelineScheduler:
             if SEQ_LEN > 4*K:
                 self.recomp_set = [1 for _ in range(STAGE_NUM)]
             self.set_layer_recomp(self.recomp_set)
-            if SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
+            if SCHEDULE_METHOD in (Schedule.INTERLEAVED, Schedule.STANDARD_INTERLEAVED):
                 for pid in range(STAGE_NUM):
                     self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
             else:
@@ -155,11 +162,11 @@ class PipelineScheduler:
             self.devices[did].static_schedule = self.schedule[did]
 
     def generate_schedule(self):
-        if SCHEDULE_METHOD == SchedulePriority.ONE_F_ONE_B:
+        if SCHEDULE_METHOD == Schedule.STANDARD_1F1B:
             self.generate_1f1b_schedule()
-        elif SCHEDULE_METHOD == SchedulePriority.ZBH1:
+        elif SCHEDULE_METHOD == Schedule.STANDARD_ZBH1:
             self.generate_zbh1_schedule()
-        elif SCHEDULE_METHOD == SchedulePriority.INTERLEAVED:
+        elif SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED and not LAYERWISE:
             self.generate_interleaved_1f1b_schedule()
         else:
             print("Generate Greedy Schedule instead.")
@@ -367,7 +374,7 @@ class PipelineScheduler:
                     print("Time {}, mem = {}, {}.".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2)))
                     last_mem_record = mem_record
                     max_mem_usage = max(max_mem_usage, mem_record)
-        if max_mem_usage > GPU_MAX_MEM and SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        if max_mem_usage > GPU_MAX_MEM and LAYERWISE:
             raise ValueError("Error: Out of Memory.")
         
         if show_all:
@@ -395,14 +402,14 @@ class PipelineScheduler:
         workload_type, mid, lid = key.split("_")
         mid = int(mid)
         lid = int(lid)
-        if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        if LAYERWISE:
             layers = 1
         else:
             layers = LAYER_NUM // STAGE_NUM
 
         if workload_type == "f":
             workload_len = F_TIME * layers
-            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if LAYERWISE:
                 if lid == 0:
                     workload_len = EMBEDDING_TIME
                 elif lid == LAYER_NUM - 1:
@@ -416,7 +423,7 @@ class PipelineScheduler:
                     workload_len += CE_F_TIME + HEAD_F_TIME
         elif workload_type == "b":
             workload_len = B_TIME * layers
-            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if LAYERWISE:
                 if lid == LAYER_NUM - 1:
                     workload_len = CE_B_TIME
                 elif lid == LAYER_NUM - 2:
@@ -426,7 +433,7 @@ class PipelineScheduler:
                     workload_len += CE_B_TIME + HEAD_B_TIME
         elif workload_type == "w":
             workload_len = W_TIME * layers
-            if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if LAYERWISE:
                 if lid == LAYER_NUM - 1:
                     workload_len = CE_W_TIME
                 elif lid == LAYER_NUM - 2:
@@ -447,7 +454,7 @@ class PipelineScheduler:
         self.resort_w()
         # self.write_fbw_to_file()
         fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
-        if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        if LAYERWISE:
             painter_conf = {
                 "device_size": DEVICE_NUM,
                 "devices": self.dsa,

@@ -86,9 +86,9 @@ class Stage:
                     workload_type=WorkloadType.F,
                     recomp=self.recomp,
                 ),    
-                total_stages=LAYER_NUM+3 if SchedulePriority.Layerwise == SCHEDULE_METHOD else STAGE_NUM,
+                total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,
             )
-            if self.stage_id == 0 and SCHEDULE_METHOD == SchedulePriority.Layerwise:
+            if self.stage_id == 0 and LAYERWISE:
                 self.workloads[mid]={
                     WorkloadType.F: fpw,
                 }
@@ -105,7 +105,7 @@ class Stage:
                     workload_type=WorkloadType.B,
                     recomp=self.recomp,
                 ),   
-                total_stages=LAYER_NUM+3 if SchedulePriority.Layerwise == SCHEDULE_METHOD else STAGE_NUM,   
+                total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,   
             )
             self.workloads[mid]={
                 WorkloadType.F: fpw,
@@ -123,7 +123,7 @@ class Stage:
                         workload_type=WorkloadType.W,
                         recomp=self.recomp,
                     ),     
-                    total_stages=LAYER_NUM+3 if SchedulePriority.Layerwise == SCHEDULE_METHOD else STAGE_NUM,
+                    total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,
                 )
                 if self.stage_type != StageType.CE:
                     self.workloads[mid][WorkloadType.W] = pgw
@@ -141,7 +141,7 @@ class Stage:
                 ) 
 
     def update_memory_usage(self, workload:Workload):
-        if SCHEDULE_METHOD == SchedulePriority.Layerwise:
+        if LAYERWISE:
             if self.stage_type == StageType.EMBD:
                 return
             if workload.workload_type == WorkloadType.F:
