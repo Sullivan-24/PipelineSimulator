@@ -4,7 +4,7 @@ painter package
 import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
-from .abstract.mutils import COMM_TIME, SPLIT_BACKPROP, MICRO_BATCH_NUM, DEVICE_NUM,SCHEDULE_METHOD,RUN_MODE,LAYER_NUM
+from .abstract.mutils import COMM_TIME, SPLIT_BACKPROP, MICRO_BATCH_NUM, DEVICE_NUM,SCHEDULE_METHOD,RUN_MODE,LAYER_NUM,SHOW_WORKLOAD_TEXT
 class SchedulingPainter:
     """Scheduling Painter"""
 
@@ -138,9 +138,14 @@ class SchedulingPainter:
                 underline= pid // self._device_size % 2,
                 weight= tk.font.NORMAL if pid // self._device_size % 2 else tk.font.BOLD
             )
-            text = main_canvas.create_text(
-                (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
-            )
+            if SHOW_WORKLOAD_TEXT:
+                text = main_canvas.create_text(
+                    (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
+                )
+                self._item2block[text] = block
+            # text = main_canvas.create_text(
+            #     (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
+            # )
             # if pid + 1 >= self._num_microbatches:
             #     bold_font = font.Font(size= pid // (self._pp_size // self._device_size), weight=tk.font.BOLD)
             #     text = main_canvas.create_text(
@@ -155,7 +160,6 @@ class SchedulingPainter:
             self._highlight_state[block] = False
             self._item2color[block] = color
             self._item2block[block] = block
-            self._item2block[text] = block
             # 求余考虑virtual stage的情况
             self._item2mid[block] = mid
 

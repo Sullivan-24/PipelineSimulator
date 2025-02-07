@@ -52,7 +52,6 @@ class Stage:
             else:
                 raise Exception("Wrong workload type!")
         else:
-            #TODO recomp
             layer_per_stage = LAYER_NUM // STAGE_NUM
             if workload_type == WorkloadType.F:
                 duration = F_TIME * layer_per_stage
@@ -61,9 +60,11 @@ class Stage:
                 elif stage_id == STAGE_NUM - 1:
                     duration += HEAD_F_TIME + CE_F_TIME
             elif workload_type == WorkloadType.B:
-                duration = B_TIME * layer_per_stage
+                duration = B_TIME * layer_per_stage if not recomp else (F_TIME + B_TIME) * layer_per_stage
                 if stage_id == STAGE_NUM - 1:
-                    duration += HEAD_B_TIME + CE_B_TIME
+                    duration += HEAD_B_TIME + CE_B_TIME 
+                    if recomp:
+                        duration += HEAD_F_TIME + CE_F_TIME
             elif workload_type == WorkloadType.W:
                 duration = W_TIME * layer_per_stage
                 if stage_id == STAGE_NUM - 1:

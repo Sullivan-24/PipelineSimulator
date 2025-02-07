@@ -24,9 +24,9 @@ if RUN_MODE == RunMode.SIM_SOLVE:
     elif SCHEDULE_METHOD == SchedulePriority.ZBH1:
         SPLIT_BACKPROP = True
         CHUNK_NUM = 1
-    elif SCHEDULE_METHOD in (SchedulePriority.GREEDY_v1, SchedulePriority.ZBV):
-        SPLIT_BACKPROP = True
-        CHUNK_NUM = 2
+    # elif SCHEDULE_METHOD in (SchedulePriority.GREEDY_v1, SchedulePriority.ZBV):
+    #     SPLIT_BACKPROP = True
+    #     CHUNK_NUM = 2
 
 STAGE_NUM = int(DEVICE_NUM * CHUNK_NUM)
 MAX_ACTIVATION_COUNTS = int(STAGE_NUM * MAX_ACTIVATION_TIMES_OF_STAGE_NUM)

@@ -169,6 +169,7 @@ class LayerwiseSchedulingPainter:
                 text = main_canvas.create_text(
                     (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
                 )
+                self._item2block[text] = block
             # if pid + 1 >= self._num_microbatches:
             #     bold_font = font.Font(size= pid // (self._pp_size // self._device_size), weight=tk.font.BOLD)
             #     text = main_canvas.create_text(
@@ -183,8 +184,6 @@ class LayerwiseSchedulingPainter:
             self._highlight_state[block] = False
             self._item2color[block] = color
             self._item2block[block] = block
-            if SHOW_WORKLOAD_TEXT:
-                self._item2block[text] = block
             # 求余考虑virtual stage的情况
             self._item2mid[block] = mid
 

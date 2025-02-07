@@ -1,1 +1,4 @@
 schedule_results/
+__pycache__/
+simulator/__pycache__/
+simulator/abstract/__pycache__/
