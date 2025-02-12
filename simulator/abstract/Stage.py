@@ -175,7 +175,7 @@ class Stage:
         else:
             layers_per_stage = LAYER_NUM // STAGE_NUM
             if workload.workload_type == WorkloadType.F:
-                self.memory_usage += Activation.FULL * layers_per_stage
+                self.memory_usage += (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
                 if self.stage_id == STAGE_NUM - 1:
                     self.memory_usage += Activation.LOSS
             elif workload.workload_type == WorkloadType.W:
@@ -183,9 +183,9 @@ class Stage:
                 if self.stage_id == STAGE_NUM - 1:
                     self.memory_usage -= Activation.LOSS
             elif SPLIT_BACKPROP and workload.workload_type == WorkloadType.B:
-                self.memory_usage += Gradient.INPUT * layers_per_stage
+                self.memory_usage += ((Activation.FULL - Activation.INPUT) * self.recomp + Gradient.INPUT) * layers_per_stage
             elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.B:
-                self.memory_usage -= Activation.FULL * layers_per_stage
+                self.memory_usage -= (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
                 if self.stage_id == STAGE_NUM - 1:
                     self.memory_usage -= Activation.LOSS
         

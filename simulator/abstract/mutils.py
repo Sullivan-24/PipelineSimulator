@@ -12,7 +12,7 @@ if RUN_MODE == RunMode.GUROBI_SOLVE:
 # SCHEDULE_METHOD = Schedule.Layerwise
 # SCHEDULE_METHOD = Schedule.GREEDY_v1
 if RUN_MODE == RunMode.SIM_SOLVE:
-    if SCHEDULE_METHOD == Schedule.ONE_F_ONE_B:
+    if SCHEDULE_METHOD in (Schedule.STANDARD_1F1B, Schedule.ONE_F_ONE_B):
         SPLIT_BACKPROP = False
         CHUNK_NUM = 1
         B_TIME += W_TIME
@@ -20,7 +20,7 @@ if RUN_MODE == RunMode.SIM_SOLVE:
         assert CHUNK_NUM > 1, "INTERLEAVED: CHUNK_NUM should be larger than 1"
         if not SPLIT_BACKPROP:
             B_TIME += W_TIME
-    elif SCHEDULE_METHOD == Schedule.ZBH1:
+    elif SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.ZBH1):
         SPLIT_BACKPROP = True
         CHUNK_NUM = 1
     elif SCHEDULE_METHOD == Schedule.ZBV and RUN_STANDARD_ZBV:
@@ -43,6 +43,10 @@ def DECREASE_TIME():
 def GET_TIME():
     global GLOBAL_TIME
     return GLOBAL_TIME
+
+def RESET_TIME():
+    global GLOBAL_TIME
+    GLOBAL_TIME = 0
 
 
 

@@ -76,7 +76,14 @@ def main():
         "emb_head_ce": SPLIT_EMB_HEAD_CE,
     }
     set_workload_length(config=config)
-    
+
+    print("SEQ={},HID={}".format(SEQ_LEN,HIDDEN_SIZE))
+    print("Activation Layer={},Activation Input={},Activation Loss={}".format(Activation.FULL, Activation.INPUT, Activation.LOSS))
+    print("Gradient Input={},Gradient Parameters={},Gradient Head={}".format(Gradient.INPUT,Gradient.PARAMETER, Gradient.HEAD))
+    print("LOSS={},VOC={}".format(Activation.LOSS,VOCAB_SIZE))
+
+    print("LAYER_MEM:{}".format(LAYER_MEMORY))
+
     if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
         config["file_path"] = os.path.join("results", filename)
         s_time = time.time()

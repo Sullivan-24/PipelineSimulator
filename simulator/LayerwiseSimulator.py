@@ -219,7 +219,6 @@ class LayerwiseSimulator:
                             binary_f = self.model.addVar(vtype=GRB.BINARY, name=f'binary_f_{lid}_{mid}_{o_lid}_{o_mid}')
                             binary_b = self.model.addVar(vtype=GRB.BINARY, name=f'binary_b_{lid}_{mid}_{o_lid}_{o_mid}')
                             binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'binary_w_{lid}_{mid}_{o_lid}_{o_mid}')
-
                             eps = 0.1
                             # M = 10000
                             M = self.M
@@ -251,7 +250,8 @@ class LayerwiseSimulator:
                         layer_wise=True,
                         recomp=self._layer_recomp_rate[lid],
                     )
-                    base_memory = (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + LAYER_MEMORY * len([l for l in self._devices[did] if l not in (0, LAYER_NUM - 1, LAYER_NUM - 2)])
+                    contain_head = LAYER_NUM + 1 in self._devices[did]
+                    base_memory = (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + LAYER_MEMORY * len([l for l in self._devices[did] if l not in (0, LAYER_NUM + 1, LAYER_NUM + 2)]) + contain_head * HEAD_MEMORY
                     accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid)
                     accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid)
                     released_memory = self._get_released_memory(did=did, lid=lid, mid=mid)
@@ -280,32 +280,38 @@ class LayerwiseSimulator:
         accumulated_activations = 0
         orders = self._orders[did][lid][mid]
         for o_lid in self._devices[did]:
-            if o_lid == 0 or o_lid >= LAYER_NUM - 2:
-                continue
+            if o_lid == 0 or o_lid == LAYER_NUM + 2:
+                continue                
             for o_mid in range(self._num_microbatches):
                 if o_lid == lid and o_mid == mid: # necessary
                     continue
-                accumulated_activations += orders[o_lid]['f'][o_mid] * (Activation.FULL * (1 - self._layer_recomp_rate[o_lid]) + Activation.INPUT * self._layer_recomp_rate[o_lid])
+                if o_lid == LAYER_NUM + 1:
+                    accumulated_activations += orders[o_lid]['f'][o_mid] * Activation.LOSS
+                else:
+                    accumulated_activations += orders[o_lid]['f'][o_mid] * (Activation.FULL * (1 - self._layer_recomp_rate[o_lid]) + Activation.INPUT * self._layer_recomp_rate[o_lid])
         return accumulated_activations
 
     def _get_accumulated_input_gradients(self, did, lid, mid):
         accumulated_input_gradients = 0
         orders = self._orders[did][lid][mid]
         for o_lid in self._devices[did]:
-            if o_lid == 0 or o_lid >= LAYER_NUM - 2:
-                continue
+            if o_lid == 0 or o_lid == LAYER_NUM + 2:
+                continue 
             for o_mid in range(self._num_microbatches):
                 if o_lid == lid and o_mid == mid: # necessary
                     continue
-                accumulated_input_gradients += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + (Activation.FULL - Activation.INPUT) * self._layer_recomp_rate[o_lid])
+                if o_lid == LAYER_NUM + 1:
+                    accumulated_input_gradients -= orders[o_lid]['b'][o_mid] * Activation.LOSS
+                else:
+                    accumulated_input_gradients += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + (Activation.FULL - Activation.INPUT) * self._layer_recomp_rate[o_lid])
         return accumulated_input_gradients
     
     def _get_released_memory(self, did, lid, mid):
         released_memory = 0
         orders = self._orders[did][lid][mid]
         for o_lid in self._devices[did]:
-            if o_lid == 0 or o_lid >= LAYER_NUM - 2:
-                continue
+            if o_lid == 0 or o_lid == LAYER_NUM + 1 or o_lid == LAYER_NUM + 2:
+                continue 
             for o_mid in range(self._num_microbatches):
                 if o_lid == lid and o_mid == mid: # necessary
                     continue
@@ -482,8 +488,8 @@ class LayerwiseSimulator:
             "device_size": self._num_device,
             "devices": self._devices,
             "pp_size": self._pp_size,
-            "pp_height": 50,
-            "pp_align": 10,
+            "pp_height": PP_HEIGHT,
+            "pp_align": PP_ALIGN,
             "pixel_base": PIXEL_BASE,
             "num_microbatches": self._num_microbatches,
             "forward_length": self._layer_f_length,

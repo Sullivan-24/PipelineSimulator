@@ -73,7 +73,7 @@ class SchedulingPainter:
             else:
                 self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
 
-        label_canvas.create_text(self._pp_align + 160, y_label, text="MinExeTime:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
+        label_canvas.create_text(self._pp_align + 145, y_label, text="MinExeTime:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
                 # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
                 round(self._max_time),
                 self._pp_size // self._device_size,

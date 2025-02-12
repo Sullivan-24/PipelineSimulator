@@ -19,8 +19,10 @@ class PipelineScheduler:
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
-        self.microbatch_schedule_range = range(0,min(MICRO_BATCH_NUM//1, MICRO_BATCH_NUM))
+        self.microbatch_schedule_range = range(0,min(MICRO_BATCH_NUM, MICRO_BATCH_NUM))
         # self.microbatch_schedule_range = range(0,min(8, MICRO_BATCH_NUM))
+        self.acc_finished_mb = 0
+        self.finish_flag = False
         self.num_finished_microbatch = 0
         self.run_schedule = run_schedule
         self._init_stage()
@@ -60,7 +62,11 @@ class PipelineScheduler:
         if filepath is None:
             filepath = 'data.txt'
         with open(filepath, 'r') as file:
-            self.results = json.load(file)
+            results = json.load(file)
+            self.results = {}
+            for k in results.keys():
+                if str(k).startswith(("f","b","w")):
+                    self.results[k] = results[k]
 
     # NOTE _reset_workload_type is efficient but 
     # lead to random order of W in some cases
@@ -112,16 +118,11 @@ class PipelineScheduler:
                         self.set_layer_recomp(recomp_list)
                     self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
         elif LAYERWISE:
-            self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
-            if SEQ_LEN > 4*K:
-                recomp_list = [0] + [1 for _ in range(LAYER_NUM)] + [0,0]
-                self.set_layer_recomp(recomp_list)
-                # self.set_layer_recomp([0, #Embedding
-                #                        0,0,0,0,0,0,0,0,
-                #                        0,0,0,0,0,0,0,0,
-                #                        0,0 # Head+CE
-                #                     ]
-                #                 )
+            self.recomp_set = [1 if RECOMP else 0 for _ in range(LAYER_NUM + 3)]
+            # self.recomp_set[1] = 1
+            # self.recomp_set[2] = 1
+            # self.recomp_set[3] = 1
+            # self.recomp_set[4] = 1
             if SCHEDULE_METHOD == Schedule.INTERLEAVED:
                 print("Use Interleaved placement")
                 for pid in range(LAYER_NUM):
@@ -138,10 +139,15 @@ class PipelineScheduler:
             self.devices[0].add_stage(LAYER_NUM+1)
             self.devices[1].add_stage(LAYER_NUM+2)
         else:
-            self.recomp_set = [0 for _ in range(STAGE_NUM)]
-            if SEQ_LEN > 4*K:
-                self.recomp_set = [1 for _ in range(STAGE_NUM)]
-            self.set_layer_recomp(self.recomp_set)
+            self.recomp_set = [1 if RECOMP else 0 for _ in range(STAGE_NUM)]
+            # self.recomp_set[0] = 1
+            # self.recomp_set[1] = 1
+            # self.recomp_set[2] = 1
+            # self.recomp_set[3] = 1
+            # self.recomp_set[4] = 1
+            # self.recomp_set[5] = 1
+            # self.recomp_set[6] = 1
+            # self.recomp_set[7] = 1
             if SCHEDULE_METHOD in (Schedule.INTERLEAVED, Schedule.STANDARD_INTERLEAVED):
                 for pid in range(STAGE_NUM):
                     self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
@@ -340,6 +346,14 @@ class PipelineScheduler:
             if device._finish_proc_workload():
                 if device.proc_workload.workload_type == WorkloadType.W:
                     self.num_finished_microbatch += 1
+                    self.acc_finished_mb += 1
+                    if LAYERWISE:
+                        if self.acc_finished_mb == (1 + LAYER_NUM) * MICRO_BATCH_NUM:
+                            self.finish_flag = True
+                    else:
+                        if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
+                            self.finish_flag = True
+
                 device.proc_workload.complete()
                 self.update_constraints(constraint=device.proc_workload)
                 device.update_memory_usage()
@@ -357,13 +371,47 @@ class PipelineScheduler:
         # if GET_TIME()==302:
         #     print(self.devices[1].stages[15].workloads[0])
             
-            
+    def reduce_recomp_degree(self):
+        recomp_set = self.recomp_set
+        for index, value in reversed(list(enumerate(recomp_set))):
+            if value:
+                self.recomp_set[index] = 0
+                print("Try the reduced the recomp degree.")
+                print(self.recomp_set)
+                return True
+        print("Already the best recomp config.")
+        return False
+    
+    def add_recomp_degree(self):
+        recomp_set = self.recomp_set
+        for index, value in list(enumerate(recomp_set)):
+            if not value:
+                self.recomp_set[index] = 1
+                print("Try the added the recomp degree.")
+                return True
+        print("Set all stage to recomputing.")
+        return False
+    
+    def reset_run_para(self):
+        self.results = {}
+        self.devices: list[Device] = []
+        self.dsa = []
+        self.acc_finished_mb = 0
+        self.finish_flag = False
+        self.num_finished_microbatch = 0
+        self._init_stage()
+
+
     def run_pipeline_parallelism(self, time_limit = TIME_LIMIT):
-        while GET_TIME() <= time_limit:
+
+        while GET_TIME() <= time_limit and not self.finish_flag:
             self.check_workload_status()
             self.execute_workload()
             UPDATE_TIME()
-
+        if self.finish_flag:
+            print("Success")
+        else:
+            print("Fail")
     def show_mem_usage(self, device_id=(0,), show_all=False):
         max_mem_usage = -1
         for device in self.devices:
@@ -451,7 +499,7 @@ class PipelineScheduler:
                 
     def draw(self) -> None:
         # 绘制结果的逻辑
-        self.resort_w()
+        # self.resort_w()
         # self.write_fbw_to_file()
         fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
         if LAYERWISE:
