@@ -83,6 +83,9 @@ def main():
     print("LOSS={},VOC={}".format(Activation.LOSS,VOCAB_SIZE))
 
     print("LAYER_MEM:{}".format(LAYER_MEMORY))
+    print("MODEL MEM:{}".format(LAYER_MEMORY * LAYER_NUM // DEVICE_NUM))
+    print("OPT MEM:{}".format(OPTIMIZER_MEMORY // DEVICE_NUM // DEVICE_NUM))
+    # input()
 
     if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
         config["file_path"] = os.path.join("results", filename)
@@ -140,6 +143,7 @@ def main():
         simulator.run_pipeline_parallelism()
         # simulator.show_detail_info()
         simulator.show_mem_usage(show_all=True)
+        print("Time:{}.".format(simulator.last_workload.end_time))
         simulator.draw()
     else:
         print("Unknown run mode.")

@@ -89,7 +89,7 @@ ax1.tick_params(axis='y', labelsize=xy_tick_size)
 
 # ax1.set_xticks([]) 
 
-s = 4*K
+s = 8*K
 h = 8*K
 
 full = (34*b*s*h + 5*b*s*s*a)/G
@@ -113,10 +113,10 @@ ax2.plot(x, yw, marker='*', linestyle='--', c='red', label="Layerwise w/ Recomp.
 ax2.plot(xawo, awo, marker='^', linestyle='dashdot', c='#006600', alpha=0.8, label="Act. counts w/o Recomp.")
 ax2.plot(xao, ao, marker='*', linestyle='dashed', c='#FF8000', alpha=0.8, label="Act. counts w/ Recomp.")
 ax2.set_ylabel("Memory Usage (GB)", fontsize=xy_label_size)
-ax2.set_xlabel("SEQ_LEN=4K, HID_SIZE=8k", fontsize=xy_label_size)
+ax2.set_xlabel("SEQ_LEN=8K, HID_SIZE=8K", fontsize=xy_label_size)
 ax2.legend(fontsize=12)
-ax2.set_yticks([0,0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7])
-ax2.set_yticks([0,1.0,2,3,4,5,6,7])
+# ax2.set_yticks([0,0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7])
+# ax2.set_yticks([0,1.0,2,3,4,5,6,7])
 ax2.grid(True)
 
 ax2.tick_params(axis='x', labelsize=xy_tick_size-3)

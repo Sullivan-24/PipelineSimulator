@@ -21,26 +21,41 @@ emb = [0.114, 0.270, 0.521, 1.054, 2.083]
 head = [1.586, 3.078, 5.982, 12.011, 26.635]
 ce = [1.365, 2.653, 5.279, 10.774, 21.368]
 
+# 归一化函数
+def normalize(data, ref):
+    return [d / r for d, r in zip(data, ref)]
+
+# 归一化数据
+F_1st_norm = normalize(F_1st, F_1st)
+B_1st_norm = normalize(B_1st, F_1st)
+F_last_norm = normalize(F_last, F_1st)
+B_last_norm = normalize(B_last, F_1st)
+
 # 设置柱状图的宽度
-bar_width = 0.2
+bar_width = 0.15
 
 # 设置x轴的位置
 index = np.arange(len(x))
 plt.figure(figsize=(5, 4))
 
 # 绘制柱状图
-plt.bar(index + 1.5 * bar_width, F_1st, bar_width, color=ccolors["F_1st"], label='F w/o Head+CE')
-plt.bar(index + 2.5 * bar_width, F_last, bar_width, color=ccolors["F_last"], label='F w/ Head+CE', edgecolor="black", hatch='//')
-plt.bar(index + 3.5 * bar_width, B_1st, bar_width, color=ccolors["B_1st"], label='B w/o Head+CE')
-plt.bar(index + 4.5 * bar_width, B_last, bar_width, color=ccolors["B_last"], label='B w/ Head+CE', edgecolor="black", hatch='\\\\')
-# plt.bar(index + 4 * bar_width, emb, bar_width, color=ccolors["emb"], label='emb')
-# plt.bar(index + 5 * bar_width, head, bar_width, color=ccolors["head"], label='head')
-# plt.bar(index + 6 * bar_width, ce, bar_width, color=ccolors["ce"], label='ce')
+bars1 = plt.bar(index + 1.5 * bar_width, F_1st, bar_width, color=ccolors["F_1st"], label='F w/o Head+CE')
+bars2 = plt.bar(index + 2.5 * bar_width, F_last, bar_width, color=ccolors["F_last"], label='F w/ Head+CE', edgecolor="black", hatch='//')
+bars3 = plt.bar(index + 3.5 * bar_width, B_1st, bar_width, color=ccolors["B_1st"], label='B w/o Head+CE')
+bars4 = plt.bar(index + 4.5 * bar_width, B_last, bar_width, color=ccolors["B_last"], label='B w/ Head+CE', edgecolor="black", hatch='\\\\')
+
+# 在每个柱状图上添加归一化后的数值
+for bars, norm_values in zip([bars1, bars2, bars3, bars4], [F_1st_norm, F_last_norm, B_1st_norm, B_last_norm]):
+    for bar, norm_value in zip(bars, norm_values):
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width() / 2., height, f'x{norm_value:.2f}', ha='center', va='bottom', rotation=90, fontsize=8)
 
 title = 'Computing times (ms) of F and B'
 # 添加x轴标签和标题
 plt.xlabel('Sequence Length')
 plt.ylabel('Time (ms)')
+plt.yscale('log')
+plt.ylim((0,600))
 plt.title(title)
 plt.xticks(index + 3 * bar_width, x)
 

@@ -147,7 +147,7 @@ class LayerwiseSchedulingPainter:
             elif RunMode == RunMode.LAYERWISE_GUROBI_SOLVE:
                 filename += f"_{True}"
 
-            print_to_file(f"{filename}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+            print_to_file(f"{filename}.txt", "{}_{}_{}_{},{},{}\n".format(stream_idx,k,mid,pid,offset,offset+block_width))
 
             mid = mid + stream_idx * self._num_microbatches
             tag = f"p_{pid}_m_{mid}_{k}"

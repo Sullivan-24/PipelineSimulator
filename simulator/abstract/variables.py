@@ -8,6 +8,12 @@ class WorkloadType(Enum):
     B = "B"
     W = "W"
 
+class Placement(Enum):
+    WAVELIKE = 1
+    VSHAPE = 2
+    INTERLEAVED = 3
+    NAIVE = 4
+    RECURRENT = 5
 
 class Schedule(Enum):
     GREEDY_v1 = 1
@@ -24,6 +30,7 @@ class Schedule(Enum):
     STANDARD_INTERLEAVED = 11
     STANDARD_ZBH1 = 12
     STANDARD_ZBV = 13
+    STANDARD_AFAB = 14
 
 class StageSearchOrder(Enum):
     Random = "Random"

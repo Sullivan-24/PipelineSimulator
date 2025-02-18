@@ -5,8 +5,10 @@ from .mutils import *
 from ..painter import SchedulingPainter as SP
 from ..LayerwisePainter import LayerwiseSchedulingPainter as LSP
 from ..utils import print_to_file
+import itertools
 import json
-
+import os
+import copy
 workload_type_mapping = {
     'f':WorkloadType.F,
     'b':WorkloadType.B,
@@ -25,11 +27,24 @@ class PipelineScheduler:
         self.finish_flag = False
         self.num_finished_microbatch = 0
         self.run_schedule = run_schedule
+        self.manual_recomp_set = []
+        self.fail_indexes = set()
+        # self.manual_recomp_set = [1 for _ in range(LAYER_NUM)]
+        # self.manual_recomp_set[-2] = 0
+        # self.manual_recomp_set[-3] = 0
+        # self.manual_recomp_set[-4] = 0
+        # self.manual_recomp_set[-5] = 0
+        # self.manual_recomp_set[-6] = 0
+        # self.manual_recomp_set[-7] = 0
+        # self.manual_recomp_set[-8] = 0
         self._init_stage()
         self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
         self.schedule = [[] for _ in range(DEVICE_NUM)]
         self.generate_schedule()
         self.set_schedule()
+        self.temp_results = {}
+        self.recomp_set_traverser = self.generate_binary_combinations()
+        self.last_workload: Workload = None
 
         if run_schedule:
             print("Read schedule generated before...")
@@ -94,11 +109,11 @@ class PipelineScheduler:
 
     def set_microbatch_schedule_range(self, microbatch_schedule_range):
         for device in self.devices:
-            device.microbatch_schedule_range = microbatch_schedule_range
+            device.mid_traverse_order = microbatch_schedule_range
 
-    def set_layer_recomp(self, settings:list):
-        for idx, r in enumerate(settings):
-            self.recomp_set[idx] = True if r else False
+    def record_recomp_set(self):
+        for idx, r in enumerate(self.recomp_set):
+            self.recomp_set[idx] = 1 if r else 0
             self.results[f"theta_{idx}"] = r
 
     def _init_stage(self):
@@ -108,38 +123,47 @@ class PipelineScheduler:
                             nmb=MICRO_BATCH_NUM,
                             )
             self.devices.append(device)
+        self.set_recomp()
 
         if self.dsa:
             for did in range(DEVICE_NUM):
                 for pid in self.dsa[did]:
-                    self.recomp_set = [0 for _ in range(LAYER_NUM + 3)]
-                    if SEQ_LEN > 4*K:
-                        recomp_list = [0] + [1 for _ in range(LAYER_NUM)] + [0,0]
-                        self.set_layer_recomp(recomp_list)
+                    self.record_recomp_set()
                     self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
         elif LAYERWISE:
-            self.recomp_set = [1 if RECOMP else 0 for _ in range(LAYER_NUM + 3)]
-            # self.recomp_set[1] = 1
-            # self.recomp_set[2] = 1
-            # self.recomp_set[3] = 1
-            # self.recomp_set[4] = 1
-            if SCHEDULE_METHOD == Schedule.INTERLEAVED:
+            if STAGE_PLACEMENT == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
                 for pid in range(LAYER_NUM):
                     self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
-            else:
+            elif STAGE_PLACEMENT == Placement.RECURRENT:
+                print("Use Recurrent placement")
+                unit = range(DEVICE_NUM)
+                orders = []
+                while len(orders) < LAYER_NUM:
+                    unit = list(unit)
+                    orders += unit[:-1]
+                    unit = reversed(unit)
+
+                for pid in range(LAYER_NUM - 1):
+                    self.devices[orders[pid]].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                self.devices[-1].add_stage(LAYER_NUM, recomp=self.recomp_set[pid])
+            else:   
                 print("Use Wavelike placement")
                 for pid in range(LAYER_NUM):
                     if (pid // DEVICE_NUM) % 2 == 0:
                         self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
                     else:
                         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
-            
-            self.devices[-1].add_stage(0)
-            self.devices[0].add_stage(LAYER_NUM+1)
-            self.devices[1].add_stage(LAYER_NUM+2)
+            if STAGE_PLACEMENT != Placement.RECURRENT:
+                self.devices[-1].add_stage(0)
+                self.devices[0].add_stage(LAYER_NUM+1)
+                self.devices[1].add_stage(LAYER_NUM+2)
+            else:
+                self.devices[-1].add_stage(0)
+                self.devices[0].add_stage(LAYER_NUM+1)
+                self.devices[1].add_stage(LAYER_NUM+2)
         else:
-            self.recomp_set = [1 if RECOMP else 0 for _ in range(STAGE_NUM)]
+            # self.recomp_set = [1 if RECOMP else 0 for _ in range(STAGE_NUM)]
             # self.recomp_set[0] = 1
             # self.recomp_set[1] = 1
             # self.recomp_set[2] = 1
@@ -157,12 +181,19 @@ class PipelineScheduler:
                         self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
                     else:
                         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
-
+        print(self.devices)
         for did in range(DEVICE_NUM):
             self.devices[did].show_stages()
             if len(self.dsa) < DEVICE_NUM:
                 self.dsa.append(list(self.devices[did].stages.keys()))
 
+    def set_recomp(self):
+        if LAYERWISE:
+            self.recomp_set = [1 if RECOMP else 0 for _ in range(LAYER_NUM + 3)]
+        else:
+            self.recomp_set = [1 if RECOMP else 0 for _ in range(STAGE_NUM)]
+        if self.manual_recomp_set:
+            self.recomp_set = self.manual_recomp_set
     def set_schedule(self):
         for did in range(DEVICE_NUM):
             self.devices[did].static_schedule = self.schedule[did]
@@ -170,12 +201,28 @@ class PipelineScheduler:
     def generate_schedule(self):
         if SCHEDULE_METHOD == Schedule.STANDARD_1F1B:
             self.generate_1f1b_schedule()
+        elif SCHEDULE_METHOD == Schedule.STANDARD_AFAB:
+            self.generate_afab_schedule()
         elif SCHEDULE_METHOD == Schedule.STANDARD_ZBH1:
             self.generate_zbh1_schedule()
         elif SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED and not LAYERWISE:
             self.generate_interleaved_1f1b_schedule()
         else:
             print("Generate Greedy Schedule instead.")
+
+    def generate_afab_schedule(self):
+        assert CHUNK_NUM == 1
+        print("Generate standard AFAB schedule...")
+        workload_type_order = [WorkloadType.F, WorkloadType.B]
+        if SPLIT_BACKPROP:
+            workload_type_order.append(WorkloadType.W)
+
+        for did in range(DEVICE_NUM):
+            mids = [0 for _ in range(WORKLOAD_TYPE_NUM)]
+            for i in range(WORKLOAD_TYPE_NUM):
+                while mids[i] < MICRO_BATCH_NUM:
+                    self.schedule[did].append((workload_type_order[i], mids[i], did))
+                    mids[i]+=1
 
     def generate_1f1b_schedule(self):
         assert WORKLOAD_TYPE_NUM == 2
@@ -201,10 +248,6 @@ class PipelineScheduler:
                 else:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                 iter+=1
-        # for did in range(DEVICE_NUM):
-        #     for (wt, mid, sid) in self.schedule[did]:
-        #         print(wt.value, mid, end=" ")
-        #     print()
 
     def generate_zbh1_schedule(self):
         assert WORKLOAD_TYPE_NUM == 3
@@ -227,19 +270,6 @@ class PipelineScheduler:
                     mids[0] += 1
                     additional_f_num -= 1
 
-            # iter = 0
-            # while iter < did * 2:
-            #     if mids[0] == MICRO_BATCH_NUM:
-            #         break
-            #     next_workload_type = warmup_type_order[iter % 2]
-            #     next_mid = mids[workload_idx_in_mids[next_workload_type]]
-            #     if next_mid < MICRO_BATCH_NUM:
-            #         self.schedule[did].append((next_workload_type, next_mid, did))
-            #         mids[workload_idx_in_mids[next_workload_type]] += 1
-            #     else:
-            #         finish_flag[workload_idx_in_mids[next_workload_type]] = 1
-            #     iter+=1
-
             # steady + cooldown
             iter = 0
             finish_flag = [0 for _ in range(WORKLOAD_TYPE_NUM)]
@@ -257,10 +287,6 @@ class PipelineScheduler:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                 iter+=1
 
-        # for did in range(DEVICE_NUM):
-        #     for (wt, mid, sid) in self.schedule[did]:
-        #         print(wt.value, mid, end=" ")
-        #     print()
 
     def generate_interleaved_1f1b_schedule(self):
         workload_type_num = 2
@@ -318,12 +344,6 @@ class PipelineScheduler:
                     operation_flag = 'f'
                 else:
                     raise("UNKOWN OPERATION FLAG")
-        
-        # for did in range(DEVICE_NUM):
-        #     for (wt, mid, sid) in self.schedule[did]:
-        #         print((wt.value, mid, sid), end=" ")
-        #     print()
-        #     print()
     
     def show_record(self):
         for k in self.results:
@@ -340,6 +360,13 @@ class PipelineScheduler:
             sid = workload.stage_id
             k = '{}_{}_{}'.format(wlt,mid,sid)
             self.results[k] = workload.start_time
+            if self.last_workload is None or workload.start_time + workload.duration > self.last_workload.start_time + self.last_workload.duration:
+                self.last_workload = workload
+
+    def change_mid_traverse_order(self, workload: Workload):
+        if workload:
+            for device in self.devices:
+                device.overlap_aware_executable_workload_reorder(workload=workload)         
 
     def check_workload_status(self):
         for device in self.devices:
@@ -353,11 +380,28 @@ class PipelineScheduler:
                     else:
                         if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
                             self.finish_flag = True
+                if not SPLIT_BACKPROP and device.proc_workload.workload_type == WorkloadType.B:
+                    self.num_finished_microbatch += 1
+                    self.acc_finished_mb += 1
+                    if LAYERWISE:
+                        if self.acc_finished_mb == (1 + LAYER_NUM) * MICRO_BATCH_NUM:
+                            self.finish_flag = True
+                    else:
+                        if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
+                            self.finish_flag = True 
 
                 device.proc_workload.complete()
                 self.update_constraints(constraint=device.proc_workload)
                 device.update_memory_usage()
                 device.state = Device.IDLE
+
+
+        for device in self.devices:
+            device.executable_workloads = device.get_executable_workload()
+
+        # for device in self.devices:
+        #     if device.proc_workload and device.proc_workload.state == Workload.COMPLETED:
+        #         self.change_mid_traverse_order(device.proc_workload)
 
         if self.num_finished_microbatch == (1 + LAYER_NUM) * len(self.microbatch_schedule_range):
             self.num_finished_microbatch = 0
@@ -372,15 +416,16 @@ class PipelineScheduler:
         #     print(self.devices[1].stages[15].workloads[0])
             
     def reduce_recomp_degree(self):
-        recomp_set = self.recomp_set
-        for index, value in reversed(list(enumerate(recomp_set))):
+        
+        self.manual_recomp_set = self.recomp_set
+        for index, value in reversed(list(enumerate(self.manual_recomp_set))):
             if value:
-                self.recomp_set[index] = 0
-                print("Try the reduced the recomp degree.")
-                print(self.recomp_set)
-                return True
+                if index not in self.fail_indexes:
+                    self.manual_recomp_set[index] = 0
+                    print("Index {}".format(index))
+                    return index
         print("Already the best recomp config.")
-        return False
+        return -1
     
     def add_recomp_degree(self):
         recomp_set = self.recomp_set
@@ -400,9 +445,55 @@ class PipelineScheduler:
         self.finish_flag = False
         self.num_finished_microbatch = 0
         self._init_stage()
+        RESET_TIME()
+    
+    def generate_binary_combinations(self):
+        """
+        生成所有长度为 layer_num 的二进制组合0 或 1。
+        每次调用 next() 返回一个未返回过的情况。
+        """
+        # 使用 itertools.product 生成所有可能的组合
+        combinations = itertools.product([1, 0], repeat=LAYER_NUM)
+        return combinations
 
+    def recomp_set_check(self, recomp_set:list):
+        # [43.37751770019531, 43.25251770019531, 43.12751770019531, 43.00251770019531, 42.87751770019531, 42.75251770019531, 42.62751770019531, 72.66658020019531]
+        # Activation Layer=6.0625,Activation Input=0.0625,Activation Loss=4.640625
+        # Gradient Input=1.5001983642578125,Gradient Parameters=1.5001983642578125,Gradient Head=2.3203125
+        # LOSS=4.640625,VOC=152064
+        # LAYER_MEM:1.5001983642578125
+        # MODEL MEM:15.0
+        # OPT MEM:11.0
+        if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
+            if sum(recomp_set[DEVICE_NUM-1::DEVICE_NUM]) < 8:
+                return False
+            # cut branch for 1st device
+            if sum(recomp_set[0::DEVICE_NUM]) != 7 and recomp_set[0] != 1:
+                return False
+            
+            last_recomp_num = LAYER_NUM + 1
+            for did in range(DEVICE_NUM):
+                layer_num_wo_recomp = recomp_set[did::DEVICE_NUM]
+                if sum(layer_num_wo_recomp) <= 7:
+                    return False
+                if sum(layer_num_wo_recomp) > last_recomp_num:
+                    return False
+                last_recomp_num = sum(layer_num_wo_recomp)
+        return True
 
     def run_pipeline_parallelism(self, time_limit = TIME_LIMIT):
+        # good_num = 0
+        # for _ in range(2**LAYER_NUM):
+        #     new_order = next(self.recomp_set_traverser)
+        #     print(new_order)
+        #     input()
+        #     if self.recomp_set_check(new_order):
+        #         good_num += 1
+        #         if good_num % 10000000 == 0:
+        #             print(good_num)
+
+        # input("WAIT")
+                
 
         while GET_TIME() <= time_limit and not self.finish_flag:
             self.check_workload_status()
@@ -410,19 +501,93 @@ class PipelineScheduler:
             UPDATE_TIME()
         if self.finish_flag:
             print("Success")
+            # print(self.results)
+            self.record_recomp_set()
+            # print(self.results)
+            # input()
+            if not self.show_mem_usage():
+                print("Fail due to OOM")
+            else:
+                self.temp_results = copy.deepcopy(self.results)
         else:
             print("Fail")
-    def show_mem_usage(self, device_id=(0,), show_all=False):
+
+        self.record_recomp_set()
+        self.result2file()
+        self.run_schedule = True
+        fail_times = 0
+        while fail_times < 2:
+            idx = self.reduce_recomp_degree()
+            self.reset_run_para()
+            print("Read schedule generated before...")
+            self.file2result()
+            self.result2schedule()
+            self.set_schedule()
+
+            print(self.recomp_set)
+            
+            while GET_TIME() <= time_limit and not self.finish_flag:
+                self.check_workload_status()
+                self.execute_workload()
+                UPDATE_TIME()
+            if self.finish_flag:
+                self.record_recomp_set()
+                if not self.show_mem_usage():
+                    print("Fail OOM")
+                    fail_times += 1
+                    self.fail_indexes.add(idx)
+                    self.recomp_set[idx] = 1
+                else:
+                    print("Success")
+                    self.temp_results = copy.deepcopy(self.results)
+                    print("Reset fail times to 0.")
+                    fail_times = 0
+            else:
+                print("Fail")
+                self.results = self.temp_results
+                break
+        
+        self.reset_run_para()
+        self.results = self.temp_results
+        self.result2schedule()
+        self.set_schedule()
+        while GET_TIME() <= time_limit and not self.finish_flag:
+            self.check_workload_status()
+            self.execute_workload()
+            UPDATE_TIME()
+        if self.finish_flag:
+            print("Success")
+        else:
+            print("Wrong answer!")
+
+
+    def show_mem_usage(self, device_id=(0,1, DEVICE_NUM-1), show_all=False):
         max_mem_usage = -1
         for device in self.devices:
-            if device.device_id in device_id:
-                print("Device {} mem usage:".format(device.device_id))
-                last_mem_record = 0
+            aim_file_path = "schedule_results/did{}_mem_usage.txt".format(device.device_id)
+            if os.path.exists(aim_file_path):  # 判断文件是否存在
+                with open(aim_file_path, "w") as file:  # 以写入模式打开文件（会清空文件内容）
+                    file.truncate(0)  # 清空文件内容
+                print(f"文件 {aim_file_path} 已存在，内容已清除。")
+            else:
+                print(f"文件 {aim_file_path} 不存在，无需清除。")
+            print_to_file(aim_file_path, "Device {} mem usage:\n".format(device.device_id))
+            last_mem_record = 0
+            for t, mem_record in device.mem_usage_record.items():
+                print_to_file(aim_file_path, "Time {}, mem = {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2)))
+                last_mem_record = mem_record
+                max_mem_usage = max(max_mem_usage, mem_record)
+        
+        if show_all:
+            max_mem_usages = [0 for _ in range(len(self.devices))]
+            for did, device in enumerate(self.devices):
                 for t, mem_record in device.mem_usage_record.items():
-                    print("Time {}, mem = {}, {}.".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2)))
-                    last_mem_record = mem_record
-                    max_mem_usage = max(max_mem_usage, mem_record)
-        if max_mem_usage > GPU_MAX_MEM and LAYERWISE:
+                    max_mem_usages[did] = max(max_mem_usages[did], mem_record)
+            print(max_mem_usages)
+
+        if max_mem_usage > GPU_MAX_MEM:
+            print("OOM!!!!")
+            return False
             raise ValueError("Error: Out of Memory.")
         
         if show_all:
@@ -431,6 +596,7 @@ class PipelineScheduler:
                 for t, mem_record in device.mem_usage_record.items():
                     max_mem_usage[did] = max(max_mem_usage[did], mem_record)
             print(max_mem_usage)
+        return True
     
     def get_workloadload_duration(self):
         fwd_time = [F_TIME for _ in range(LAYER_NUM+3)]

@@ -12,7 +12,7 @@ if RUN_MODE == RunMode.GUROBI_SOLVE:
 # SCHEDULE_METHOD = Schedule.Layerwise
 # SCHEDULE_METHOD = Schedule.GREEDY_v1
 if RUN_MODE == RunMode.SIM_SOLVE:
-    if SCHEDULE_METHOD in (Schedule.STANDARD_1F1B, Schedule.ONE_F_ONE_B):
+    if SCHEDULE_METHOD in (Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB, Schedule.ONE_F_ONE_B):
         SPLIT_BACKPROP = False
         CHUNK_NUM = 1
         B_TIME += W_TIME

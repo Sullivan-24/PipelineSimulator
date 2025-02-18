@@ -48,7 +48,7 @@ class ChimeraPipelineScheduler:
 
     def set_microbatch_schedule_range(self, microbatch_schedule_range):
         for device in self.devices:
-            device.microbatch_schedule_range = microbatch_schedule_range
+            device.mid_traverse_order = microbatch_schedule_range
 
     def set_layer_recomp(self, settings:list):
         for idx, r in enumerate(settings):
@@ -144,7 +144,7 @@ class ChimeraPipelineScheduler:
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
             
             for workload_type in now_workload_priority_order:
-                for mid in device.microbatch_schedule_range:
+                for mid in device.mid_traverse_order:
                     for sid in device.stages:
                         required_memory = get_required_memory(
                             stage_id=sid, 

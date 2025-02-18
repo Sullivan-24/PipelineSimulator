@@ -79,7 +79,7 @@ class Device:
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
         self.proc_workload: Workload = None
-        self.optimizer_mem_usage: int = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)
+        self.optimizer_mem_usage: int = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) / 8
         self.current_mem_usage: int = self.optimizer_mem_usage
         self.nmb: int = nmb
         self.max_activation_counts: int = max_activation_counts
@@ -89,7 +89,7 @@ class Device:
         self.workload_type_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
         self.last_workload_type = None
         self.total_layers = 0
-        self.microbatch_schedule_range = range(0,self.nmb)
+        self.mid_traverse_order:list[int] = list(range(0,self.nmb))
         self.warmup_num_f = 0
         self.warmup_num_b = 0
         self.warmup_num_w = 0
@@ -97,14 +97,10 @@ class Device:
         self.exe_num_b = 0
         self.exe_num_w = 0
         self.order_balance = True
-        # To avoid simulator failure, memory need to be preserved.
-        # Record each mid, if mid already started, ensure the memory is 
-        # sufficient to complete the remaining workload.
-        # Example:
-        # mid = 0 begin, preserved_memory = max(F + B + W, F, B, W)
-        # mid = 0 F finish, preserved_memory = max(B + W, B, W)
-        # mid = 0 B finish, preserved_memory = W
-        # mid = 0 W finish, switch to monitor mid = 1
+
+        self.executable_workloads:list[Workload] = self.get_executable_workload()
+
+        self.workload_type_traverse_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
         self.next_mid = 0
         self.released_workloads = []
 
@@ -119,6 +115,42 @@ class Device:
                 if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
                     return True
         return False
+
+    def get_executable_workload(self)->list[Workload]:
+        executable_workoads = []
+        for workload_type in [WorkloadType.B,WorkloadType.F,WorkloadType.W]:
+            for mid in range(self.nmb):
+                for stage_id in self.stages:
+                    workloads = self.stages[stage_id].workloads
+                    if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
+                        executable_workoads.append(workloads[mid][workload_type])
+        return executable_workoads
+    
+    def reorder_executable_workload_with_workload_type(self):
+        pass
+
+    def overlap_aware_executable_workload_reorder(self, workload:Workload):
+        if workload:
+            if workload.workload_type ==  WorkloadType.F:
+                next_stage_id = workload.stage_id + 1
+            elif workload.workload_type == WorkloadType.B:
+                next_stage_id = workload.stage_id - 1
+            else:
+                return
+            
+            if next_stage_id in self.stages.keys():
+                head = []
+                tail = []
+                for wl in self.executable_workloads:
+                    if wl.microbatch_id == workload.microbatch_id and wl.workload_type == workload.workload_type and wl.stage_id == next_stage_id:
+                        tail.append(wl)
+                    else:
+                        head.append(wl)
+                self.executable_workloads = head + tail
+                # if head+tail != self.executable_workloads:
+                #     print(head+tail)
+                #     print(self.executable_workloads)
+                #     input()
 
     def show_stages(self, detail_info=False):
         for sid in self.stages:
@@ -166,43 +198,92 @@ class Device:
         for sid in self.stages:
             self.stages[sid].update_constraints(constraint=constraint)
     
+    def update_mid_traverse_order(self,mid=None):
+        if type(self.mid_traverse_order) is not list:
+            self.mid_traverse_order = list(self.mid_traverse_order)
+        self.mid_traverse_order.sort()
+        if mid:
+            self.mid_traverse_order.remove(mid)
+            self.mid_traverse_order.append(mid)
+
     def execute_workload(self, run_schedule=False) -> None:
         if self.state == Device.IDLE:
-            # if SCHEDULE_METHOD == Schedule.Layerwise:
-            if LAYERWISE or SCHEDULE_METHOD in (Schedule.ONE_F_ONE_B, Schedule.ZBH1, Schedule.INTERLEAVED):  
+            if TEMP_TEST:
+                for workload in self.executable_workloads:
+                    workload_type = workload.workload_type
+                    sid = workload.stage_id
+                    mid = workload.microbatch_id
+                    did = workload.device_id
+
+                    required_memory = get_required_memory(
+                        stage_id=sid, 
+                        layer_num=1,
+                        workload_type=workload_type,
+                        workload_type_num=3 if SPLIT_BACKPROP else 2, 
+                        layer_wise=True,
+                        recomp=self.stages[sid].recomp,
+                    )
+
+                    workload_type = self._reset_workload_type(
+                        workload_type=workload_type,
+                        required_memory=required_memory,
+                        current_mem_usage=self.current_mem_usage,
+                        max_memory=GPU_MAX_MEM,
+                    )
+
+                    proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                    if proc_workload:
+                        self.last_workload_type = workload_type
+                        if workload_type == WorkloadType.F:
+                            if self.stages[sid].stage_type == StageType.LAYER:
+                                self.exe_num_f += 1
+                        elif workload_type == WorkloadType.B:
+                            if self.stages[sid].stage_type == StageType.LAYER:
+                                self.exe_num_b += 1
+                        elif workload_type == WorkloadType.W:
+                            if self.stages[sid].stage_type == StageType.LAYER:
+                                self.exe_num_w += 1
+                        else:
+                            raise Exception("Error workload type.")
+                        self.proc_workload = proc_workload
+                        self.update_memory_usage()
+                        self.state = Device.BUSY
+                        self.order_balance = not self.order_balance
+                        return proc_workload
+            elif LAYERWISE or SCHEDULE_METHOD in (Schedule.ONE_F_ONE_B, Schedule.ZBH1, Schedule.INTERLEAVED):  
                 # Method 1 6661   
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 if self.last_workload_type == WorkloadType.B:
                     now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
                 elif self.last_workload_type == WorkloadType.F:
                     now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
+                
+                mb_range = self.mid_traverse_order
+
+                # if self.exe_num_b < self.exe_num_f:
+                #     now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
+                # else:
+                #     now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
+
+
+                # # Method 2 6841
+                # if self.last_workload_type == WorkloadType.B:
+                #     now_workload_priority_order = [WorkloadType.F, WorkloadType.W, WorkloadType.B]
+                # elif self.last_workload_type == WorkloadType.F:
+                #     now_workload_priority_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F]
                 # elif self.last_workload_type == WorkloadType.W:
                 #     now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
-                if self.exe_num_b < self.exe_num_f:
-                    now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-                else:
-                    now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
 
+                # # 6661
+                # if self.exe_num_b < self.exe_num_f:
+                #     now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
+                # else:
+                #     now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
 
-                # Method 2 6841
-                if self.last_workload_type == WorkloadType.B:
-                    now_workload_priority_order = [WorkloadType.F, WorkloadType.W, WorkloadType.B]
-                elif self.last_workload_type == WorkloadType.F:
-                    now_workload_priority_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F]
-                elif self.last_workload_type == WorkloadType.W:
-                    now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
-
-                # 6661
-                if self.exe_num_b < self.exe_num_f:
-                    now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-                else:
-                    now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
-
-                mb_range = self.microbatch_schedule_range
-                if self.order_balance:
-                    mb_range = self.microbatch_schedule_range
-                else:
-                    mb_range = list(reversed(self.microbatch_schedule_range))
+                # if self.order_balance:
+                #     mb_range = self.mid_traverse_order
+                # else:
+                #     mb_range = list(reversed(self.mid_traverse_order))
 
                 if self.exe_num_f > MICRO_BATCH_NUM*2.5:
                     for workload_type in now_workload_priority_order:
@@ -285,8 +366,7 @@ class Device:
                                 if self.exe_num_f > MICRO_BATCH_NUM*2.5:
                                     self.order_balance = not self.order_balance
                                 return proc_workload
-                            
-            elif run_schedule or SCHEDULE_METHOD in (Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED):
+            elif run_schedule or SCHEDULE_METHOD in (Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB):
                 if self.next_workload_idx == len(self.stages) * self.nmb * WORKLOAD_TYPE_NUM:
                     return None
                 if self.next_workload_idx == len(self.static_schedule):
@@ -299,6 +379,55 @@ class Device:
                     self.state = Device.BUSY
                     self.next_workload_idx += 1
                     return proc_workload
+            elif SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
+                if self.last_workload_type == WorkloadType.F:
+                    workload_type = WorkloadType.B
+                else:
+                    workload_type = WorkloadType.F
+
+                if self.warmup_num_f < 1 + DEVICE_NUM * (CHUNK_NUM  - 1) + (DEVICE_NUM - 1 - self.device_id) * 2: # 1672 2112
+                # if self.warmup_num_f < 1 + DEVICE_NUM * (CHUNK_NUM  - 1) + (DEVICE_NUM - 1 - self.device_id): # 1672 2208 
+                    workload_type = WorkloadType.F
+
+                if self.warmup_num_f == CHUNK_NUM * MICRO_BATCH_NUM:
+                    workload_type = WorkloadType.B
+
+                for mid in range(MICRO_BATCH_NUM):
+                    for sid in self.stages:
+                        proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                        if proc_workload:
+                            if workload_type == WorkloadType.F:
+                                self.warmup_num_f += 1
+                            elif workload_type == WorkloadType.B:
+                                self.warmup_num_b += 1
+                            self.last_workload_type = workload_type
+                            self.proc_workload = proc_workload
+                            self.update_memory_usage()
+                            self.state = Device.BUSY
+                            return proc_workload
+                        
+                if self.warmup_num_b > 0:
+                    if self.last_workload_type == WorkloadType.F:
+                        workload_type_order = [WorkloadType.B, WorkloadType.F]
+                    else:
+                        workload_type_order = [WorkloadType.F, WorkloadType.B]
+                    for workload_type in workload_type_order:
+                        for mid in range(MICRO_BATCH_NUM):
+                            for sid in self.stages:
+                                proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                                if proc_workload:
+                                    if workload_type == WorkloadType.F:
+                                        self.warmup_num_f += 1
+                                    elif workload_type == WorkloadType.B:
+                                        self.warmup_num_b += 1
+                                    elif workload_type == WorkloadType.W:
+                                        self.warmup_num_w += 1
+                                    self.last_workload_type = workload_type
+                                    self.proc_workload = proc_workload
+                                    self.update_memory_usage()
+                                    self.state = Device.BUSY
+                                    return proc_workload         
+            
             elif SCHEDULE_METHOD == Schedule.GREEDY_v1:
                 for workload_type in self.workload_type_priority_order:
                     if self.current_mem_usage == self.max_activation_counts and workload_type == WorkloadType.F:
@@ -347,7 +476,7 @@ class Device:
                     workload_type = WorkloadType.B
                 if self.warmup_num_b == MICRO_BATCH_NUM:
                     workload_type = WorkloadType.W
-                for mid in self.microbatch_schedule_range:
+                for mid in range(MICRO_BATCH_NUM):
                     for sid in self.stages:
                         required_memory = get_required_memory(
                             stage_id=sid, 
@@ -384,7 +513,7 @@ class Device:
                 
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 for workload_type in now_workload_priority_order:
-                    for mid in self.microbatch_schedule_range:
+                    for mid in range(MICRO_BATCH_NUM):
                         for sid in self.stages:
                             required_memory = get_required_memory(
                                 stage_id=sid, 
@@ -433,7 +562,7 @@ class Device:
                 if self.warmup_num_b == MICRO_BATCH_NUM * 2:
                     workload_type = WorkloadType.W
 
-                for mid in self.microbatch_schedule_range:
+                for mid in range(MICRO_BATCH_NUM):
                     for sid in self.stages:
                         required_memory = get_required_memory(
                             stage_id=sid, 
@@ -470,7 +599,7 @@ class Device:
                 
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 for workload_type in now_workload_priority_order:
-                    for mid in self.microbatch_schedule_range:
+                    for mid in range(MICRO_BATCH_NUM):
                         for sid in self.stages:
                             required_memory = get_required_memory(
                                 stage_id=sid, 
@@ -509,7 +638,7 @@ class Device:
                     now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
                 
                 for workload_type in now_workload_priority_order:
-                    for mid in self.microbatch_schedule_range:
+                    for mid in self.mid_traverse_order:
                         for sid in self.stages:
                             required_memory = get_required_memory(
                                 stage_id=sid, 
@@ -542,6 +671,8 @@ class Device:
         #TODO 不同个Wave情况下，处于Wave不同边上的memory预留的值应该不同
         if current_mem_usage + required_memory >= max_memory - Gradient.INPUT - Gradient.PARAMETER:
             workload_type = WorkloadType.B
+            if not SPLIT_BACKPROP:
+                return workload_type
         if current_mem_usage + required_memory >= max_memory - Gradient.PARAMETER:
             workload_type = WorkloadType.W
         return workload_type
