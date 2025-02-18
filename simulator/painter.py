@@ -79,7 +79,7 @@ class SchedulingPainter:
                 self._pp_size // self._device_size,
                 self._basic_forward_length[max_key_pid], 
                 self._basic_backward_b_length[max_key_pid], 
-                self._basic_backward_w_length[max_key_pid], 
+                self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
                 # int(sum(self._comm_length) / len(self._comm_length))
                 COMM_TIME
             ),

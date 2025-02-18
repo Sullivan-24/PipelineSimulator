@@ -103,23 +103,6 @@ def main():
         simulator = ChimeraSimulator(config)
         simulator.run(draw=True)
     elif config["run_mode"] == RunMode.GUROBI_SOLVE:
-        config["forward_execution_time"] =    [F_TIME * LAYER_NUM // DEVICE_NUM // CHUNK_NUM for _ in range(STAGE_NUM)] 
-        config["backward_execution_i_time"] = [B_TIME * LAYER_NUM // DEVICE_NUM // CHUNK_NUM for _ in range(STAGE_NUM)] 
-        config["backward_execution_g_time"] = [W_TIME * LAYER_NUM // DEVICE_NUM // CHUNK_NUM for _ in range(STAGE_NUM)]
-        
-        fwd_time = config["forward_execution_time"]
-        fwd_time[0] += EMBEDDING_TIME
-        fwd_time[-1] += CE_F_TIME + HEAD_F_TIME
-        config["forward_execution_time"] = fwd_time
-
-        iwd_time = config["backward_execution_i_time"]
-        iwd_time[-1] += CE_B_TIME + HEAD_B_TIME
-        config["backward_execution_i_time"] = iwd_time
-
-        gwd_time = config["backward_execution_g_time"]
-        gwd_time[-1] += CE_W_TIME + HEAD_W_TIME
-        config["backward_execution_g_time"] = gwd_time
-
         simulator = GSimulator(config)
         simulator.run(draw=True)
         simulator.show_solution_detail()
@@ -143,8 +126,9 @@ def main():
         simulator.run_pipeline_parallelism()
         # simulator.show_detail_info()
         simulator.show_mem_usage(show_all=True)
-        print("Time:{}.".format(simulator.last_workload.end_time))
         simulator.draw()
+        print("Time:{}.".format(simulator.last_workload.end_time))
+
     else:
         print("Unknown run mode.")
 

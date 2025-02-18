@@ -4,6 +4,14 @@ from .painter import SchedulingPainter
 from .abstract.mutils import *
 from .utils import resort_microbatch_index, print_to_file
 from .abstract import Pipeline
+from .abstract.Device import get_required_memory
+
+workload_type_mapping = {
+    'f':WorkloadType.F,
+    'b':WorkloadType.B,
+    'w':WorkloadType.W,
+}
+
 class GSimulator:
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
@@ -16,7 +24,11 @@ class GSimulator:
         self._model_layer_num = config["model_size"]
         self._num_microbatches = config["num_microbatches"]
         self._max_activation_counts = config["max_activation_counts"]
-        
+        self._num_device = config["device_size"]
+
+        self.estimated_time_cost = self.estimate_time_cost()
+        self.M = self.set_M_value(self.estimated_time_cost)
+
         self._mix_training = config["mix_training"]
         self._model_para_num = config["model_para_num"]
         self._device_mem = config["device_mem"]
@@ -25,7 +37,6 @@ class GSimulator:
         self._profiled_layer_b_length = config["backward_execution_i_time"]
         self._profiled_layer_w_length = config["backward_execution_g_time"]
         self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
-        
         # 检查输入参数
         assert isinstance(self._profiled_layer_f_length, (list, tuple))
         assert isinstance(self._profiled_layer_b_length, (list, tuple))
@@ -42,8 +53,7 @@ class GSimulator:
         self._stage_b_length = []
         self._stage_w_length = []
 
-        self._layer_recomp_rate = []
-        self._layers = []
+        self._stage_recomp_rate = []
 
         self._stage_f_offsets = [[] for _ in range(self._pp_size)]
         self._stage_b_offsets = [[] for _ in range(self._pp_size)]
@@ -59,8 +69,28 @@ class GSimulator:
         if self._base_solution:
             self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
             self.pipeline_scheduler.run_pipeline_parallelism()
+            print(self.pipeline_scheduler.results)
+            input()
             # self.pipeline_scheduler.draw()
         self.model_result = None
+
+    def estimate_time_cost(self):
+        fbw_time = (MICRO_BATCH_NUM + DEVICE_NUM) * (F_TIME + B_TIME + W_TIME)
+        emb_time = EMBEDDING_TIME
+        head_time = MICRO_BATCH_NUM * (HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME)
+        ce_time = MICRO_BATCH_NUM * (CE_F_TIME + CE_B_TIME + CE_W_TIME)
+        comm_time = COMM_TIME
+        res = fbw_time + emb_time + head_time + ce_time + comm_time
+        assert res > 0, "Time cost should be greater than 0"
+        print_to_file(self._file_path, "Estimated time cost {}.\n".format(res))
+        return res
+
+    def set_M_value(self, estimated_cost):
+        import math
+        n = math.floor(math.log10(estimated_cost)) + 2  # 计算位数
+        print_to_file(self._file_path, "Set M to {}.\n".format(10 ** (n + 1)))
+        return 10 ** (n + 1)  # 返回 10 的 (n + 1) 次方
+
 
     def show_device_stage_mapping(self):
         for did, ds in enumerate(self._devices):
@@ -99,49 +129,199 @@ class GSimulator:
         return new_comm_length
 
     def _build_constraints(self) -> None:
-        for i in range(self._pp_size):
+        for sid in range(self._pp_size):
 
-            layer_var = self.model.addVar(vtype=GRB.INTEGER, name=f"l_{i}", lb=1, ub=self._model_layer_num)
-            self._layers.append(layer_var)
-
-            recompute_var = self.model.addVar(vtype=GRB.BINARY, name=f"theta_{i}")
-            self._layer_recomp_rate.append(recompute_var)
-
-            for mb in range(self._num_microbatches):
+            self._stage_recomp_rate.append(self.model.addVar(vtype=GRB.BINARY, name=f"theta_{sid}"))
+            for mid in range(self._num_microbatches):
                 
-                f_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mb}_{i}", lb=0)
-                self._stage_f_offsets[i].append(f_offset)
-
-                b_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mb}_{i}", lb=0)
-                self._stage_b_offsets[i].append(b_offset)
-
+                self._stage_f_offsets[sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid}_{sid}", lb=0))
+                self._stage_b_offsets[sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid}_{sid}", lb=0))
                 if SPLIT_BACKPROP:
-                    w_offset = self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mb}_{i}", lb=0)
-                    self._stage_w_offsets[i].append(w_offset)
-            # Set length per stage
-            # self._stage_f_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_f"))
-            # self.model.addConstr(self._stage_f_length[i] == self._layers[i] * self._profiled_layer_f_length[i])
-            # self._stage_b_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_b"))
-            # self.model.addConstr(self._stage_b_length[i] == self._layers[i] * (self._profiled_layer_b_length[i] + self._layer_recomp_rate[i] * self._stage_f_length[i]))
-            # self._stage_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_w"))
-            # self.model.addConstr(self._stage_w_length[i] == self._layers[i] * self._profiled_layer_w_length[i])
-            self._stage_f_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_f"))
-            self.model.addConstr(self._stage_f_length[i] == self._profiled_layer_f_length[i])
-            self._stage_b_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_b"))
-            self.model.addConstr(self._stage_b_length[i] == (self._profiled_layer_b_length[i] + self._layer_recomp_rate[i] * self._stage_f_length[i]))
-            self._stage_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{i}_w"))
-            self.model.addConstr(self._stage_w_length[i] == self._profiled_layer_w_length[i])
+                    self._stage_w_offsets[sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid}_{sid}", lb=0))
+            
+            # self._stage_f_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{sid}_f"))
+            self._stage_b_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{sid}_b"))
+            if SPLIT_BACKPROP:
+                self._stage_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{sid}_w"))
 
-        self._get_device_stage_microbatch_alignment()
+            self._stage_f_length.append(self._profiled_layer_f_length[sid])
+            self.model.addConstr(self._stage_b_length[sid] == self._profiled_layer_b_length[sid] + self._stage_recomp_rate[sid] * self._stage_f_length[sid], name=f"length_of_b_{sid}")
+            if SPLIT_BACKPROP:
+                self.model.addConstr(self._stage_w_length[sid] == self._profiled_layer_w_length[sid])
 
-        # 添加约束
-        # self.model.addConstr(quicksum(self._layers) == self._model_layer_num)
         self._comm_length = self._reset_comm_length(self._devices)
-
         self._real_pipeline_modeling_constraint_strict()
         self._serial_computation_within_device_constraint()
+        self._add_memory_constraints()
         # self._pipeline_activation_accumulation_constraint()
 
+    def freeze_schedule_by_mid(self, mid):
+        if BASE_SOLUTION:
+            self.model.update()
+            for var in self.model.getVars():
+                if not var.VarName.startswith(("f_","b_","w_")):
+                    continue
+                _mid = int(var.VarName.split("_")[1])
+                if _mid == mid:
+                    self.model.addConstr(var == self.pipeline_scheduler.results[var.VarName])
+
+    def _add_memory_constraints(self):
+        return
+        """
+            self._orders = {
+                device_id:{
+                    lid:{
+                        mid:{
+                            lid1:{
+                                f:[],
+                                b:[],
+                                w:[],
+                            },
+                            lid2:{
+                                f:[],
+                                b:[],
+                                w:[],
+                            },
+                            ...
+                        },
+                        ...
+                    }
+                    ...
+                }
+                ...
+            }
+        """
+        self._orders = {}
+        for did in range(self._num_device):
+            self._orders[did] = {}
+            for lid in self._devices[did]:
+                self._orders[did][lid] = {}
+                for mid in range(self._num_microbatches):
+                    self._orders[did][lid][mid] = {}
+                    for o_lid in self._devices[did]:
+                        self._orders[did][lid][mid][o_lid] = {
+                            'f': [self.model.addVar(name=f'act_f_{did}_{lid}_{mid}_{o_lid}_{time.time()}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)],
+                            'b': [self.model.addVar(name=f'act_b_{did}_{lid}_{mid}_{o_lid}_{time.time()}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)],
+                        }
+                        if SPLIT_BACKPROP:
+                            self._orders[did][lid][mid][o_lid]['w'] = [self.model.addVar(name=f'act_w_{did}_{lid}_{mid}_{o_lid}_{time.time()}', vtype=GRB.BINARY) for mid in range(self._num_microbatches)]
+
+        for did in range(self._num_device):
+            for lid in self._devices[did]:
+                for mid in range(self._num_microbatches):
+                    if SPLIT_BACKPROP:
+                        pivot = self._stage_w_offsets[lid][mid]
+                    else:
+                        pivot = self._stage_b_offsets[lid][mid]
+                        
+                    for o_lid in self._devices[did]:
+                        for o_mid in range(self._num_microbatches):
+                            if o_lid == lid and o_mid == mid: # necessary, or leads to solution finding failure
+                                continue 
+                            binary_f = self.model.addVar(vtype=GRB.BINARY, name=f'mem_binary_f_{lid}_{mid}_{o_lid}_{o_mid}')
+                            binary_b = self.model.addVar(vtype=GRB.BINARY, name=f'mem_binary_b_{lid}_{mid}_{o_lid}_{o_mid}')
+                            binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'mem_binary_w_{lid}_{mid}_{o_lid}_{o_mid}')
+                            eps = 0.1
+                            # M = 10000
+                            M = self.M
+                            self.model.addConstr(pivot >= self._stage_f_offsets[o_lid][o_mid] + eps - M * (1 - binary_f) )
+                            self.model.addConstr(pivot <= self._stage_f_offsets[o_lid][o_mid] + M * binary_f)
+
+                            self.model.addConstr(pivot >= self._stage_b_offsets[o_lid][o_mid] + eps - M * (1 - binary_b) )
+                            self.model.addConstr(pivot <= self._stage_b_offsets[o_lid][o_mid] + M * binary_b)
+
+                            if SPLIT_BACKPROP:
+                                self.model.addConstr(pivot >= self._stage_w_offsets[o_lid][o_mid] + eps - M * (1 - binary_w) )
+                                self.model.addConstr(pivot <= self._stage_w_offsets[o_lid][o_mid] + M * binary_w)
+
+                            self.model.addConstr((binary_f == 1) >> (self._orders[did][lid][mid][o_lid]['f'][o_mid] == 1))
+                            self.model.addConstr((binary_f == 0) >> (self._orders[did][lid][mid][o_lid]['f'][o_mid] == 0))
+                            
+                            self.model.addConstr((binary_b == 1) >> (self._orders[did][lid][mid][o_lid]['b'][o_mid] == 1))
+                            self.model.addConstr((binary_b == 0) >> (self._orders[did][lid][mid][o_lid]['b'][o_mid] == 0))
+
+                            if SPLIT_BACKPROP:                                
+                                self.model.addConstr((binary_w == 1) >> (self._orders[did][lid][mid][o_lid]['w'][o_mid] == 1))
+                                self.model.addConstr((binary_w == 0) >> (self._orders[did][lid][mid][o_lid]['w'][o_mid] == 0))
+                    
+                    required_memory = get_required_memory(
+                        stage_id=lid,
+                        layer_num=LAYER_NUM//DEVICE_NUM//CHUNK_NUM,
+                        workload_type=workload_type_mapping['w' if SPLIT_BACKPROP else 'b'],
+                        workload_type_num=WORKLOAD_TYPE_NUM,
+                        layer_wise=False,
+                        recomp=self._stage_recomp_rate[lid],
+                    )
+                    contain_head = LAYER_NUM + 1 in self._devices[did]
+                    layer_per_stage = LAYER_NUM//DEVICE_NUM//CHUNK_NUM
+                    base_memory = (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + LAYER_MEMORY * layer_per_stage + contain_head * HEAD_MEMORY
+                    accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid) * layer_per_stage
+                    accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid) * layer_per_stage
+                    released_memory = self._get_released_memory(did=did, lid=lid, mid=mid) * layer_per_stage
+                    # mw = self.model.addVar(name=f"mem_w_{lid}_{mid}",vtype=GRB.CONTINUOUS)
+
+                    # self.model.addConstr(
+                    #     (accumulated_activations
+                    #     + accumulated_input_gradients
+                    #     - released_memory
+                    #     + base_memory
+                    #     + required_memory) == mw
+                    # )   
+                    # self.model.addConstr(
+                    #     mw <= GPU_MAX_MEM
+                    # )
+
+                    self.model.addConstr(
+                        (accumulated_activations
+                        + accumulated_input_gradients
+                        - released_memory
+                        + base_memory
+                        + required_memory) <= GPU_MAX_MEM,name=f"mem_w_{lid}_{mid}"
+                    )
+
+    def _get_accumulated_activations(self, did, lid, mid):
+        accumulated_activations = 0
+        orders = self._orders[did][lid][mid]
+        for o_lid in self._devices[did]:
+            if o_lid == 0:
+                continue                
+            for o_mid in range(self._num_microbatches):
+                if o_lid == lid and o_mid == mid: # necessary
+                    continue
+                if o_lid == STAGE_NUM - 1:
+                    accumulated_activations += orders[o_lid]['f'][o_mid] * Activation.LOSS
+                else:
+                    accumulated_activations += orders[o_lid]['f'][o_mid] * (Activation.FULL * (1 - self._stage_recomp_rate[o_lid]) + Activation.INPUT * self._stage_recomp_rate[o_lid])
+        return accumulated_activations
+
+    def _get_accumulated_input_gradients(self, did, lid, mid):
+        accumulated_input_gradients = 0
+        orders = self._orders[did][lid][mid]
+        for o_lid in self._devices[did]:
+            if o_lid == 0:
+                continue 
+            for o_mid in range(self._num_microbatches):
+                if o_lid == lid and o_mid == mid: # necessary
+                    continue
+                if o_lid == STAGE_NUM - 1:
+                    accumulated_input_gradients -= orders[o_lid]['b'][o_mid] * Activation.LOSS
+                else:
+                    accumulated_input_gradients += orders[o_lid]['b'][o_mid] * (Gradient.INPUT + (Activation.FULL - Activation.INPUT) * self._stage_recomp_rate[o_lid])
+        return accumulated_input_gradients
+    
+    def _get_released_memory(self, did, lid, mid):
+        released_memory = 0
+        if SPLIT_BACKPROP:
+            orders = self._orders[did][lid][mid]
+            for o_lid in self._devices[did]:
+                if o_lid == 0:
+                    continue 
+                for o_mid in range(self._num_microbatches):
+                    if o_lid == lid and o_mid == mid: # necessary
+                        continue
+                    released_memory += orders[o_lid]['w'][o_mid] * (Gradient.INPUT + Activation.FULL)
+        return released_memory
+    
     def _real_pipeline_modeling_constraint_strict(self):
         for mb in range(self._num_microbatches):
             for i in range(1, self._pp_size):
@@ -177,18 +357,18 @@ class GSimulator:
         print_to_file(self._file_path, "Stage alignment:{}.\n".format(self._devices))
         total_constraints = 0
         same_mb_redundant_constraints = 0
-        for did in range(self._device_size):
+        for did in range(self._num_device):
             # 加入对w的判断，同时修改_length的判断
-            stages_within_device = self._devices[did]
+            layers_within_device = self._devices[did]
             _pp_vars = []
-            for pp in stages_within_device:
+            for pp in layers_within_device:
                 _pp_vars += self._stage_f_offsets[pp] + self._stage_b_offsets[pp]
                 if SPLIT_BACKPROP:
                     _pp_vars += self._stage_w_offsets[pp]
             type_of_workload = 3 if SPLIT_BACKPROP else 2
             group_size = self._num_microbatches * type_of_workload
             for i, _ in enumerate(_pp_vars):
-                i_pp = stages_within_device[i // group_size]
+                i_pp = layers_within_device[i // group_size]
                 _i_length = (
                     self._stage_f_length[i_pp]
                     if (i % group_size) // self._num_microbatches == 0 
@@ -204,7 +384,7 @@ class GSimulator:
                         if j % self._num_microbatches == i % self._num_microbatches:
                             same_mb_redundant_constraints += 1
                             continue
-                    j_pp = stages_within_device[j // group_size]
+                    j_pp = layers_within_device[j // group_size]
                     _j_length = (
                         self._stage_f_length[j_pp]
                         if (j % group_size) // self._num_microbatches == 0
@@ -214,84 +394,14 @@ class GSimulator:
                             else self._stage_w_length[j_pp]
                         )
                     )
-                    # z3-solver way
-                    # self._solver.add(
-                    #     z3.Or(
-                    #         _pp_vars[j] >= _pp_vars[i] + _i_length,
-                    #         _pp_vars[j] + _j_length <= _pp_vars[i],
-                    #     )
-                    # )
-                    # gurobi way, too slow
-                    # self.model.addConstr(
-                    #     (_pp_vars[j] + _j_length - _pp_vars[i]) * (_pp_vars[j] - _pp_vars[i] - _i_length) >= 0
-                    # )
                     y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{did}_{i}_{j}")
                     # when time increses, M also increases to ensure right answer
-                    M = 1e5
-                    self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M) 
-                    self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M)
+                    # M = 1e4
+                    M = self.M
+                    self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M, name=f"Do{did}_{i}_{j}1") 
+                    self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M, name=f"Do{did}_{i}_{j}2")
                     
         print_to_file(self._file_path, "Total Constraints within Device:{}, Redundant Constraints:{}.\n".format(total_constraints, same_mb_redundant_constraints))
-
-    def _get_device_stage_microbatch_alignment(self):
-        _de_vars = {}
-        for did in range(self._device_size):
-            stages_within_device = self._devices[did]
-            _pp_vars = {}
-            for sid in stages_within_device:
-                _mt_vars = {'f':[],'b':[],'w':[],'pf':[],'pb':[],'pw':[]}
-                for mid in range(self._num_microbatches):
-                    _mt_vars['f'].append(self._stage_f_offsets[sid][mid])
-                    _mt_vars['b'].append(self._stage_b_offsets[sid][mid])
-                    if SPLIT_BACKPROP:
-                        _mt_vars['w'].append(self._stage_w_offsets[sid][mid])
-                    
-                    _mt_vars['pf'].append([self.model.addVar(name=f'act_f_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
-                    # _mt_vars['pb'].append([self.model.addVar(name=f'act_b_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
-                    _mt_vars['pw'].append([self.model.addVar(name=f'act_w_{mid}_{sid}_{did}', vtype=GRB.BINARY) for mid in range(self._num_microbatches * CHUNK_NUM)])
-
-                _pp_vars[sid] = _mt_vars
-            _de_vars[did] = _pp_vars
-        self._de_st_mb = _de_vars
-
-    def _offload_reload_strategy_constraint(self):
-        pass
-
-    def _pipeline_activation_accumulation_constraint(self):
-        if MAX_ACTIVATION_COUNTS >= MICRO_BATCH_NUM * CHUNK_NUM:
-            print("ACTIVATION LIMIT FREE")
-            return
-        #对每个Device上的所有W或B Microbatch进行检查：保证当前Device上的activation积累不超过上限 MAX_ACTIVATION_COUNTS * CHUNK_NUM
-        mt = 'w' if SPLIT_BACKPROP else 'b'
-        for did in self._de_st_mb:
-            for sid in self._de_st_mb[did]:
-                for mid in range(self._num_microbatches):
-                    pivot = self._de_st_mb[did][sid][mt][mid]
-                    for o_mid in range(self._num_microbatches):
-                        for idx, o_sid in enumerate(self._de_st_mb[did]):
-                            binary_f = self.model.addVar(vtype=GRB.BINARY, name=f'binary_f_{sid}_{mid}_{o_sid}_{o_mid}')
-                            binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'binary_w_{sid}_{mid}_{o_sid}_{o_mid}')
-
-                            eps = 0.001
-                            M = 100000
-                            self.model.addConstr(pivot >= self._de_st_mb[did][o_sid]['f'][o_mid] + eps - M * (1 - binary_f) )
-                            self.model.addConstr(pivot <= self._de_st_mb[did][o_sid]['f'][o_mid] + M * binary_f)
-
-                            self.model.addConstr(pivot >= self._de_st_mb[did][o_sid][mt][o_mid] + eps - M * (1 - binary_w) )
-                            self.model.addConstr(pivot <= self._de_st_mb[did][o_sid][mt][o_mid] + M * binary_w)
-
-                            self.model.addConstr((binary_f == 1) >> (self._de_st_mb[did][sid]['pf'][mid][o_mid + idx * self._num_microbatches] == 1))
-                            self.model.addConstr((binary_f == 0) >> (self._de_st_mb[did][sid]['pf'][mid][o_mid + idx * self._num_microbatches] == 0))
-                            
-                            self.model.addConstr((binary_w == 1) >> (self._de_st_mb[did][sid]['pw'][mid][o_mid + idx * self._num_microbatches] == 1))
-                            self.model.addConstr((binary_w == 0) >> (self._de_st_mb[did][sid]['pw'][mid][o_mid + idx * self._num_microbatches] == 0))
-                    self.model.addConstr(
-                        # set recomputing rate to 0 when searching procedure is slow
-                        quicksum(self._de_st_mb[did][sid]['pf'][mid]) * (1 - 0) - quicksum(self._de_st_mb[did][sid]['pw'][mid]) 
-                        # quicksum(self._de_st_mb[did][sid]['pf'][mid]) * (1 - self._recomputing_rate[sid]) - quicksum(self._de_st_mb[did][sid]['pw'][mid]) 
-                        <= 
-                        self._max_activation_counts[did]
-                    )
 
     def _build_optimize_objectives(self) -> None:
         max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
@@ -309,6 +419,8 @@ class GSimulator:
             if var.VarName in self.pipeline_scheduler.results.keys():
                 var.Start = self.pipeline_scheduler.results[var.VarName]
 
+        self.model.write("model.lp")
+
     def run(self, draw=False) -> None:
         """run simulation"""
         self._build_constraints()        
@@ -320,10 +432,32 @@ class GSimulator:
         if self._base_solution:
             self.set_baseline_solution()
 
+        for mid in range(MICRO_BATCH_NUM):
+            self.freeze_schedule_by_mid(mid=mid)
+
         start_time = time.time()
         print_to_file(self._file_path, "Gurobi Solver Solving...\n")
         self.model.optimize()
         end_time = time.time()
+        if self.model.status == GRB.INFEASIBLE:
+            print("Model is infeasible. Computing IIS...")
+
+            # 计算不一致子集
+            self.model.computeIIS()
+
+            # 输出导致不可行的约束
+            print("The following constraints are infeasible:")
+            for c in self.model.getConstrs():
+                if c.IISConstr:
+                    print(f"{c.ConstrName}")
+                    input()
+
+            # 可选：输出变量
+            # print("The following variables are part of the IIS:")
+            # for v in self.model.getVars():
+            #     if v.IISVar:
+            #         print(f"{v.VarName}")
+
         if self.model.status == GRB.OPTIMAL:
             print_to_file(self._file_path, f"Optimal Result Cost: {end_time - start_time:.2f}.\n")
             # tranforms the result to a dictionary.
@@ -337,9 +471,12 @@ class GSimulator:
         self.model_result = results
         print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"]))
         for i in range(self._pp_size):
-            self._stage_f_length[i] = self.model_result[self._stage_f_length[i].varName]
+            # self._stage_f_length[i] = self.model_result[self._stage_f_length[i].varName]
             self._stage_b_length[i] = self.model_result[self._stage_b_length[i].varName] 
-            self._stage_w_length[i] = self.model_result[self._stage_w_length[i].varName]
+            print(self._stage_b_length[i])
+            input()
+            if SPLIT_BACKPROP:
+                self._stage_w_length[i] = self.model_result[self._stage_w_length[i].varName]
         
         if draw:
             # 4. draws the result.

@@ -29,14 +29,7 @@ class PipelineScheduler:
         self.run_schedule = run_schedule
         self.manual_recomp_set = []
         self.fail_indexes = set()
-        # self.manual_recomp_set = [1 for _ in range(LAYER_NUM)]
-        # self.manual_recomp_set[-2] = 0
-        # self.manual_recomp_set[-3] = 0
-        # self.manual_recomp_set[-4] = 0
-        # self.manual_recomp_set[-5] = 0
-        # self.manual_recomp_set[-6] = 0
-        # self.manual_recomp_set[-7] = 0
-        # self.manual_recomp_set[-8] = 0
+        self.manual_recomp_set = []
         self._init_stage()
         self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
         self.schedule = [[] for _ in range(DEVICE_NUM)]
@@ -65,13 +58,22 @@ class PipelineScheduler:
             sid = int(sid)
             mid = int(mid)
             did = self._sid2did(sid=sid)
-            self.schedule[did].append((workload_type_mapping[k], mid, sid))
+            t = self.results[key]
+            self.schedule[did].append((workload_type_mapping[k], mid, sid, t))
+        
+        # for did, schedule in enumerate(self.schedule):
+            
+        #     print(f"{did}, Schedule",self.schedule[did][:5])
+        
+        # input()
+        print("Result to schedule successfully.")
 
     def result2file(self, filepath=None):
         if filepath is None:
             filepath = 'data.txt'
         with open(filepath, 'w') as file:
             json.dump(self.results, file)
+        print("Result to file successfully.")
 
     def file2result(self, filepath=None):
         if filepath is None:
@@ -121,6 +123,7 @@ class PipelineScheduler:
             device = Device(device_id = did, 
                             max_activation_counts=MAX_ACTIVATION_COUNTS, 
                             nmb=MICRO_BATCH_NUM,
+                            memory_usage_constrain_rate=0.85 if did == 0 else 0.85
                             )
             self.devices.append(device)
         self.set_recomp()
@@ -156,8 +159,8 @@ class PipelineScheduler:
                         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
             if STAGE_PLACEMENT != Placement.RECURRENT:
                 self.devices[-1].add_stage(0)
-                self.devices[0].add_stage(LAYER_NUM+1)
-                self.devices[1].add_stage(LAYER_NUM+2)
+                self.devices[1].add_stage(LAYER_NUM+1)
+                self.devices[0].add_stage(LAYER_NUM+2)
             else:
                 self.devices[-1].add_stage(0)
                 self.devices[0].add_stage(LAYER_NUM+1)
@@ -181,7 +184,10 @@ class PipelineScheduler:
                         self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
                     else:
                         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
-        print(self.devices)
+        
+        for device in self.devices:
+            device.init_required_mem_for_each_microbatch()
+            
         for did in range(DEVICE_NUM):
             self.devices[did].show_stages()
             if len(self.dsa) < DEVICE_NUM:
@@ -193,7 +199,10 @@ class PipelineScheduler:
         else:
             self.recomp_set = [1 if RECOMP else 0 for _ in range(STAGE_NUM)]
         if self.manual_recomp_set:
+            print("Use manual recomp set")
             self.recomp_set = self.manual_recomp_set
+            return
+        print("Set recomputation")
     def set_schedule(self):
         for did in range(DEVICE_NUM):
             self.devices[did].static_schedule = self.schedule[did]
@@ -201,14 +210,21 @@ class PipelineScheduler:
     def generate_schedule(self):
         if SCHEDULE_METHOD == Schedule.STANDARD_1F1B:
             self.generate_1f1b_schedule()
+            print("Generate STANDARD_1F1B Schedule.")
+
         elif SCHEDULE_METHOD == Schedule.STANDARD_AFAB:
             self.generate_afab_schedule()
+            print("Generate STANDARD_AFAB Schedule.")
+
         elif SCHEDULE_METHOD == Schedule.STANDARD_ZBH1:
             self.generate_zbh1_schedule()
+            print("Generate STANDARD_ZBH1 Schedule.")
+
         elif SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED and not LAYERWISE:
             self.generate_interleaved_1f1b_schedule()
+            print("Generate STANDARD_INTERLEAVED Schedule.")
         else:
-            print("Generate Greedy Schedule instead.")
+            print("Using UPP Schedule.")
 
     def generate_afab_schedule(self):
         assert CHUNK_NUM == 1
@@ -286,7 +302,6 @@ class PipelineScheduler:
                 else:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                 iter+=1
-
 
     def generate_interleaved_1f1b_schedule(self):
         workload_type_num = 2
@@ -482,18 +497,7 @@ class PipelineScheduler:
         return True
 
     def run_pipeline_parallelism(self, time_limit = TIME_LIMIT):
-        # good_num = 0
-        # for _ in range(2**LAYER_NUM):
-        #     new_order = next(self.recomp_set_traverser)
-        #     print(new_order)
-        #     input()
-        #     if self.recomp_set_check(new_order):
-        #         good_num += 1
-        #         if good_num % 10000000 == 0:
-        #             print(good_num)
-
-        # input("WAIT")
-                
+        self.run_schedule = False
 
         while GET_TIME() <= time_limit and not self.finish_flag:
             self.check_workload_status()
@@ -501,64 +505,66 @@ class PipelineScheduler:
             UPDATE_TIME()
         if self.finish_flag:
             print("Success")
-            # print(self.results)
             self.record_recomp_set()
-            # print(self.results)
-            # input()
             if not self.show_mem_usage():
                 print("Fail due to OOM")
             else:
                 self.temp_results = copy.deepcopy(self.results)
         else:
             print("Fail")
+        # input("RUN OVER")
+        if AUTO_RECOMP_SEARCH:
+            # self.record_recomp_set()
+            # self.result2file()
+            self.run_schedule = True
+            fail_times = 0
+            while fail_times < DEVICE_NUM:
+                idx = self.reduce_recomp_degree()
+                if idx == -1:
+                    break
+                self.reset_run_para()
+                print("Read schedule generated before...")
+                # self.file2result()
+                # self.result2schedule()
+                self.set_schedule()
 
-        self.record_recomp_set()
-        self.result2file()
-        self.run_schedule = True
-        fail_times = 0
-        while fail_times < 2:
-            idx = self.reduce_recomp_degree()
-            self.reset_run_para()
-            print("Read schedule generated before...")
-            self.file2result()
-            self.result2schedule()
-            self.set_schedule()
-
-            print(self.recomp_set)
+                print(self.recomp_set)
+                
+                while GET_TIME() <= time_limit and not self.finish_flag:
+                    self.check_workload_status()
+                    self.execute_workload()
+                    UPDATE_TIME()
+                if self.finish_flag:
+                    self.record_recomp_set()
+                    if not self.show_mem_usage():
+                        print("Fail OOM")
+                        fail_times += 1
+                        self.fail_indexes.add(idx)
+                        self.recomp_set[idx] = 1
+                    else:
+                        print("Success")
+                        self.temp_results = copy.deepcopy(self.results)
+                        print("Reset fail times to 0.")
+                        fail_times = 0
+                else:
+                    print("Fail")
+                    self.results = self.temp_results
+                    break
             
+            self.reset_run_para()
+            self.results = self.temp_results
+            # self.result2schedule()
+            self.set_schedule()
             while GET_TIME() <= time_limit and not self.finish_flag:
                 self.check_workload_status()
                 self.execute_workload()
                 UPDATE_TIME()
             if self.finish_flag:
+                print("Success")
                 self.record_recomp_set()
-                if not self.show_mem_usage():
-                    print("Fail OOM")
-                    fail_times += 1
-                    self.fail_indexes.add(idx)
-                    self.recomp_set[idx] = 1
-                else:
-                    print("Success")
-                    self.temp_results = copy.deepcopy(self.results)
-                    print("Reset fail times to 0.")
-                    fail_times = 0
+                self.result2file()
             else:
-                print("Fail")
-                self.results = self.temp_results
-                break
-        
-        self.reset_run_para()
-        self.results = self.temp_results
-        self.result2schedule()
-        self.set_schedule()
-        while GET_TIME() <= time_limit and not self.finish_flag:
-            self.check_workload_status()
-            self.execute_workload()
-            UPDATE_TIME()
-        if self.finish_flag:
-            print("Success")
-        else:
-            print("Wrong answer!")
+                print("Wrong answer!")
 
 
     def show_mem_usage(self, device_id=(0,1, DEVICE_NUM-1), show_all=False):

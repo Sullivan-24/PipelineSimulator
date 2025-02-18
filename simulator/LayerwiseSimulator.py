@@ -442,6 +442,16 @@ class LayerwiseSimulator:
         # DEBUG
         self.model.write("model.lp")
 
+    def freeze_schedule_by_mid(self, mid):
+        if BASE_SOLUTION:
+            self.model.update()
+            for var in self.model.getVars():
+                if not var.VarName.startswith(("f","b","w")):
+                    continue
+                _mid = int(var.VarName.split("_")[1])
+                if _mid == mid:
+                    self.model.addConstr(var == self.pipeline_scheduler.results[var.VarName])
+
     def run(self, draw=False) -> None:
         """run simulation"""
         self._build_constraints()        
@@ -452,6 +462,9 @@ class LayerwiseSimulator:
 
         if self._base_solution:
             self.set_baseline_solution()
+
+        for mid in range(MICRO_BATCH_NUM - 4):
+            self.freeze_schedule_by_mid(mid=mid)
 
         start_time = time.time()
         print_to_file(self._file_path, "Gurobi Solver Solving...\n")
