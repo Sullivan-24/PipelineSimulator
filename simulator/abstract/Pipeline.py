@@ -159,8 +159,8 @@ class PipelineScheduler:
                         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
             if STAGE_PLACEMENT != Placement.RECURRENT:
                 self.devices[-1].add_stage(0)
-                self.devices[1].add_stage(LAYER_NUM+1)
-                self.devices[0].add_stage(LAYER_NUM+2)
+                self.devices[0].add_stage(LAYER_NUM+1)
+                self.devices[1].add_stage(LAYER_NUM+2)
             else:
                 self.devices[-1].add_stage(0)
                 self.devices[0].add_stage(LAYER_NUM+1)
@@ -187,7 +187,7 @@ class PipelineScheduler:
         
         for device in self.devices:
             device.init_required_mem_for_each_microbatch()
-            
+
         for did in range(DEVICE_NUM):
             self.devices[did].show_stages()
             if len(self.dsa) < DEVICE_NUM:

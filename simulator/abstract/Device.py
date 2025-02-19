@@ -221,7 +221,7 @@ class Device:
         if mid:
             self.mid_traverse_order.remove(mid)
             self.mid_traverse_order.append(mid)
-
+    
     def execute_workload(self, run_schedule=False) -> None:
         if self.state == Device.IDLE:
             if TEMP_TEST:
@@ -292,11 +292,9 @@ class Device:
                                     recomp=self.stages[sid].recomp,
                                 )
 
-                                if mid == self.executing_mid_idx:
-                                    pass
-                                else:
+                                if mid != self.executing_mid_idx:
                                     try:
-                                        if self.executing_mid_idx<self.nmb and GPU_MAX_MEM - required_memory - self.current_mem_usage < self.executing_workload_required_mem[self.executing_mid_idx + 1]:
+                                        if self.executing_mid_idx < self.nmb and GPU_MAX_MEM - required_memory - self.current_mem_usage < self.executing_workload_required_mem[self.executing_mid_idx + 1]:
                                             mid = self.executing_mid_idx
                                     except Exception as e:
                                         print(self.executing_mid_idx)
@@ -308,6 +306,9 @@ class Device:
                                             self.executing_workload_required_mem[mid] -= Activation.INPUT
                                         else:
                                             self.executing_workload_required_mem[mid] -= Activation.FULL
+                                        
+                                        if is_head_layer(sid=sid) or is_last_stage(sid=sid):
+                                            self.executing_workload_required_mem[mid] -= Activation.LOSS 
 
                                         if self.stages[sid].stage_type == StageType.LAYER:
                                             self.exe_num_f += 1

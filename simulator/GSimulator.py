@@ -474,7 +474,7 @@ class GSimulator:
             # self._stage_f_length[i] = self.model_result[self._stage_f_length[i].varName]
             self._stage_b_length[i] = self.model_result[self._stage_b_length[i].varName] 
             print(self._stage_b_length[i])
-            input()
+            # input()
             if SPLIT_BACKPROP:
                 self._stage_w_length[i] = self.model_result[self._stage_w_length[i].varName]
         

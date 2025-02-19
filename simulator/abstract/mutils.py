@@ -26,6 +26,10 @@ if RUN_MODE == RunMode.SIM_SOLVE:
     elif SCHEDULE_METHOD == Schedule.ZBV and RUN_STANDARD_ZBV:
         SPLIT_BACKPROP = True
         CHUNK_NUM = 2
+# Fix Gurobi solving bug caused by RunMode, SPLIT_BACKPROP, and BW time set
+if RUN_MODE == RunMode.GUROBI_SOLVE:
+    if not SPLIT_BACKPROP:
+        B_TIME += W_TIME
 
 STAGE_NUM = int(DEVICE_NUM * CHUNK_NUM)
 MAX_ACTIVATION_COUNTS = int(STAGE_NUM * MAX_ACTIVATION_TIMES_OF_STAGE_NUM)
@@ -47,6 +51,17 @@ def GET_TIME():
 def RESET_TIME():
     global GLOBAL_TIME
     GLOBAL_TIME = 0
+
+
+def is_head_layer(sid, total_layer_num=LAYER_NUM, layerwise=LAYERWISE):
+    if layerwise and total_layer_num - 2 == sid:
+        return True
+    return False
+
+def is_last_stage(sid, total_stage_num=STAGE_NUM):
+    if total_stage_num - 1 == sid:
+        return True
+    return False
 
 
 
