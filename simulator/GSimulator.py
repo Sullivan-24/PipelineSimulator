@@ -70,7 +70,6 @@ class GSimulator:
             self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
             self.pipeline_scheduler.run_pipeline_parallelism()
             print(self.pipeline_scheduler.results)
-            input()
             # self.pipeline_scheduler.draw()
         self.model_result = None
 
@@ -166,7 +165,6 @@ class GSimulator:
                     self.model.addConstr(var == self.pipeline_scheduler.results[var.VarName])
 
     def _add_memory_constraints(self):
-        return
         """
             self._orders = {
                 device_id:{
@@ -547,8 +545,8 @@ class GSimulator:
             "device_size": self._device_size,
             "devices": self._devices,
             "pp_size": self._pp_size,
-            "pp_height": 50,
-            "pp_align": 10,
+            "pp_height": PP_HEIGHT,
+            "pp_align": PP_ALIGN,
             "pixel_base": PIXEL_BASE,
             "num_microbatches": self._num_microbatches,
             "forward_length": self._stage_f_length,

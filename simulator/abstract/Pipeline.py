@@ -1,4 +1,4 @@
-from .Device import Device, Schedule, RunMode
+from .Device import Device, Schedule, RunMode, MemoryMonitor
 from .Stage import Stage
 from .Workload import Workload
 from .mutils import *
@@ -152,11 +152,16 @@ class PipelineScheduler:
                 self.devices[-1].add_stage(LAYER_NUM, recomp=self.recomp_set[pid])
             else:   
                 print("Use Wavelike placement")
-                for pid in range(LAYER_NUM):
+                offset = DEVICE_NUM if REVERSE_LAST_STAGES else 0
+                print(f"Reverse last {offset} stages.")
+                for pid in range(LAYER_NUM - offset):
                     if (pid // DEVICE_NUM) % 2 == 0:
                         self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
                     else:
                         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                for pid in range(LAYER_NUM - offset, LAYER_NUM):
+                    self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+
             if STAGE_PLACEMENT != Placement.RECURRENT:
                 self.devices[-1].add_stage(0)
                 self.devices[0].add_stage(LAYER_NUM+1)
@@ -166,30 +171,28 @@ class PipelineScheduler:
                 self.devices[0].add_stage(LAYER_NUM+1)
                 self.devices[1].add_stage(LAYER_NUM+2)
         else:
-            # self.recomp_set = [1 if RECOMP else 0 for _ in range(STAGE_NUM)]
-            # self.recomp_set[0] = 1
-            # self.recomp_set[1] = 1
-            # self.recomp_set[2] = 1
-            # self.recomp_set[3] = 1
-            # self.recomp_set[4] = 1
-            # self.recomp_set[5] = 1
-            # self.recomp_set[6] = 1
-            # self.recomp_set[7] = 1
             if SCHEDULE_METHOD in (Schedule.INTERLEAVED, Schedule.STANDARD_INTERLEAVED):
                 for pid in range(STAGE_NUM):
                     self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
             else:
-                for pid in range(STAGE_NUM):
+                assert STAGE_NUM <= LAYER_NUM, "STAGE should be less than LAYER"                
+                offset = DEVICE_NUM if REVERSE_LAST_STAGES else 0
+                for pid in range(STAGE_NUM - offset):
                     if (pid // DEVICE_NUM) % 2 == 0:
                         self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
                     else:
                         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
-        
+                for pid in range(STAGE_NUM - offset, STAGE_NUM):
+                    self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
+
         for device in self.devices:
             device.init_required_mem_for_each_microbatch()
+            
+        #     mm = MemoryMonitor(device.nmb, device.stages)
+        #     mm.init_monitor()
 
         for did in range(DEVICE_NUM):
-            self.devices[did].show_stages()
+            print(list(self.devices[did].stages.keys()))
             if len(self.dsa) < DEVICE_NUM:
                 self.dsa.append(list(self.devices[did].stages.keys()))
 

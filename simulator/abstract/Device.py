@@ -1,6 +1,39 @@
 from .Stage import *
 import queue 
 
+def get_required_memory_by_workload(workload:Workload):
+        stage_id = workload.stage_id
+        layer_num = LAYER_NUM // DEVICE_NUM // CHUNK_NUM
+        workload_type = workload.workload_type
+        workload_type_num = 3 if SPLIT_BACKPROP else 2
+        layer_wise=LAYERWISE
+        recomp=workload.recomp
+
+        assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type!"
+        if workload_type ==WorkloadType.F:
+            required_memory = Activation.FULL * layer_num 
+            if recomp:
+                required_memory = layer_num * (Activation.FULL * (1 - recomp) + Activation.INPUT * recomp)
+            if layer_wise and stage_id == LAYER_NUM - 2:
+                required_memory = Activation.LOSS
+            elif not layer_wise and stage_id == STAGE_NUM - 1:
+                    required_memory += Activation.LOSS
+        elif workload_type == WorkloadType.B:
+            required_memory = Gradient.INPUT * layer_num
+            if recomp:
+                required_memory += layer_num * (Activation.FULL - Activation.INPUT) * recomp 
+            if workload_type_num == 2:
+                required_memory += Gradient.PARAMETER * layer_num
+        elif workload_type == WorkloadType.W:
+            assert workload_type_num == 3, "Workload number error!"
+            required_memory = Gradient.PARAMETER * layer_num
+        else:
+            raise ValueError("Unsupported workload type!")
+
+        if layer_wise and (stage_id == 0 or stage_id == LAYER_NUM - 1):
+            required_memory = 0
+        return required_memory
+
 def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True, recomp=None):
         assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type!"
         if workload_type ==WorkloadType.F:
@@ -69,6 +102,52 @@ def get_layerwise_required_memory(lid, workload_type, recomp=None, workload_type
         required_memory = 0
     return required_memory
 
+class MemoryMonitor:
+    def __init__(self, nmb:int, stages:dict, max_memory:float = GPU_MAX_MEM):
+        self.nmb = nmb
+        self.stages = stages
+        self.allocated_memory = 0
+        self.max_memory = max_memory
+        self.tracing_workloads:list[Workload] = []
+        self.workloads_required_mem:list[int] = [0 for _ in range(self.nmb)]
+
+    def init_monitor(self):
+        self.init_memory_usage()
+        self.init_required_mem_for_each_microbatch()
+
+    def init_memory_usage(self):
+        optimizer_mem = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)
+        model_mem = len(self.stages.keys()) * LAYER_MEMORY * LAYER_NUM // DEVICE_NUM
+        self.allocated_memory = optimizer_mem + model_mem
+
+    def init_required_mem_for_each_microbatch(self):
+        workload_type = WorkloadType.F
+        for mid in range(self.nmb):
+            for sid in self.stages:
+                workload = self.stages[sid].workloads[mid][workload_type]
+                workload_mem_usage = get_required_memory_by_workload(workload)
+                self.workloads_required_mem[mid] += workload_mem_usage
+
+            self.workloads_required_mem[mid] += Activation.FULL + Gradient.INPUT + Gradient.PARAMETER
+
+    def trace_workload(self,workload:Workload):
+        self.tracing_workloads.append(workload)
+        workload_mem_usage = get_required_memory_by_workload(workload)
+        self.allocated_memory += workload_mem_usage
+        self.workloads_required_mem[workload.microbatch_id] -= workload_mem_usage
+    
+    def get_tolerant_mids(self, workload:Workload):
+        workload_mem_usage = get_required_memory_by_workload(workload)
+        safe_mids = []
+        for mid in range(MICRO_BATCH_NUM):
+            if workload_mem_usage + self.workloads_required_mem[mid] + self.allocated_memory < self.max_memory:
+                safe_mids.append(mid)
+        return safe_mids
+
+    def is_executable_workload(self, workload:Workload):
+        mids = self.get_tolerant_mids(workload)
+        return mids
+
 class Device:
     
     BUSY = 1
@@ -109,6 +188,12 @@ class Device:
         self.executing_workload_required_mem : list = [0 for _ in range(self.nmb)]
         self.executing_mid_idx = 0
         self.ok_flag = False
+
+        self.memory_monitor = None
+        self.wait_for_schedule = 0
+
+    def init_memory_monitor(self):
+        self.memory_monitor = MemoryMonitor(self.nmb, self.stages)
 
     def init_required_mem_for_each_microbatch(self):
         for mid in range(self.nmb):
@@ -276,7 +361,6 @@ class Device:
                 if self.current_mem_usage > GPU_MAX_MEM * self.memory_usage_constrain_rate:
                     now_workload_priority_order = [WorkloadType.W, WorkloadType.B, WorkloadType.F]
                 mb_range = self.mid_traverse_order
-
                 if not self.ok_flag:
                     now_workload_priority_order = [WorkloadType.W, WorkloadType.B, WorkloadType.F]
                     for workload_type in now_workload_priority_order:
@@ -294,7 +378,7 @@ class Device:
 
                                 if mid != self.executing_mid_idx:
                                     try:
-                                        if self.executing_mid_idx < self.nmb and GPU_MAX_MEM - required_memory - self.current_mem_usage < self.executing_workload_required_mem[self.executing_mid_idx + 1]:
+                                        if self.executing_mid_idx < self.nmb and GPU_MAX_MEM - required_memory - self.current_mem_usage - Activation.FULL < self.executing_workload_required_mem[self.executing_mid_idx + 1]:
                                             mid = self.executing_mid_idx
                                     except Exception as e:
                                         print(self.executing_mid_idx)
@@ -342,17 +426,17 @@ class Device:
                         for mid in mb_range:
                             for sid in self.stages:
                                 
-                                # required_memory = get_required_memory(
-                                #     stage_id=sid, 
-                                #     layer_num=1,
-                                #     workload_type=workload_type,
-                                #     workload_type_num=WORKLOAD_TYPE_NUM, 
-                                #     layer_wise=True,
-                                #     recomp=self.stages[sid].recomp,
-                                # )
+                                required_memory = get_required_memory(
+                                    stage_id=sid, 
+                                    layer_num=1,
+                                    workload_type=workload_type,
+                                    workload_type_num=WORKLOAD_TYPE_NUM, 
+                                    layer_wise=True,
+                                    recomp=self.stages[sid].recomp,
+                                )
 
-                                # if required_memory + self.current_mem_usage > GPU_MAX_MEM - Gradient.PARAMETER:
-                                #     workload_type = WorkloadType.W
+                                if workload_type == WorkloadType.F and required_memory + self.current_mem_usage > GPU_MAX_MEM - Gradient.PARAMETER - Gradient.INPUT:
+                                    continue
                                 
                                 proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
                                 if proc_workload:
@@ -372,7 +456,42 @@ class Device:
                                     self.update_memory_usage()
                                     self.state = Device.BUSY
                                     return proc_workload
-            elif run_schedule or SCHEDULE_METHOD in (Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB, Schedule.STANDARD_INTERLEAVED):
+            elif SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
+                if self.next_workload_idx == len(self.stages) * self.nmb * WORKLOAD_TYPE_NUM:
+                    return None
+                if self.next_workload_idx == len(self.static_schedule):
+                    return None
+                (workload_type, workload_mid, workload_sid) = self.static_schedule[self.next_workload_idx]
+                
+
+                if self.wait_for_schedule != 0 and self.wait_for_schedule > GET_TIME():
+                    # delay the first F to achive overlap with B
+                    return None
+                
+                proc_workload = self.stages[workload_sid].execute_workload(mid=workload_mid,workload_type=workload_type)
+                if proc_workload:
+                    self.proc_workload = proc_workload
+                    self.update_memory_usage()
+                    self.state = Device.BUSY
+                    self.last_workload_type = workload_type
+                    if workload_type == WorkloadType.F:
+                        self.exe_num_f += 1
+                    elif workload_type == WorkloadType.B:
+                            self.exe_num_b += 1
+                    elif workload_type == WorkloadType.W:
+                            self.exe_num_w += 1
+                    else:
+                        raise Exception("Error workload type.")
+                    self.next_workload_idx += 1
+
+                    if workload_type == WorkloadType.F and self.exe_num_f == DEVICE_NUM * (CHUNK_NUM - 1) + (DEVICE_NUM - self.device_id - 1) * 2:
+                        f_time = F_TIME * LAYER_NUM // CHUNK_NUM // DEVICE_NUM
+                        self.wait_for_schedule = GET_TIME() + (DEVICE_NUM - self.device_id) * f_time * 2 - f_time
+                    return proc_workload
+
+                
+                
+            elif run_schedule or SCHEDULE_METHOD in (Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB):
                 if self.next_workload_idx == len(self.stages) * self.nmb * WORKLOAD_TYPE_NUM:
                     return None
                 if self.next_workload_idx == len(self.static_schedule):

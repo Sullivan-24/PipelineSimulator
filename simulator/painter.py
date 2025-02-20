@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
 from .abstract.mutils import COMM_TIME, SPLIT_BACKPROP, MICRO_BATCH_NUM, DEVICE_NUM,SCHEDULE_METHOD,RUN_MODE,LAYER_NUM,SHOW_WORKLOAD_TEXT
+from .PainterToImage import save_canvas_as_image
 class SchedulingPainter:
     """Scheduling Painter"""
 
@@ -162,6 +163,8 @@ class SchedulingPainter:
             self._item2block[block] = block
             # 求余考虑virtual stage的情况
             self._item2mid[block] = mid
+        
+        save_canvas_as_image(canvas=main_canvas, filename=f'{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}')
 
         # Register hook for highlighting execution block of this microbatch
         def _trigger_hook(event):

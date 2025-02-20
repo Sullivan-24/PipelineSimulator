@@ -86,6 +86,7 @@ class Stage:
                     workload_type=WorkloadType.F,
                     recomp=self.recomp,
                 ),    
+                recomp=self.recomp,
                 total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,
             )
             if self.stage_id == 0 and LAYERWISE:
@@ -105,6 +106,7 @@ class Stage:
                     workload_type=WorkloadType.B,
                     recomp=self.recomp,
                 ),   
+                recomp=self.recomp,
                 total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,   
             )
             self.workloads[mid]={
@@ -123,6 +125,7 @@ class Stage:
                         workload_type=WorkloadType.W,
                         recomp=self.recomp,
                     ),     
+                    recomp=self.recomp,
                     total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,
                 )
                 if self.stage_type != StageType.CE:
