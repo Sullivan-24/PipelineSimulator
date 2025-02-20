@@ -417,7 +417,7 @@ class GSimulator:
             if var.VarName in self.pipeline_scheduler.results.keys():
                 var.Start = self.pipeline_scheduler.results[var.VarName]
 
-        self.model.write("model.lp")
+        self.model.write("schedule_results/model.lp")
 
     def run(self, draw=False) -> None:
         """run simulation"""

@@ -440,7 +440,7 @@ class LayerwiseSimulator:
                 var.Start = self.pipeline_scheduler.results[var.VarName]
 
         # DEBUG
-        self.model.write("model.lp")
+        self.model.write("schedule_results/model.lp")
 
     def freeze_schedule_by_mid(self, mid):
         if BASE_SOLUTION:

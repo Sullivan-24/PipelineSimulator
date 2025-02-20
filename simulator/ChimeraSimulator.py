@@ -299,7 +299,7 @@ class ChimeraSimulator:
                 "cwi_1_f_","cwi_1_b_","cwi_1_w_",
                 ))}
             self._draw(resort_microbatch_index(self._num_microbatches ,results))
-        self.model.write("model.lp")
+        self.model.write("schedule_results/model.lp")
         return results
     
 
