@@ -233,7 +233,7 @@ class ChimeraPipelineScheduler:
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": PIXEL_BASE,
-            "num_microbatches": MICRO_BATCH_NUM,
+            "nmb": MICRO_BATCH_NUM,
             "forward_length": fwd_time,
             "backward_length": iwd_time,
             "backward_length2": pwd_time,

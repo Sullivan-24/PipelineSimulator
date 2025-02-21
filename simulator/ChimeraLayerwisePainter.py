@@ -18,7 +18,7 @@ class LayerwiseSchedulingPainter:
         self._max_time      = config["max_time"] if 'max_time' in config else -1
         self._emb_head_ce   = config["emb_head_ce"]
         
-        self._num_microbatches = config["num_microbatches"]
+        self._num_microbatches = config["nmb"]
         self._num_layer = config["num_layer"]
 
         self._comm_length = [_len for _len in config["comm_length"]]

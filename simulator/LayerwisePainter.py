@@ -17,7 +17,7 @@ class LayerwiseSchedulingPainter:
         self._pixel_base    = config["pixel_base"]
         self._max_time      = config["max_time"] if 'max_time' in config else -1
         
-        self._num_microbatches = config["num_microbatches"]
+        self._num_microbatches = config["nmb"]
         self._num_layer = config["num_layer"]
 
         self._basic_forward_length = [_len for _len in config["forward_length"]]

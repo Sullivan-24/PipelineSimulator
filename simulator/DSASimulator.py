@@ -13,7 +13,7 @@ class DSASimulator:
         self._pp_size                   = config["pp_size"]
         self._device_size               = config["device_size"]
         self.config                     = config
-        self._basic_comm_length         = config["communication_time"]
+        self._basic_comm_length         = config["comm_time"]
         self._device_stage_alignments   = []
         self._dsa_hash                  = set()
         self._file_path                 = config["file_path"]

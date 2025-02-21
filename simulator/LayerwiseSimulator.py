@@ -23,23 +23,23 @@ class LayerwiseSimulator:
         self._pp_size = config["pp_size"]
         self._num_device = config["device_size"]
         self._num_layer = config["model_size"]
-        self._num_microbatches = config["num_microbatches"]
+        self._num_microbatches = config["nmb"]
         self._max_activation_counts = config["max_activation_counts"]
         
         self._mix_training = config["mix_training"]
         self._model_para_num = config["model_para_num"]
         self._device_mem = config["device_mem"]
         # obtained by profiling
-        self._profiled_layer_f_length = config["forward_execution_time"]
-        self._profiled_layer_b_length = config["backward_execution_i_time"]
-        self._profiled_layer_w_length = config["backward_execution_g_time"]
+        self._profiled_layer_f_length = config["f_time"]
+        self._profiled_layer_b_length = config["b_time"]
+        self._profiled_layer_w_length = config["w_time"]
         
         
         self._profiled_additional_layer_f_length = [0 for _ in range(self._num_layer)]
         self._profiled_additional_layer_b_length = [0 for _ in range(self._num_layer)]
         self._profiled_additional_layer_w_length = [0 for _ in range(self._num_layer)]
         
-        self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
+        self._comm_length = config["comm_time"] if not new_comm_length else new_comm_length
         
         # 检查输入参数
         assert isinstance(self._profiled_layer_f_length, (list, tuple))
@@ -504,7 +504,7 @@ class LayerwiseSimulator:
             "pp_height": PP_HEIGHT,
             "pp_align": PP_ALIGN,
             "pixel_base": PIXEL_BASE,
-            "num_microbatches": self._num_microbatches,
+            "nmb": self._num_microbatches,
             "forward_length": self._layer_f_length,
             "backward_length": self._layer_b_length,
             "backward_length2": self._layer_w_length,

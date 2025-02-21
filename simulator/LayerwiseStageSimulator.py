@@ -14,22 +14,22 @@ class LayerwiseSimulator:
         self._pp_size = config["pp_size"]
         self._device_size = config["device_size"]
         self._model_layer_num = config["model_size"]
-        self._num_microbatches = config["num_microbatches"]
+        self._num_microbatches = config["nmb"]
         self._max_activation_counts = config["max_activation_counts"]
         
         self._mix_training = config["mix_training"]
         self._model_para_num = config["model_para_num"]
         self._device_mem = config["device_mem"]
         # obtained by profiling
-        self._profiled_layer_f_length = config["forward_execution_time"]
-        self._profiled_layer_b_length = config["backward_execution_i_time"]
-        self._profiled_layer_w_length = config["backward_execution_g_time"]
+        self._profiled_layer_f_length = config["f_time"]
+        self._profiled_layer_b_length = config["b_time"]
+        self._profiled_layer_w_length = config["w_time"]
         
         self._profiled_additional_layer_f_length = [EMB_TIME  if lid == 0 else (HEAD_F_TIME if lid == LAYER_NUM-1 else 0) for lid in range(LAYER_NUM)]
         self._profiled_additional_layer_b_length = [HEAD_B_TIME if lid == LAYER_NUM-1 else 0 for lid in range(LAYER_NUM)]
         self._profiled_additional_layer_w_length = [0 for _ in range(LAYER_NUM)]
         
-        self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
+        self._comm_length = config["comm_time"] if not new_comm_length else new_comm_length
         
         # 检查输入参数
         assert isinstance(self._profiled_layer_f_length, (list, tuple))
@@ -380,7 +380,7 @@ class LayerwiseSimulator:
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": PIXEL_BASE,
-            "num_microbatches": self._num_microbatches,
+            "nmb": self._num_microbatches,
             "forward_length": self._stage_f_length,
             "backward_length": self._stage_b_length,
             "backward_length2": self._stage_w_length,

@@ -23,7 +23,7 @@ class ChimeraSimulator:
         self._num_device = config["device_size"]
         self._num_layer = config["model_size"]
         self.total_stream = 2
-        self._num_microbatches = config["num_microbatches"]
+        self._num_microbatches = config["nmb"]
         self._emb_head_ce = config["emb_head_ce"]
         if self._emb_head_ce:
             self._num_layer += 3
@@ -330,7 +330,7 @@ class ChimeraSimulator:
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": PIXEL_BASE,
-            "num_microbatches": self.streams[0]._num_microbatches,
+            "nmb": self.streams[0]._num_microbatches,
             "forward_length": [stream._layer_f_length for stream in self.streams],
             "backward_length": [stream._layer_b_length for stream in self.streams],
             "backward_length2": [stream._layer_w_length for stream in self.streams],
@@ -353,14 +353,14 @@ class ChimeraStream:
         self._pp_size = config["pp_size"]
         self._num_device = config["device_size"]
         self._num_layer = config["model_size"]
-        self._num_microbatches = config["num_microbatches"]
+        self._num_microbatches = config["nmb"]
         self._emb_head_ce = config["emb_head_ce"]
         self._chimera_way_idx = chimera_way_idx
         self._total_stream = total_stream
 
-        self._profiled_layer_f_length = config["forward_execution_time"]
-        self._profiled_layer_b_length = config["backward_execution_i_time"]
-        self._profiled_layer_w_length = config["backward_execution_g_time"]
+        self._profiled_layer_f_length = config["f_time"]
+        self._profiled_layer_b_length = config["b_time"]
+        self._profiled_layer_w_length = config["w_time"]
 
         if self._emb_head_ce:
             self._profiled_layer_f_length = [EMB_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
@@ -373,7 +373,7 @@ class ChimeraStream:
             self._profiled_layer_b_length[-1] += CE_B_TIME + HEAD_B_TIME
             self._profiled_layer_w_length[-1] += CE_W_TIME + HEAD_W_TIME
 
-        self._comm_length = config["communication_time"] if not new_comm_length else new_comm_length
+        self._comm_length = config["comm_time"] if not new_comm_length else new_comm_length
         
         # 检查输入参数
         assert isinstance(self._profiled_layer_f_length, (list, tuple))

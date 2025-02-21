@@ -14,14 +14,14 @@ class CompCommSimulator:
         self._pp_size = config["pp_size"]
         self._device_size = config["device_size"]
         self._model_layer_num = config["model_size"]
-        self._num_microbatches = config["num_microbatches"]
+        self._num_microbatches = config["nmb"]
         self._max_activation_counts = config["max_activation_counts"]
         self.split_backprop = config["split_backprop"]
         self.pixel_base = config["pixel_base"]
         # obtained by profiling
-        self._profiled_layer_f_length = config["forward_execution_time"]
-        self._profiled_layer_b_length = config["backward_execution_i_time"]
-        self._profiled_layer_w_length = config["backward_execution_g_time"]
+        self._profiled_layer_f_length = config["f_time"]
+        self._profiled_layer_b_length = config["b_time"]
+        self._profiled_layer_w_length = config["w_time"]
         
         # 检查输入参数
         assert isinstance(self._profiled_layer_f_length, (list, tuple))
@@ -291,7 +291,7 @@ class CompCommSimulator:
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": self.pixel_base,
-            "num_microbatches": self._num_microbatches,
+            "nmb": self._num_microbatches,
             "forward_length": self._stage_f_length,
             "backward_length": self._stage_b_length,
             "backward_length2": self._stage_w_length,
@@ -311,14 +311,14 @@ if __name__ == "__main__":
         "stage_order_search": STAGE_SEARCH_METHOD,
         "pp_size": int(STAGE_NUM),
         "model_size": int(LAYER_NUM),
-        "num_microbatches": int(MICRO_BATCH_NUM),
-        "forward_execution_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-        "backward_execution_i_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-        "backward_execution_g_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "nmb": int(MICRO_BATCH_NUM),
+        "f_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "b_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "w_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
         "mix_training": MIX_TRAINING,
         "model_para_num": PARAMETER_NUM,
-        "communication_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
+        "comm_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
         "sequential_order_constraint_strategy": "strict",
         "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
         # "file_path": filename,

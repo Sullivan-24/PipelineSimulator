@@ -13,12 +13,12 @@ class SPSimulator:
         self._pp_size                   = config["pp_size"]
         self._device_size               = config["device_size"]
         self._model_size                = config["model_size"]
-        self._num_microbatches          = config["num_microbatches"]
+        self._num_microbatches          = config["nmb"]
         self._max_activation_counts     = config["max_activation_counts"]
-        self._basic_forward_length      = config["forward_execution_time"]
-        self._basic_backward_b_length   = config["backward_execution_i_time"]
-        self._basic_backward_w_length   = config["backward_execution_g_time"]
-        self._comm_length               = config["communication_time"] if not new_comm_length else new_comm_length
+        self._basic_forward_length      = config["f_time"]
+        self._basic_backward_b_length   = config["b_time"]
+        self._basic_backward_w_length   = config["w_time"]
+        self._comm_length               = config["comm_time"] if not new_comm_length else new_comm_length
 
         self._sequential_order_constraint_strategy = config[
             "sequential_order_constraint_strategy"
@@ -379,7 +379,7 @@ class SPSimulator:
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": 2,
-            "num_microbatches": self._num_microbatches,
+            "nmb": self._num_microbatches,
             "forward_length": self._forward_length,
             "backward_length": self._backward_b_length,
             "backward_length2": self._backward_w_length,

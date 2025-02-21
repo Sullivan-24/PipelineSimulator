@@ -14,27 +14,27 @@ from simulator.abstract.mutils import *
 
 def set_workload_length(config):
     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
-        config["forward_execution_time"] = [EMB_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
-        config["backward_execution_i_time"] = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
-        config["backward_execution_g_time"] = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
+        config["f_time"] = [EMB_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
+        config["b_time"] = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
+        config["w_time"] = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
         config["model_size"] = config["model_size"] + 3
     else:
-        config["forward_execution_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
-        config["backward_execution_i_time"] = [B_TIME for _ in range(LAYER_NUM)] 
-        config["backward_execution_g_time"] = [W_TIME for _ in range(LAYER_NUM)]
+        config["f_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
+        config["b_time"] = [B_TIME for _ in range(LAYER_NUM)] 
+        config["w_time"] = [W_TIME for _ in range(LAYER_NUM)]
         
-        fwd_time = config["forward_execution_time"]
+        fwd_time = config["f_time"]
         fwd_time[0] += EMB_TIME
         fwd_time[-1] += CE_F_TIME + HEAD_F_TIME
-        config["forward_execution_time"] = fwd_time
+        config["f_time"] = fwd_time
 
-        iwd_time = config["backward_execution_i_time"]
+        iwd_time = config["b_time"]
         iwd_time[-1] += CE_B_TIME + HEAD_B_TIME
-        config["backward_execution_i_time"] = iwd_time
+        config["b_time"] = iwd_time
 
-        gwd_time = config["backward_execution_g_time"]
+        gwd_time = config["w_time"]
         gwd_time[-1] += CE_W_TIME + HEAD_W_TIME
-        config["backward_execution_g_time"] = gwd_time
+        config["w_time"] = gwd_time
 
 def check_standard_zbv_conditions():
     if EMB_TIME!=0:
@@ -59,14 +59,14 @@ def main():
         "stage_order_search": STAGE_SEARCH_METHOD,
         "pp_size": int(STAGE_NUM),
         "model_size": int(LAYER_NUM),
-        "num_microbatches": int(MICRO_BATCH_NUM),
-        "forward_execution_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-        "backward_execution_i_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-        "backward_execution_g_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "nmb": int(MICRO_BATCH_NUM),
+        "f_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "b_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "w_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
         "mix_training": MIX_TRAINING,
         "model_para_num": PARAMETER_NUM,
-        "communication_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
+        "comm_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
         "sequential_order_constraint_strategy": "strict",
         "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
         # "file_path": filename,
@@ -97,9 +97,9 @@ def main():
         simulator = LayerwiseSimulator(config=config)
         simulator.run(draw=True)
     elif config["run_mode"] == RunMode.CHIMERA:
-        config["forward_execution_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
-        config["backward_execution_i_time"] = [B_TIME for _ in range(LAYER_NUM)] 
-        config["backward_execution_g_time"] = [W_TIME for _ in range(LAYER_NUM)]
+        config["f_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
+        config["b_time"] = [B_TIME for _ in range(LAYER_NUM)] 
+        config["w_time"] = [W_TIME for _ in range(LAYER_NUM)]
         simulator = ChimeraSimulator(config)
         simulator.run(draw=True)
     elif config["run_mode"] == RunMode.GUROBI_SOLVE:
@@ -140,14 +140,14 @@ if __name__ == "__main__":
     #     "stage_order_search": STAGE_SEARCH_METHOD,
     #     "pp_size": int(STAGE_NUM),
     #     "model_size": int(LAYER_NUM),
-    #     "num_microbatches": int(MICRO_BATCH_NUM),
-    #     "forward_execution_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-    #     "backward_execution_i_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-    #     "backward_execution_g_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+    #     "nmb": int(MICRO_BATCH_NUM),
+    #     "f_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+    #     "b_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+    #     "w_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
     #     "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
     #     "mix_training": MIX_TRAINING,
     #     "model_para_num": PARAMETER_NUM,
-    #     "communication_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
+    #     "comm_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
     #     "sequential_order_constraint_strategy": "strict",
     #     "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
     #     # "file_path": filename,
