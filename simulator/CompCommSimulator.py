@@ -11,9 +11,9 @@ class CompCommSimulator:
         self._schedule_method = config['schedule_method']
         self._file_path = config["file_path"]
         self._time_limit = config["time_limit"]
-        self._pp_size = config["pp_size"]
-        self._device_size = config["device_size"]
-        self._model_layer_num = config["model_size"]
+        self._pp_size = config["stage_num"]
+        self._device_size = config["device_num"]
+        self._model_layer_num = config["layer_num"]
         self._num_microbatches = config["nmb"]
         self._max_activation_counts = config["max_activation_counts"]
         self.split_backprop = config["split_backprop"]
@@ -285,9 +285,9 @@ class CompCommSimulator:
         # 绘制结果的逻辑
         # self.write_fbw_to_file()
         painter_conf = {
-            "device_size": self._device_size,
+            "device_num": self._device_size,
             "devices": self._devices,
-            "pp_size": self._pp_size,
+            "stage_num": self._pp_size,
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": self.pixel_base,
@@ -306,18 +306,18 @@ class CompCommSimulator:
 if __name__ == "__main__":
     config = {
         "run_mode": RUN_MODE,
-        "device_size": int(DEVICE_NUM),
+        "device_num": int(DEVICE_NUM),
         "time_limit": int(SOLVING_TIME_LIMIT),
         "stage_order_search": STAGE_SEARCH_METHOD,
-        "pp_size": int(STAGE_NUM),
-        "model_size": int(LAYER_NUM),
+        "stage_num": int(STAGE_NUM),
+        "layer_num": int(LAYER_NUM),
         "nmb": int(MICRO_BATCH_NUM),
         "f_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "b_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "w_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
         "mix_training": MIX_TRAINING,
-        "model_para_num": PARAMETER_NUM,
+        "para_num": PARAMETER_NUM,
         "comm_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
         "sequential_order_constraint_strategy": "strict",
         "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],

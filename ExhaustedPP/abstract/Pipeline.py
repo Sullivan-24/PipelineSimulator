@@ -99,9 +99,9 @@ class PipelineScheduler:
     def draw(self) -> None:
         # 绘制结果的逻辑
         painter_conf = {
-            "device_size": DEVICE_NUM,
+            "device_num": DEVICE_NUM,
             "devices": self.dsa,
-            "pp_size": STAGE_NUM,
+            "stage_num": STAGE_NUM,
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": 2,

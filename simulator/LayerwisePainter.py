@@ -9,9 +9,9 @@ class LayerwiseSchedulingPainter:
     """Scheduling Painter"""
 
     def __init__(self, config: dict) -> None:
-        self._device_size   = config["device_size"]
+        self._device_size   = config["device_num"]
         self._devices       = config["devices"]
-        self._pp_size       = config["pp_size"]
+        self._pp_size       = config["stage_num"]
         self._pp_height     = config["pp_height"]
         self._pp_align      = config["pp_align"]
         self._pixel_base    = config["pixel_base"]

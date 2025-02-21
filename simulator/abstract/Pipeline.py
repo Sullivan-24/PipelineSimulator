@@ -679,10 +679,10 @@ class PipelineScheduler:
         fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
         if LAYERWISE:
             painter_conf = {
-                "device_size": DEVICE_NUM,
+                "device_num": DEVICE_NUM,
                 "devices": self.dsa,
                 "num_layer": LAYER_NUM+3,
-                "pp_size": LAYER_NUM+3,
+                "stage_num": LAYER_NUM+3,
                 "pp_height": PP_HEIGHT,
                 "pp_align": PP_ALIGN,
                 "pixel_base": PIXEL_BASE,
@@ -699,9 +699,9 @@ class PipelineScheduler:
                 if key.startswith(("f_","b_","w_")):
                     res[key] = self.results[key]
             painter_conf = {
-                "device_size": DEVICE_NUM,
+                "device_num": DEVICE_NUM,
                 "devices": self.dsa,
-                "pp_size": STAGE_NUM,
+                "stage_num": STAGE_NUM,
                 "pp_height": PP_HEIGHT,
                 "pp_align": PP_ALIGN,
                 "pixel_base": PIXEL_BASE,

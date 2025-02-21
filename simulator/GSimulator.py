@@ -19,18 +19,18 @@ class GSimulator:
         self._schedule_method = config['schedule_method']
         self._file_path = config["file_path"]
         self._time_limit = config["time_limit"]
-        self._pp_size = config["pp_size"]
-        self._device_size = config["device_size"]
-        self._model_layer_num = config["model_size"]
+        self._pp_size = config["stage_num"]
+        self._device_size = config["device_num"]
+        self._model_layer_num = config["layer_num"]
         self._num_microbatches = config["nmb"]
         self._max_activation_counts = config["max_activation_counts"]
-        self._num_device = config["device_size"]
+        self._num_device = config["device_num"]
 
         self.estimated_time_cost = self.estimate_time_cost()
         self.M = self.set_M_value(self.estimated_time_cost)
 
         self._mix_training = config["mix_training"]
-        self._model_para_num = config["model_para_num"]
+        self._model_para_num = config["para_num"]
         self._device_mem = config["device_mem"]
         # obtained by profiling
         self._profiled_layer_f_length = config["f_time"]
@@ -542,9 +542,9 @@ class GSimulator:
         # 绘制结果的逻辑
         # self.write_fbw_to_file()
         painter_conf = {
-            "device_size": self._device_size,
+            "device_num": self._device_size,
             "devices": self._devices,
-            "pp_size": self._pp_size,
+            "stage_num": self._pp_size,
             "pp_height": PP_HEIGHT,
             "pp_align": PP_ALIGN,
             "pixel_base": PIXEL_BASE,

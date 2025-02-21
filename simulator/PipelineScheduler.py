@@ -19,9 +19,9 @@ class PipelineSchedulerSolver:
         self._schedule_method = config['schedule_method']
         self._file_path = config["file_path"]
         self._time_limit = config["time_limit"]
-        self._pp_size = config["pp_size"]
-        self._num_device = config["device_size"]
-        self._num_layer = config["model_size"]
+        self._pp_size = config["stage_num"]
+        self._num_device = config["device_num"]
+        self._num_layer = config["layer_num"]
         self._num_microbatches = config["nmb"]
         
         # obtained by profiling
@@ -461,9 +461,9 @@ class PipelineSchedulerSolver:
     def _draw(self, results: dict) -> None:
         # 绘制结果的逻辑
         painter_conf = {
-            "device_size": self._num_device,
+            "device_num": self._num_device,
             "devices": self._devices,
-            "pp_size": self._pp_size,
+            "stage_num": self._pp_size,
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": PIXEL_BASE,

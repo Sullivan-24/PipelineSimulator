@@ -10,9 +10,9 @@ class SPSimulator:
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
         self._file_path = config["file_path"]
-        self._pp_size                   = config["pp_size"]
-        self._device_size               = config["device_size"]
-        self._model_size                = config["model_size"]
+        self._pp_size                   = config["stage_num"]
+        self._device_size               = config["device_num"]
+        self._model_size                = config["layer_num"]
         self._num_microbatches          = config["nmb"]
         self._max_activation_counts     = config["max_activation_counts"]
         self._basic_forward_length      = config["f_time"]
@@ -373,9 +373,9 @@ class SPSimulator:
 
     def _draw(self, results: dict) -> None:
         painter_conf = {
-            "device_size": self._device_size,
+            "device_num": self._device_size,
             "devices": self._devices,
-            "pp_size": self._pp_size,
+            "stage_num": self._pp_size,
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": 2,

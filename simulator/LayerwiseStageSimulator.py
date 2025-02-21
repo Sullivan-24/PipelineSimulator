@@ -11,14 +11,14 @@ class LayerwiseSimulator:
         self._schedule_method = config['schedule_method']
         self._file_path = config["file_path"]
         self._time_limit = config["time_limit"]
-        self._pp_size = config["pp_size"]
-        self._device_size = config["device_size"]
-        self._model_layer_num = config["model_size"]
+        self._pp_size = config["stage_num"]
+        self._device_size = config["device_num"]
+        self._model_layer_num = config["layer_num"]
         self._num_microbatches = config["nmb"]
         self._max_activation_counts = config["max_activation_counts"]
         
         self._mix_training = config["mix_training"]
-        self._model_para_num = config["model_para_num"]
+        self._model_para_num = config["para_num"]
         self._device_mem = config["device_mem"]
         # obtained by profiling
         self._profiled_layer_f_length = config["f_time"]
@@ -374,9 +374,9 @@ class LayerwiseSimulator:
     def _draw(self, results: dict) -> None:
         # 绘制结果的逻辑
         painter_conf = {
-            "device_size": self._device_size,
+            "device_num": self._device_size,
             "devices": self._devices,
-            "pp_size": self._pp_size,
+            "stage_num": self._pp_size,
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": PIXEL_BASE,

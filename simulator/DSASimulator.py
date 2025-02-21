@@ -10,8 +10,8 @@ from .abstract.mutils import F_TIME, W_TIME, B_TIME, LAYER_NUM
 class DSASimulator:
     def __init__(self, config, solver_type="gurobi") -> None:
 
-        self._pp_size                   = config["pp_size"]
-        self._device_size               = config["device_size"]
+        self._pp_size                   = config["stage_num"]
+        self._device_size               = config["device_num"]
         self.config                     = config
         self._basic_comm_length         = config["comm_time"]
         self._device_stage_alignments   = []

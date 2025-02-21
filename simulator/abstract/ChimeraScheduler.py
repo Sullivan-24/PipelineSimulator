@@ -227,9 +227,9 @@ class ChimeraPipelineScheduler:
         painter_conf = {
             "devices": self.dsa,
             "emb_head_ce": self.emb_head_ce,
-            "device_size": self.device_num,
+            "device_num": self.device_num,
             "num_layer": LAYER_NUM+3,
-            "pp_size": LAYER_NUM+3,
+            "stage_num": LAYER_NUM+3,
             "pp_height": 50,
             "pp_align": 10,
             "pixel_base": PIXEL_BASE,

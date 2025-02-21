@@ -17,7 +17,7 @@ def set_workload_length(config):
         config["f_time"] = [EMB_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
         config["b_time"] = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
         config["w_time"] = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
-        config["model_size"] = config["model_size"] + 3
+        config["layer_num"] = config["layer_num"] + 3
     else:
         config["f_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
         config["b_time"] = [B_TIME for _ in range(LAYER_NUM)] 
@@ -54,18 +54,18 @@ def check_standard_zbv_conditions():
 def main():
     config = {
         "run_mode": RUN_MODE,
-        "device_size": int(DEVICE_NUM),
+        "device_num": int(DEVICE_NUM),
         "time_limit": int(SOLVING_TIME_LIMIT),
         "stage_order_search": STAGE_SEARCH_METHOD,
-        "pp_size": int(STAGE_NUM),
-        "model_size": int(LAYER_NUM),
+        "stage_num": int(STAGE_NUM),
+        "layer_num": int(LAYER_NUM),
         "nmb": int(MICRO_BATCH_NUM),
         "f_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "b_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "w_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
         "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
         "mix_training": MIX_TRAINING,
-        "model_para_num": PARAMETER_NUM,
+        "para_num": PARAMETER_NUM,
         "comm_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
         "sequential_order_constraint_strategy": "strict",
         "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
@@ -135,18 +135,18 @@ def main():
 if __name__ == "__main__":
     # config = {
     #     "run_mode": RUN_MODE,
-    #     "device_size": int(DEVICE_NUM),
+    #     "device_num": int(DEVICE_NUM),
     #     "time_limit": int(SOLVING_TIME_LIMIT),
     #     "stage_order_search": STAGE_SEARCH_METHOD,
-    #     "pp_size": int(STAGE_NUM),
-    #     "model_size": int(LAYER_NUM),
+    #     "stage_num": int(STAGE_NUM),
+    #     "layer_num": int(LAYER_NUM),
     #     "nmb": int(MICRO_BATCH_NUM),
     #     "f_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
     #     "b_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
     #     "w_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
     #     "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
     #     "mix_training": MIX_TRAINING,
-    #     "model_para_num": PARAMETER_NUM,
+    #     "para_num": PARAMETER_NUM,
     #     "comm_time": [[COMM_TIME if i != j else 0 for j in range(STAGE_NUM)] for i in range(STAGE_NUM)],
     #     "sequential_order_constraint_strategy": "strict",
     #     "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
