@@ -361,6 +361,7 @@ class Device:
                 if self.current_mem_usage > GPU_MAX_MEM * self.memory_usage_constrain_rate:
                     now_workload_priority_order = [WorkloadType.W, WorkloadType.B, WorkloadType.F]
                 mb_range = self.mid_traverse_order
+                
                 # if not self.ok_flag:
                 #     now_workload_priority_order = [WorkloadType.W, WorkloadType.B, WorkloadType.F]
                 #     for workload_type in now_workload_priority_order:

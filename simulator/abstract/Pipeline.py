@@ -123,7 +123,7 @@ class PipelineScheduler:
             device = Device(device_id = did, 
                             max_activation_counts=MAX_ACTIVATION_COUNTS, 
                             nmb=MICRO_BATCH_NUM,
-                            memory_usage_constrain_rate=0.85 if did == 0 else 0.85
+                            memory_usage_constrain_rate=0.85
                             )
             self.devices.append(device)
         self.set_recomp()
@@ -150,6 +150,22 @@ class PipelineScheduler:
                 for pid in range(LAYER_NUM - 1):
                     self.devices[orders[pid]].add_stage(pid + 1, recomp=self.recomp_set[pid])
                 self.devices[-1].add_stage(LAYER_NUM, recomp=self.recomp_set[pid])
+            elif STAGE_PLACEMENT == Placement.CROSS:
+                print("Use V+I placement")
+                for pid in range(LAYER_NUM):
+                    # if (pid // (DEVICE_NUM * 2)) == LAYER_NUM // (DEVICE_NUM * 2) - 1:
+                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                    # else:
+                        # if (pid // (DEVICE_NUM * 2)) % 2 == 0:
+                        #     if (pid // DEVICE_NUM) % 2 == 0:
+                        #         self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                        #     else:
+                        #         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                        # else:
+                        #     if (pid // DEVICE_NUM) % 2 == 1:
+                        #         self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                        #     else:
+                        #         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
             else:   
                 print("Use Wavelike placement")
                 offset = DEVICE_NUM if REVERSE_LAST_STAGES else 0
@@ -515,6 +531,7 @@ class PipelineScheduler:
                 self.temp_results = copy.deepcopy(self.results)
         else:
             print("Fail")
+        # print(self.results)
         # input("RUN OVER")
         if AUTO_RECOMP_SEARCH:
             # self.record_recomp_set()
