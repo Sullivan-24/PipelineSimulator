@@ -241,14 +241,14 @@ class CompCommSimulator:
             workload_len = F_TIME * layers
             if SCHEDULE_METHOD == Schedule.Layerwise:
                 if lid == 0:
-                    workload_len = EMBEDDING_TIME
+                    workload_len = EMB_TIME
                 elif lid == LAYER_NUM - 1:
                     workload_len = CE_F_TIME
                 elif lid == LAYER_NUM - 2:
                     workload_len = HEAD_F_TIME
             else:
                 if lid == 0:
-                    workload_len += EMBEDDING_TIME
+                    workload_len += EMB_TIME
                 elif lid == STAGE_NUM - 1:
                     workload_len += CE_F_TIME + HEAD_F_TIME
         elif workload_type == "b":

@@ -31,7 +31,7 @@ class Stage:
             if workload_type == WorkloadType.F:
                 duration = F_TIME
                 if stage_type == StageType.EMBD:
-                    duration = EMBEDDING_TIME
+                    duration = EMB_TIME
                 elif stage_type == StageType.CE:
                     duration = CE_F_TIME
                 elif stage_type == StageType.HEAD:
@@ -56,7 +56,7 @@ class Stage:
             if workload_type == WorkloadType.F:
                 duration = F_TIME * layer_per_stage
                 if stage_id == 0:
-                    duration += EMBEDDING_TIME
+                    duration += EMB_TIME
                 elif stage_id == STAGE_NUM - 1:
                     duration += HEAD_F_TIME + CE_F_TIME
             elif workload_type == WorkloadType.B:

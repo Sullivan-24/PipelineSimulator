@@ -75,7 +75,7 @@ class GSimulator:
 
     def estimate_time_cost(self):
         fbw_time = (MICRO_BATCH_NUM + DEVICE_NUM) * (F_TIME + B_TIME + W_TIME)
-        emb_time = EMBEDDING_TIME
+        emb_time = EMB_TIME
         head_time = MICRO_BATCH_NUM * (HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME)
         ce_time = MICRO_BATCH_NUM * (CE_F_TIME + CE_B_TIME + CE_W_TIME)
         comm_time = COMM_TIME
@@ -498,14 +498,14 @@ class GSimulator:
             workload_len = F_TIME * layers
             if SCHEDULE_METHOD == Schedule.Layerwise:
                 if lid == 0:
-                    workload_len = EMBEDDING_TIME
+                    workload_len = EMB_TIME
                 elif lid == LAYER_NUM - 1:
                     workload_len = CE_F_TIME
                 elif lid == LAYER_NUM - 2:
                     workload_len = HEAD_F_TIME
             else:
                 if lid == 0:
-                    workload_len += EMBEDDING_TIME
+                    workload_len += EMB_TIME
                 elif lid == STAGE_NUM - 1:
                     workload_len += CE_F_TIME + HEAD_F_TIME
         elif workload_type == "b":

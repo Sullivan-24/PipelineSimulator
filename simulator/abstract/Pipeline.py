@@ -21,7 +21,7 @@ class PipelineScheduler:
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
-        self.microbatch_schedule_range = range(0,min(MICRO_BATCH_NUM, MICRO_BATCH_NUM))
+        self.microbatch_schedule_range = range(0,min(SCHEDULE_UNIT, MICRO_BATCH_NUM))
         # self.microbatch_schedule_range = range(0,min(8, MICRO_BATCH_NUM))
         self.acc_finished_mb = 0
         self.finish_flag = False
@@ -500,7 +500,7 @@ class PipelineScheduler:
         return True
 
     def run_pipeline_parallelism(self, time_limit = TIME_LIMIT):
-        self.run_schedule = False
+        # self.run_schedule = False
 
         while GET_TIME() <= time_limit and not self.finish_flag:
             self.check_workload_status()
@@ -634,14 +634,14 @@ class PipelineScheduler:
             workload_len = F_TIME * layers
             if LAYERWISE:
                 if lid == 0:
-                    workload_len = EMBEDDING_TIME
+                    workload_len = EMB_TIME
                 elif lid == LAYER_NUM - 1:
                     workload_len = CE_F_TIME
                 elif lid == LAYER_NUM - 2:
                     workload_len = HEAD_F_TIME
             else:
                 if lid == 0:
-                    workload_len += EMBEDDING_TIME
+                    workload_len += EMB_TIME
                 elif lid == STAGE_NUM - 1:
                     workload_len += CE_F_TIME + HEAD_F_TIME
         elif workload_type == "b":

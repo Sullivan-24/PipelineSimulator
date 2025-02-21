@@ -305,7 +305,7 @@ class ChimeraSimulator:
 
     def estimate_time_cost(self):
         fbw_time = (MICRO_BATCH_NUM + DEVICE_NUM) * (F_TIME + B_TIME + W_TIME)
-        emb_time = EMBEDDING_TIME
+        emb_time = EMB_TIME
         head_time = MICRO_BATCH_NUM * (HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME)
         ce_time = MICRO_BATCH_NUM * (CE_F_TIME + CE_B_TIME + CE_W_TIME)
         comm_time = COMM_TIME
@@ -363,12 +363,12 @@ class ChimeraStream:
         self._profiled_layer_w_length = config["backward_execution_g_time"]
 
         if self._emb_head_ce:
-            self._profiled_layer_f_length = [EMBEDDING_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
+            self._profiled_layer_f_length = [EMB_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
             self._profiled_layer_b_length = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
             self._profiled_layer_w_length = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
             self._num_layer += 3
         else:        
-            self._profiled_layer_f_length[0] += EMBEDDING_TIME
+            self._profiled_layer_f_length[0] += EMB_TIME
             self._profiled_layer_f_length[-1] += CE_F_TIME + HEAD_F_TIME
             self._profiled_layer_b_length[-1] += CE_B_TIME + HEAD_B_TIME
             self._profiled_layer_w_length[-1] += CE_W_TIME + HEAD_W_TIME
