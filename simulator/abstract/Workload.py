@@ -7,9 +7,9 @@ class Workload:
     COMPLETED = 3
 
     def __init__(self, device_id:int, microbatch_id: int, stage_id: int, duration: int, total_stages:int, workload_type: WorkloadType, recomp:bool):
-        self.device_id = device_id
-        self.microbatch_id: int = microbatch_id  # 微批次编号
-        self.stage_id: int = stage_id              # 阶段编号
+        self.did = device_id
+        self.mid: int = microbatch_id  # 微批次编号
+        self.sid: int = stage_id              # 阶段编号
         self.duration: int = duration               # 任务所需时间
         self.start_time: float = None               # 初始开始时间为None
         self.end_time: float = None                 # 结束时间
@@ -17,7 +17,7 @@ class Workload:
         self.ready_time: int = -1
         self.total_stages: int = total_stages
         self.recomp:bool = recomp
-        if self.microbatch_id == 0 and self.stage_id == 0:
+        if self.mid == 0 and self.sid == 0:
             self.ready_time = 0
         self.workload_type: WorkloadType = workload_type  # 工作负载类型
         self.constraints: set = set()               # {(i1, j1, C1), ...}表示Stage i1 上的Microbatch j1 的 C1 操作是前置约束
@@ -25,42 +25,42 @@ class Workload:
 
     def _generate_constraints(self):
         if self.workload_type == WorkloadType.F:
-            if self.stage_id > 0:
+            if self.sid > 0:
                 self.constraints.add(
                     WorkloadConstraint(
-                        device_id = self.device_id,
-                        microbatch_id = self.microbatch_id,
-                        stage_id = self.stage_id - 1,
+                        device_id = self.did,
+                        microbatch_id = self.mid,
+                        stage_id = self.sid - 1,
                         workload_type = WorkloadType.F)
                 )
         elif self.workload_type == WorkloadType.B:
-            if self.stage_id + 1 < self.total_stages:
+            if self.sid + 1 < self.total_stages:
                 self.constraints.add(
                     WorkloadConstraint(
-                        device_id = self.device_id,
-                        stage_id = self.stage_id+1, 
-                        microbatch_id= self.microbatch_id, 
+                        device_id = self.did,
+                        stage_id = self.sid+1, 
+                        microbatch_id= self.mid, 
                         workload_type = WorkloadType.B)
                 )
             else:
                 self.constraints.add(
                     WorkloadConstraint(
-                        device_id = self.device_id,
+                        device_id = self.did,
                         stage_id=self.total_stages - 1, 
-                        microbatch_id=self.microbatch_id, 
+                        microbatch_id=self.mid, 
                         workload_type = WorkloadType.F)
                 )
         elif self.workload_type == WorkloadType.W:
             self.constraints.add(
                 WorkloadConstraint(
-                    device_id = self.device_id,
-                    stage_id=self.stage_id, 
-                    microbatch_id=self.microbatch_id, 
+                    device_id = self.did,
+                    stage_id=self.sid, 
+                    microbatch_id=self.mid, 
                     workload_type=WorkloadType.B)
             )
 
     def _generate_communication(self, constraint: WorkloadConstraint):
-        if constraint.device_id != self.device_id:
+        if constraint.did != self.did:
             self.ready_time = max(self.ready_time, GET_TIME() + COMM_TIME)
         else:
             self.ready_time = max(self.ready_time, GET_TIME())
@@ -91,8 +91,8 @@ class Workload:
             self.state = Workload.COMPLETED
 
     def __repr__(self):
-        return (f"{self.__class__.__name__}(device_id={self.device_id}, "
-            f"microbatch_id={self.microbatch_id}, stage_id={self.stage_id}, "
+        return (f"{self.__class__.__name__}(device_id={self.did}, "
+            f"microbatch_id={self.mid}, stage_id={self.sid}, "
             f"duration={self.duration}, start_time={self.start_time}, "
             f"end_time={self.end_time}, state={self.state}, "
             f"ready_time={self.ready_time}, total_stages={self.total_stages}, "

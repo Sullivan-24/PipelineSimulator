@@ -15,9 +15,9 @@ SCHEDULE_METHOD = Schedule.Layerwise
 # SCHEDULE_METHOD = Schedule.INTERLEAVED
 # SCHEDULE_METHOD = Schedule.ZBV
 STAGE_PLACEMENT = Placement.WAVELIKE
-# STAGE_PLACEMENT = Placement.CROSS
+STAGE_PLACEMENT = Placement.CROSS
 # STAGE_PLACEMENT = Placement.RECURRENT
-# STAGE_PLACEMENT = Placement.INTERLEAVED
+STAGE_PLACEMENT = Placement.INTERLEAVED
 
 # --------------------- Solver config ---------------------
 
@@ -29,8 +29,8 @@ TIME_LIMIT = 4500
 
 EMB_TIME = 1
 HEAD_F_TIME = 2
-HEAD_B_TIME = 2
-HEAD_W_TIME = 2
+HEAD_B_TIME = 1
+HEAD_W_TIME = 1
 CE_F_TIME = 2
 CE_B_TIME = 2
 CE_W_TIME = 0
@@ -92,7 +92,7 @@ class Gradient:
 
 
 # --------------------- Painter Config ---------------------
-PIXEL_BASE = 2
+PIXEL_BASE = 4
 PP_HEIGHT = 35
 PP_ALIGN = 5
 SHOW_WORKLOAD_TEXT = True

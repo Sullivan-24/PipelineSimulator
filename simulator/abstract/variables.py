@@ -53,24 +53,24 @@ class WorkloadConstraint:
                  stage_id: int, 
                  workload_type: WorkloadType,
                 ) -> None:
-        self.device_id = device_id
-        self.microbatch_id: int = microbatch_id  # 微批次编号
-        self.stage_id: int = stage_id              # 阶段编号
+        self.did = device_id
+        self.mid: int = microbatch_id  # 微批次编号
+        self.sid: int = stage_id              # 阶段编号
         self.workload_type: WorkloadType = workload_type  # 工作负载类型
 
     def __eq__(self, other):
         if not isinstance(other, WorkloadConstraint):
             return NotImplemented
         return (
-            self.microbatch_id == other.microbatch_id 
-            and self.stage_id == other.stage_id
+            self.mid == other.mid 
+            and self.sid == other.sid
             and self.workload_type == other.workload_type
         )
     
     def __hash__(self):
-        return hash((self.microbatch_id, self.stage_id, self.workload_type))
+        return hash((self.mid, self.sid, self.workload_type))
     
     def __repr__(self):
-        return (f"{self.__class__.__name__}(device_id={self.device_id}, "
-            f"microbatch_id={self.microbatch_id}, stage_id={self.stage_id}, "
+        return (f"{self.__class__.__name__}(device_id={self.did}, "
+            f"microbatch_id={self.mid}, stage_id={self.sid}, "
             f"workload_type={self.workload_type})")

@@ -105,8 +105,8 @@ class PipelineScheduler:
 
     def show_detail_info(self):
         for device in self.devices:
-            print("Device ID:{}".format(device.device_id))
-            if device.device_id == 7:
+            print("Device ID:{}".format(device.did))
+            if device.did == 7:
                 device.show_stages(detail_info=True)
 
     def set_microbatch_schedule_range(self, microbatch_schedule_range):
@@ -153,19 +153,10 @@ class PipelineScheduler:
             elif STAGE_PLACEMENT == Placement.CROSS:
                 print("Use V+I placement")
                 for pid in range(LAYER_NUM):
-                    # if (pid // (DEVICE_NUM * 2)) == LAYER_NUM // (DEVICE_NUM * 2) - 1:
-                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
-                    # else:
-                        # if (pid // (DEVICE_NUM * 2)) % 2 == 0:
-                        #     if (pid // DEVICE_NUM) % 2 == 0:
-                        #         self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
-                        #     else:
-                        #         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
-                        # else:
-                        #     if (pid // DEVICE_NUM) % 2 == 1:
-                        #         self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
-                        #     else:
-                        #         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                    if (pid // (DEVICE_NUM)) == LAYER_NUM // (DEVICE_NUM) - 1:
+                        self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                    else:
+                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
             else:   
                 print("Use Wavelike placement")
                 offset = DEVICE_NUM if REVERSE_LAST_STAGES else 0
@@ -389,8 +380,8 @@ class PipelineScheduler:
     def record_workload(self, workload: Workload):
         if workload:
             wlt = workload.workload_type.value.lower()
-            mid = workload.microbatch_id
-            sid = workload.stage_id
+            mid = workload.mid
+            sid = workload.sid
             k = '{}_{}_{}'.format(wlt,mid,sid)
             self.results[k] = workload.start_time
             if self.last_workload is None or workload.start_time + workload.duration > self.last_workload.start_time + self.last_workload.duration:
@@ -589,14 +580,14 @@ class PipelineScheduler:
     def show_mem_usage(self, device_id=(0,1, DEVICE_NUM-1), show_all=False):
         max_mem_usage = -1
         for device in self.devices:
-            aim_file_path = "schedule_results/did{}_mem_usage.txt".format(device.device_id)
+            aim_file_path = "schedule_results/did{}_mem_usage.txt".format(device.did)
             if os.path.exists(aim_file_path):  # 判断文件是否存在
                 with open(aim_file_path, "w") as file:  # 以写入模式打开文件（会清空文件内容）
                     file.truncate(0)  # 清空文件内容
                 print(f"文件 {aim_file_path} 已存在，内容已清除。")
             else:
                 print(f"文件 {aim_file_path} 不存在，无需清除。")
-            print_to_file(aim_file_path, "Device {} mem usage:\n".format(device.device_id))
+            print_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did))
             last_mem_record = 0
             for t, mem_record in device.mem_usage_record.items():
                 print_to_file(aim_file_path, "Time {}, mem = {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2)))

@@ -42,8 +42,8 @@ class ChimeraPipelineScheduler:
 
     def show_detail_info(self):
         for device in self.devices:
-            print("Device ID:{}".format(device.device_id))
-            if device.device_id == 7:
+            print("Device ID:{}".format(device.did))
+            if device.did == 7:
                 device.show_stages(detail_info=True)
 
     def set_microbatch_schedule_range(self, microbatch_schedule_range):
@@ -96,23 +96,23 @@ class ChimeraPipelineScheduler:
     def update_constraints(self, constraint:Workload):
         for device in self.devices:
             # NOTE only update constraints within the same Chimera stream
-            if constraint.device_id // DEVICE_NUM == device.device_id // DEVICE_NUM:
+            if constraint.did // DEVICE_NUM == device.did // DEVICE_NUM:
                 device.update_constraints(constraint=constraint)
         
     def record_workload(self, workload: Workload):
         if workload:
             print("did={}({}), {}, sid={}, mid={}, s={}, e={}".format(
-                workload.device_id%DEVICE_NUM, workload.device_id, 
-                workload.workload_type.value, workload.stage_id, workload.microbatch_id,
+                workload.did%DEVICE_NUM, workload.did, 
+                workload.workload_type.value, workload.sid, workload.mid,
                 workload.start_time, workload.end_time,
                 )
             )
             input()
             wlt = workload.workload_type.value.lower()
-            mid = workload.microbatch_id
-            sid = workload.stage_id
+            mid = workload.mid
+            sid = workload.sid
             # NOTE new key for Chimera results
-            did = workload.device_id
+            did = workload.did
             k = 'cwi_{}_{}_{}_{}'.format(did//DEVICE_NUM,wlt,mid,sid)
 
             self.results[k] = workload.start_time
@@ -128,7 +128,7 @@ class ChimeraPipelineScheduler:
                 device.state = Device.IDLE
                 # 0 1 2 3      4 5 6 7
                 real_device_num = self.device_num // self.chimera_stream_num
-                self.devices[(device.device_id + real_device_num) % self.device_num].state = Device.IDLE
+                self.devices[(device.did + real_device_num) % self.device_num].state = Device.IDLE
 
         # if self.num_finished_microbatch == (1 + LAYER_NUM) * len(self.microbatch_schedule_range):
         #     self.num_finished_microbatch = 0
@@ -169,7 +169,7 @@ class ChimeraPipelineScheduler:
                             device.update_memory_usage()
                             device.state = Device.BUSY
                             real_device_num = self.device_num // self.chimera_stream_num
-                            self.devices[(device.device_id + real_device_num) % self.device_num].state = Device.BUSY
+                            self.devices[(device.did + real_device_num) % self.device_num].state = Device.BUSY
                             # for d in self.devices:
                             #     print(d)
                             # input()
@@ -190,8 +190,8 @@ class ChimeraPipelineScheduler:
     def show_mem_usage(self, device_id=(0,)):
         max_mem_usage = -1
         for device in self.devices:
-            if device.device_id in device_id:
-                print("Device {} mem usage:".format(device.device_id))
+            if device.did in device_id:
+                print("Device {} mem usage:".format(device.did))
                 last_mem_record = 0
                 for t, mem_record in device.mem_usage_record.items():
                     print("Time {}, mem = {}, {}.".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2)))
@@ -207,11 +207,11 @@ class ChimeraPipelineScheduler:
         for device in self.devices:
             for sid in device.stages:
                 for mid in range(MICRO_BATCH_NUM):
-                    fwd_time[device.device_id // DEVICE_NUM][sid] = device.stages[sid].workloads[mid][WorkloadType.F].duration
+                    fwd_time[device.did // DEVICE_NUM][sid] = device.stages[sid].workloads[mid][WorkloadType.F].duration
                     if WorkloadType.B in device.stages[sid].workloads[mid]:
-                        iwd_time[device.device_id // DEVICE_NUM][sid] = device.stages[sid].workloads[mid][WorkloadType.B].duration
+                        iwd_time[device.did // DEVICE_NUM][sid] = device.stages[sid].workloads[mid][WorkloadType.B].duration
                     if WorkloadType.W in device.stages[sid].workloads[mid]:
-                        pwd_time[device.device_id // DEVICE_NUM][sid] = device.stages[sid].workloads[mid][WorkloadType.W].duration
+                        pwd_time[device.did // DEVICE_NUM][sid] = device.stages[sid].workloads[mid][WorkloadType.W].duration
         return fwd_time, iwd_time, pwd_time
     
     def write_fbw_to_file(self):

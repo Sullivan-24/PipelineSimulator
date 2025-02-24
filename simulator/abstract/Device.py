@@ -3,7 +3,7 @@ import queue
 from ..utils import print_to_file
 
 def get_required_memory_by_workload(workload:Workload):
-        stage_id = workload.stage_id
+        stage_id = workload.sid
         layer_num = LAYER_NUM // DEVICE_NUM // CHUNK_NUM
         workload_type = workload.workload_type
         workload_type_num = WORKLOAD_TYPE_NUM
@@ -113,15 +113,15 @@ class MemoryMonitor:
         self.workloads_required_mem:list[int] = [0 for _ in range(self.nmb)]
 
     def init_monitor(self):
-        self.init_memory_usage()
-        self.init_required_mem_for_each_microbatch()
+        self.init_mem_usage()
+        self.init_reserved_mem_by_mid()
 
-    def init_memory_usage(self):
+    def init_mem_usage(self):
         optimizer_mem = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)
         model_mem = sum(stage.memory_usage for stage in self.stages.values())
         self.allocated_memory = optimizer_mem + model_mem
 
-    def init_required_mem_for_each_microbatch(self):
+    def init_reserved_mem_by_mid(self):
         workload_type = WorkloadType.F
         for mid in range(self.nmb):
             for sid in self.stages:
@@ -129,13 +129,13 @@ class MemoryMonitor:
                 workload_mem_usage = get_required_memory_by_workload(workload)
                 self.workloads_required_mem[mid] += workload_mem_usage
 
-            self.workloads_required_mem[mid] += Activation.FULL + Gradient.INPUT + Gradient.PARAMETER
+            self.workloads_required_mem[mid] += Activation.LOSS + Gradient.INPUT + Gradient.PARAMETER
 
     def trace_workload(self,workload:Workload):
         self.tracing_workloads.append(workload)
         workload_mem_usage = get_required_memory_by_workload(workload)
         self.allocated_memory += workload_mem_usage
-        self.workloads_required_mem[workload.microbatch_id] -= workload_mem_usage
+        self.workloads_required_mem[workload.mid] -= workload_mem_usage
     
     def get_tolerant_mids(self, workload:Workload):
         workload_mem_usage = get_required_memory_by_workload(workload)
@@ -155,7 +155,7 @@ class Device:
     IDLE = 2
 
     def __init__(self, device_id: int, max_activation_counts: int, nmb:int, static_schedule: list = None, memory_usage_constrain_rate: float = 1):
-        self.device_id = device_id
+        self.did = device_id
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
         self.proc_workload: Workload = None
@@ -199,7 +199,7 @@ class Device:
     def init_memory_monitor(self):
         self.memory_monitor = MemoryMonitor(self.nmb, self.stages)
         self.memory_monitor.init_monitor()
-        print(f"Device {self.device_id} init MemoryMonitor.")
+        print(f"Device {self.did} init MemoryMonitor.")
         print(self.memory_monitor.allocated_memory)
 
     def init_required_mem_for_each_microbatch(self):
@@ -259,9 +259,9 @@ class Device:
     def overlap_aware_executable_workload_reorder(self, workload:Workload):
         if workload:
             if workload.workload_type ==  WorkloadType.F:
-                next_stage_id = workload.stage_id + 1
+                next_stage_id = workload.sid + 1
             elif workload.workload_type == WorkloadType.B:
-                next_stage_id = workload.stage_id - 1
+                next_stage_id = workload.sid - 1
             else:
                 return
             
@@ -269,7 +269,7 @@ class Device:
                 head = []
                 tail = []
                 for wl in self.executable_workloads:
-                    if wl.microbatch_id == workload.microbatch_id and wl.workload_type == workload.workload_type and wl.stage_id == next_stage_id:
+                    if wl.mid == workload.mid and wl.workload_type == workload.workload_type and wl.sid == next_stage_id:
                         tail.append(wl)
                     else:
                         head.append(wl)
@@ -311,14 +311,14 @@ class Device:
             if stage_id == STAGE_NUM - 1:
                 basic_memory += HEAD_MEMORY
         stage = Stage(
-                device_id=self.device_id, 
+                device_id=self.did, 
                 stage_id=stage_id,
                 memory_usage=basic_memory/TP_SIZE, 
                 stage_type=stage_type,
                 recomp=recomp,
                 layerwise=layerwise,
             )
-        self.stages[stage.stage_id] = stage
+        self.stages[stage.sid] = stage
         self.total_layers+=layer_per_stage
 
     def update_constraints(self, constraint):
@@ -337,12 +337,12 @@ class Device:
         if self.state == Device.IDLE:
             if TEMP_TEST:
                 self.situations *= len(self.executable_workloads)
-                print_to_file(f"schedule_results/device{self.device_id}.txt",f"{GET_TIME()},{len(self.executable_workloads)}\n")
+                print_to_file(f"schedule_results/device{self.did}.txt",f"{GET_TIME()},{len(self.executable_workloads)}\n")
                 for workload in self.executable_workloads:
                     workload_type = workload.workload_type
-                    sid = workload.stage_id
-                    mid = workload.microbatch_id
-                    did = workload.device_id
+                    sid = workload.sid
+                    mid = workload.mid
+                    did = workload.did
 
                     required_memory = get_required_memory(
                         stage_id=sid, 
@@ -375,7 +375,7 @@ class Device:
                         else:
                             raise Exception("Error workload type.")
                         
-                        self.mid_priority[proc_workload.microbatch_id] -= 1
+                        self.mid_priority[proc_workload.mid] -= 1
                         self.proc_workload = proc_workload
                         self.update_memory_usage()
                         self.state = Device.BUSY
@@ -515,9 +515,9 @@ class Device:
                         raise Exception("Error workload type.")
                     self.next_workload_idx += 1
 
-                    if workload_type == WorkloadType.F and self.exe_num_f == DEVICE_NUM * (CHUNK_NUM - 1) + (DEVICE_NUM - self.device_id - 1) * 2:
+                    if workload_type == WorkloadType.F and self.exe_num_f == DEVICE_NUM * (CHUNK_NUM - 1) + (DEVICE_NUM - self.did - 1) * 2:
                         f_time = F_TIME * LAYER_NUM // CHUNK_NUM // DEVICE_NUM
-                        self.wait_for_schedule = GET_TIME() + (DEVICE_NUM - self.device_id) * f_time * 2 - f_time
+                        self.wait_for_schedule = GET_TIME() + (DEVICE_NUM - self.did) * f_time * 2 - f_time
                     return proc_workload
 
                 
@@ -642,7 +642,7 @@ class Device:
                 else:
                     workload_type = WorkloadType.F
 
-                if self.warmup_num_f < DEVICE_NUM - self.device_id:
+                if self.warmup_num_f < DEVICE_NUM - self.did:
                     workload_type = WorkloadType.F
 
                 if self.warmup_num_f == MICRO_BATCH_NUM:
@@ -859,9 +859,9 @@ class Device:
 
     def update_memory_usage(self) -> int:
         if self.proc_workload.state == Workload.IN_PROGRESS and self.proc_workload.workload_type in (WorkloadType.F, WorkloadType.B):
-            self.stages[self.proc_workload.stage_id].update_memory_usage(workload=self.proc_workload)
+            self.stages[self.proc_workload.sid].update_memory_usage(workload=self.proc_workload)
         elif self.proc_workload.state == Workload.COMPLETED and self.proc_workload.workload_type == WorkloadType.W:
-            self.stages[self.proc_workload.stage_id].update_memory_usage(workload=self.proc_workload)
+            self.stages[self.proc_workload.sid].update_memory_usage(workload=self.proc_workload)
             
         self.current_mem_usage = self.optimizer_mem_usage + sum(stage.memory_usage for stage in self.stages.values())
         self.mem_usage_record[(self.proc_workload.start_time,self.proc_workload.end_time)] = self.current_mem_usage

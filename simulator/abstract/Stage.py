@@ -16,9 +16,9 @@ class Stage:
     WAVELIKE = 3
 
     def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False):
-        self.device_id: int = device_id
-        self.stage_id: int = stage_id
-        self.microbatch_num: int = microbatch_num
+        self.did: int = device_id
+        self.sid: int = stage_id
+        self.nmb: int = microbatch_num
         self.memory_usage: int = memory_usage
         self.workloads: dict[int, {WorkloadType, Workload}] = {}  
         self.stage_type: StageType = stage_type
@@ -74,14 +74,14 @@ class Stage:
         return duration
         
     def _add_workload(self) -> None:
-        for mid in range(self.microbatch_num):
+        for mid in range(self.nmb):
             fpw = Workload(
-                device_id=self.device_id,
-                stage_id=self.stage_id,
+                device_id=self.did,
+                stage_id=self.sid,
                 microbatch_id=mid,
                 workload_type=WorkloadType.F,
                 duration=self._get_workload_duration(
-                    stage_id=self.stage_id,
+                    stage_id=self.sid,
                     stage_type=self.stage_type,
                     workload_type=WorkloadType.F,
                     recomp=self.recomp,
@@ -89,19 +89,19 @@ class Stage:
                 recomp=self.recomp,
                 total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,
             )
-            if self.stage_id == 0 and LAYERWISE:
+            if self.sid == 0 and LAYERWISE:
                 self.workloads[mid]={
                     WorkloadType.F: fpw,
                 }
                 continue
 
             igw = Workload(
-                device_id=self.device_id,
-                stage_id=self.stage_id,
+                device_id=self.did,
+                stage_id=self.sid,
                 microbatch_id=mid,
                 workload_type=WorkloadType.B,
                 duration=self._get_workload_duration(
-                    stage_id=self.stage_id,
+                    stage_id=self.sid,
                     stage_type=self.stage_type,
                     workload_type=WorkloadType.B,
                     recomp=self.recomp,
@@ -115,12 +115,12 @@ class Stage:
             }
             if SPLIT_BACKPROP:
                 pgw = Workload(
-                    device_id=self.device_id,
-                    stage_id=self.stage_id,
+                    device_id=self.did,
+                    stage_id=self.sid,
                     microbatch_id=mid,
                     workload_type=WorkloadType.W,
                     duration=self._get_workload_duration(
-                        stage_id=self.stage_id,
+                        stage_id=self.sid,
                         stage_type=self.stage_type,
                         workload_type=WorkloadType.W,
                         recomp=self.recomp,
@@ -136,9 +136,9 @@ class Stage:
             for wlt in self.workloads[mid]:
                 self.workloads[mid][wlt].update_constraints(
                     WorkloadConstraint(
-                        device_id=constraint.device_id,
-                        stage_id=constraint.stage_id, 
-                        microbatch_id=constraint.microbatch_id, 
+                        device_id=constraint.did,
+                        stage_id=constraint.sid, 
+                        microbatch_id=constraint.mid, 
                         workload_type=constraint.workload_type
                     )
                 ) 
@@ -179,17 +179,17 @@ class Stage:
             layers_per_stage = LAYER_NUM // STAGE_NUM
             if workload.workload_type == WorkloadType.F:
                 self.memory_usage += (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
-                if self.stage_id == STAGE_NUM - 1:
+                if self.sid == STAGE_NUM - 1:
                     self.memory_usage += Activation.LOSS
             elif workload.workload_type == WorkloadType.W:
                 self.memory_usage -= (Activation.FULL + Gradient.INPUT) * layers_per_stage
-                if self.stage_id == STAGE_NUM - 1:
+                if self.sid == STAGE_NUM - 1:
                     self.memory_usage -= Activation.LOSS
             elif SPLIT_BACKPROP and workload.workload_type == WorkloadType.B:
                 self.memory_usage += ((Activation.FULL - Activation.INPUT) * self.recomp + Gradient.INPUT) * layers_per_stage
             elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.B:
                 self.memory_usage -= (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
-                if self.stage_id == STAGE_NUM - 1:
+                if self.sid == STAGE_NUM - 1:
                     self.memory_usage -= Activation.LOSS
         
     def execute_workload(self, mid=None, workload_type=None)->Workload:
@@ -206,5 +206,5 @@ class Stage:
         return None
 
     def __repr__(self) -> str:
-        return (f"StageClass(stage_id={self.stage_id}, "
+        return (f"StageClass(stage_id={self.sid}, "
                 f"memory_usage={self.memory_usage})")
