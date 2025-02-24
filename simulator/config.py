@@ -1,237 +1,67 @@
 from dataclasses import dataclass
 from .abstract.variables import *
-def MEMORY(mem):
-    #TODO not always work
-    if mem > G:
-        return round(mem / G, 2)
-    return mem
+from .model_config import *
 
-G = 1024 * 1024 * 1024
-M = 1024 * 1024
-K = 1024
-B = G
-SHOW_WORKLOAD_TEXT = True
-FIND_OPTIMAL_RECOMP = True
-TEMP_TEST= True
-# TEMP_TEST= False
-TIME_LIMIT = 4500
-
-# Profiled time overhead
-EMB_TIME = 1
-HEAD_F_TIME = 6
-HEAD_B_TIME = 3
-HEAD_W_TIME = 3
-
-CE_F_TIME = 5
-CE_B_TIME = 5
-CE_W_TIME = 0
-
-F_TIME = 12
-B_TIME = 12
-W_TIME = 12
-COMM_TIME = 0
-
-
-EMB_TIME = 0
-HEAD_F_TIME = 0
-HEAD_B_TIME = 0
-HEAD_W_TIME = 0
-CE_F_TIME = 0
-CE_B_TIME = 0
-CE_W_TIME = 0
-
-SPLIT_BACKPROP = True
-SPLIT_BACKPROP = False
-
-LAYERWISE = True
-LAYERWISE = False
-
-RECOMP = False
-RECOMP = False
-
-RUN_SCHEDULE = False
-RUN_STANDARD_ZBV = False
-
+# --------------------- Solver config ---------------------
 BASE_SOLUTION = True
 RUN_MODE = RunMode.LAYERWISE_GUROBI_SOLVE
 RUN_MODE = RunMode.GUROBI_SOLVE
+RUN_MODE = RunMode.CHIMERA
 RUN_MODE = RunMode.SIM_SOLVE
-# RUN_MODE = RunMode.CHIMERA
+
 SOLVING_TIME_LIMIT = 60 * 30
-GLOBAL_TIME = 0
-
-
 SCHEDULE_METHOD = Schedule.Layerwise
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.INTERLEAVED
-# SCHEDULE_METHOD = Schedule.Chimera
+# SCHEDULE_METHOD = Schedule.ZBV
 STAGE_PLACEMENT = Placement.WAVELIKE
 # STAGE_PLACEMENT = Placement.CROSS
 # STAGE_PLACEMENT = Placement.RECURRENT
 # STAGE_PLACEMENT = Placement.INTERLEAVED
 
-FP32 = 4 # 4 Bytes
-FP16 = 2 # 2 Bytes
-PIXEL_BASE = 1
-PP_HEIGHT = 35
-PP_ALIGN = 5
-# Known parameter settings
-DEVICE_NUM = 4 * 1
-GPU_MAX_MEM = 80 * G / G
-WORLD_SIZE = DEVICE_NUM
-PP_SIZE = DEVICE_NUM
-TP_SIZE = WORLD_SIZE // PP_SIZE
+# --------------------- Solver config ---------------------
 
-VOCAB_SIZE = 92544
-NUM_ATTENTION_HEAD = 32
-SEQ_LEN = 2 * K
-HIDDEN_SIZE = 4 * K
-MICRO_BATCH_SIZE = 1
-MICRO_BATCH_NUM = 4 * 1 * 1
-LAYER_NUM = 4 * 2 * 1
-CHUNK_NUM = 2
+
+# --------------------- Simulator config ---------------------
+FIND_OPTIMAL_RECOMP = True
+TEMP_TEST= False
+TIME_LIMIT = 4500
+
+EMB_TIME = 1
+HEAD_F_TIME = 2
+HEAD_B_TIME = 2
+HEAD_W_TIME = 2
+CE_F_TIME = 2
+CE_B_TIME = 2
+CE_W_TIME = 0
+F_TIME = 4
+B_TIME = 4
+W_TIME = 4
+COMM_TIME = 0
+
+SPLIT_BACKPROP = True
+LAYERWISE = True
+RECOMP = False
+RUN_SCHEDULE = False
+RUN_STANDARD_ZBV = True
 AUTO_RECOMP_SEARCH = False
-
-# Run standard ZBV ------
-# SCHEDULE_METHOD = Schedule.ZBV
-# RUN_SCHEDULE = False
-# RUN_STANDARD_ZBV = True
-# Run standard ZBV ------
 SCHEDULE_UNIT = MICRO_BATCH_NUM // 1
 REVERSE_LAST_STAGES = False
 
+# Run standard ZBV ---------------------
+# SCHEDULE_METHOD = Schedule.ZBV
+# RUN_SCHEDULE = False
+# RUN_STANDARD_ZBV = True
+# Run standard ZBV ---------------------
 
-# # Qwen 72B I1F1B --------------
-# LAYERWISE = True
-# REVERSE_LAST_STAGES = False
-# CHUNK_NUM = 10
-# VOCAB_SIZE = 152064
-# HIDDEN_SIZE = 8 * K
-# SEQ_LEN = 4 * K
-# LAYER_NUM = 80
-# DEVICE_NUM = 8
-# SPLIT_BACKPROP = True
-# NUM_ATTENTION_HEAD=64
-# MICRO_BATCH_NUM = 4 * 2 * 2
-# F_TIME = 4
-# B_TIME = 4
-# W_TIME = 4
-# EMB_TIME = 0
-# HEAD_F_TIME = 2
-# HEAD_B_TIME = 1
-# HEAD_W_TIME = 1
-# CE_F_TIME = 2
-# CE_B_TIME = 2
-# CE_W_TIME = 0
-# COMM_TIME = 0
-# WORLD_SIZE = DEVICE_NUM
-# PP_SIZE = DEVICE_NUM
-# TP_SIZE = 8
-# RECOMP = False
-# AUTO_RECOMP_SEARCH = False
-# # Qwen 72B I1F1B --------------
-# LAYERWISE = False
-
-# HEAD_F_TIME = 0
-# HEAD_B_TIME = 0
-# HEAD_W_TIME = 0
-# CE_F_TIME = 0
-# CE_B_TIME = 0
-# CE_W_TIME = 0
-# COMM_TIME = 0
-# TP_SIZE = 8
-# SEQ_LEN = 2 * K
-# HIDDEN_SIZE = 4 * K
-
-# # #Qwen 32B I1F1B --------------
-# LAYERWISE = False
-# REVERSE_LAST_STAGES = False
-# CHUNK_NUM = 8
-# VOCAB_SIZE = 152064
-# HIDDEN_SIZE = 5 * K
-# SEQ_LEN = 4 * K
-# LAYER_NUM = 64
-# DEVICE_NUM = 8
-# SPLIT_BACKPROP = False
-# NUM_ATTENTION_HEAD=40
-# MICRO_BATCH_NUM = 4 * 4 * 1
-# F_TIME = 4
-# B_TIME = 4
-# W_TIME = 4
-# EMBEDDING_TIME = 0
-# HEAD_F_TIME = 2
-# HEAD_B_TIME = 2
-# HEAD_W_TIME = 0
-# CE_F_TIME = 2
-# CE_B_TIME = 2
-# CE_W_TIME = 0
-# WORLD_SIZE = DEVICE_NUM
-# PP_SIZE = DEVICE_NUM
-# TP_SIZE = 4
-# RECOMP = False
-# AUTO_RECOMP_SEARCH = False
-# # #Qwen 32B I1F1B --------------
-
-# # #Qwen 14B I1F1B --------------
-# LAYERWISE = False
-# REVERSE_LAST_STAGES = False
-# CHUNK_NUM = 6
-# VOCAB_SIZE = 152064
-# HIDDEN_SIZE = 5 * K
-# SEQ_LEN = 4 * K
-# LAYER_NUM = 48
-# DEVICE_NUM = 8
-# SPLIT_BACKPROP = False
-# NUM_ATTENTION_HEAD=40
-# MICRO_BATCH_NUM = 4 * 4 * 1
-# F_TIME = 4
-# B_TIME = 4
-# W_TIME = 4
-# EMBEDDING_TIME = 0
-# HEAD_F_TIME = 2
-# HEAD_B_TIME = 2
-# HEAD_W_TIME = 0
-# CE_F_TIME = 2
-# CE_B_TIME = 2
-# CE_W_TIME = 0
-# WORLD_SIZE = DEVICE_NUM
-# PP_SIZE = DEVICE_NUM
-# TP_SIZE = 4
-# RECOMP = False
-# AUTO_RECOMP_SEARCH = False
-# # #Qwen 14B I1F1B --------------
-
-# # #Qwen 7(8)B I1F1B --------------
-# LAYERWISE = False
-# REVERSE_LAST_STAGES = False
-# CHUNK_NUM = 4
-# VOCAB_SIZE = 152064
-# HIDDEN_SIZE = 3.5 * K
-# SEQ_LEN = 4 * K
-# # LAYER_NUM = 28
-# LAYER_NUM = 32
-# DEVICE_NUM = 8
-# SPLIT_BACKPROP = True
-# NUM_ATTENTION_HEAD=40
-# MICRO_BATCH_NUM = 4 * 4 * 1
-# F_TIME = 4
-# B_TIME = 4
-# W_TIME = 4
-# EMBEDDING_TIME = 0
-# HEAD_F_TIME = 2
-# HEAD_B_TIME = 2
-# HEAD_W_TIME = 0
-# CE_F_TIME = 2
-# CE_B_TIME = 2
-# CE_W_TIME = 0
-# WORLD_SIZE = DEVICE_NUM
-# PP_SIZE = DEVICE_NUM
-# TP_SIZE = 2
-# RECOMP = False
-# AUTO_RECOMP_SEARCH = False
-# # #Qwen 7(8)B I1F1B --------------
+# --------------------- Simulator config ---------------------
 
 # Memory overhead calculation
+GPU_MAX_MEM = 80 * G / G
+FP32 = 4 # 4 Bytes
+FP16 = 2 # 2 Bytes
+MIX_TRAINING = True
+DATA_TYPE: int = FP16 if MIX_TRAINING else FP32
 b = MICRO_BATCH_SIZE
 s = SEQ_LEN
 h = HIDDEN_SIZE
@@ -239,26 +69,33 @@ a = NUM_ATTENTION_HEAD
 l = LAYER_NUM
 v = VOCAB_SIZE
 
-MIX_TRAINING = True
-DATA_TYPE: int = FP16 if MIX_TRAINING else FP32
+LAYER_PARA_NUM = 12 * h * h + 13 * h
+HEAD_PARA_NUM = v * h
+PARAMETER_NUM = LAYER_PARA_NUM * LAYER_NUM + HEAD_PARA_NUM
 
+LAYER_MEMORY = DATA_TYPE * LAYER_PARA_NUM / G
+HEAD_MEMORY = DATA_TYPE * HEAD_PARA_NUM / G
+
+OPTIMIZER_MEMORY = PARAMETER_NUM * FP32 * 3 / G # Optimizer status * 2, gradients * 1, model parameters * 1
+MAX_ACTIVATION_TIMES_OF_STAGE_NUM = 3
 @dataclass
 class Activation:
     INPUT: int = (2*b*s*h)/G
     FULL: int = (34*b*s*h + 5*b*s*s*a)/G/TP_SIZE
     LOSS: int = (2*FP32*b*s*v)/G
-
-LAYER_PARA_NUM = 12 * h * h + 13 * h
-HEAD_PARA_NUM = v * h
-LAYER_MEMORY = DATA_TYPE * LAYER_PARA_NUM / G
-HEAD_MEMORY = DATA_TYPE * HEAD_PARA_NUM / G
 @dataclass
 class Gradient:
     INPUT: int = DATA_TYPE * LAYER_PARA_NUM / G
     PARAMETER: int = DATA_TYPE * LAYER_PARA_NUM / G
     HEAD: int = DATA_TYPE * HEAD_PARA_NUM / G
 
-# Memory Overhead
-PARAMETER_NUM = LAYER_PARA_NUM * LAYER_NUM + HEAD_PARA_NUM
-OPTIMIZER_MEMORY = PARAMETER_NUM * FP32 * 3 / G # Optimizer status * 2, gradients * 1, model parameters * 1
-MAX_ACTIVATION_TIMES_OF_STAGE_NUM = 3
+
+
+# --------------------- Painter Config ---------------------
+PIXEL_BASE = 2
+PP_HEIGHT = 35
+PP_ALIGN = 5
+SHOW_WORKLOAD_TEXT = True
+# --------------------- Painter Config ---------------------
+
+

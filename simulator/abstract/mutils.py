@@ -1,30 +1,33 @@
 from ..config import *
 
-if RUN_MODE == RunMode.CHIMERA:
-    SCHEDULE_METHOD = Schedule.ZBH1
-    CHUNK_NUM=1
-if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
-    SCHEDULE_METHOD = Schedule.Layerwise
-if RUN_MODE == RunMode.GUROBI_SOLVE:
-    if SCHEDULE_METHOD == Schedule.ZBH1:
-        print("Pre CHUNK_NUM={}, set CHUNK_NUM=1".format(CHUNK_NUM))
-        CHUNK_NUM = 1
-# SCHEDULE_METHOD = Schedule.Layerwise
-# SCHEDULE_METHOD = Schedule.GREEDY_v1
+WORKLOAD_TYPE_NUM = 3
 if not SPLIT_BACKPROP:
     B_TIME += W_TIME
+    WORKLOAD_TYPE_NUM = 2
 
-if SCHEDULE_METHOD in (Schedule.STANDARD_INTERLEAVED, Schedule.INTERLEAVED, Schedule.ZBV):
-    assert CHUNK_NUM > 1, "INTERLEAVED: CHUNK_NUM should be larger than 1"
+if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
+    assert SCHEDULE_METHOD == Schedule.Layerwise, "SCHEDULE_METHOD should be Layerwise"
+
+if SCHEDULE_METHOD in (Schedule.STANDARD_INTERLEAVED, Schedule.INTERLEAVED):
+    assert CHUNK_NUM > 1, "Interleaved: CHUNK_NUM should be larger than 1"
 elif SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.ZBH1):
     assert CHUNK_NUM == 1, "ZBH1: CHUNK_NUM should be 1"
-elif SCHEDULE_METHOD == Schedule.ZBV and RUN_STANDARD_ZBV:
+elif SCHEDULE_METHOD in (Schedule.ONE_F_ONE_B, Schedule.STANDARD_1F1B):
+    assert CHUNK_NUM == 1, "1F1B: CHUNK_NUM should be 1"
+elif SCHEDULE_METHOD in (Schedule.Chimera, ):
+    assert CHUNK_NUM == 1, "Chimera: CHUNK_NUM should be 1"
+elif SCHEDULE_METHOD in (Schedule.STANDARD_ZBV, Schedule.ZBV, ):
     assert CHUNK_NUM == 2, "ZBV: CHUNK_NUM should be 2"
 
+assert CHUNK_NUM <= (LAYER_NUM // DEVICE_NUM), f"Chunk num should be in [1,{LAYER_NUM//DEVICE_NUM}], but got {CHUNK_NUM}. "
+
 STAGE_NUM = int(DEVICE_NUM * CHUNK_NUM)
+assert STAGE_NUM <= LAYER_NUM, f"Stage ({STAGE_NUM}) should be less than Layer ({LAYER_NUM}). "
+
 MAX_ACTIVATION_COUNTS = int(STAGE_NUM * MAX_ACTIVATION_TIMES_OF_STAGE_NUM)
-WORKLOAD_TYPE_NUM = 3 if SPLIT_BACKPROP else 2
 STAGE_SEARCH_METHOD = StageSearchOrder.Random
+
+GLOBAL_TIME = 0
 
 def UPDATE_TIME():
     global GLOBAL_TIME

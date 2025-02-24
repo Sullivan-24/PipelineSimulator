@@ -6,7 +6,7 @@ def get_required_memory_by_workload(workload:Workload):
         stage_id = workload.stage_id
         layer_num = LAYER_NUM // DEVICE_NUM // CHUNK_NUM
         workload_type = workload.workload_type
-        workload_type_num = 3 if SPLIT_BACKPROP else 2
+        workload_type_num = WORKLOAD_TYPE_NUM
         layer_wise=LAYERWISE
         recomp=workload.recomp
 
@@ -232,8 +232,14 @@ class Device:
         if self.exe_num_b == 0:
             workload_type_order = [WorkloadType.B,WorkloadType.F,WorkloadType.W]
         else:
-            workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
-        
+            if self.last_workload_type == WorkloadType.W:
+                workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
+            elif self.last_workload_type == WorkloadType.B:
+                workload_type_order = [WorkloadType.W,WorkloadType.F,WorkloadType.B]
+            elif self.last_workload_type == WorkloadType.F:
+                workload_type_order = [WorkloadType.B,WorkloadType.W,WorkloadType.F]
+            else:
+                raise Exception("Wrong workload type")
 
         for workload_type in workload_type_order:
             for mid in range(self.nmb):
@@ -242,8 +248,8 @@ class Device:
                     if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
                         executable_workoads.append(workloads[mid][workload_type])
     
-        if self.exe_num_b > 0:
-            executable_workoads.sort(key=lambda x: self.mid_priority[x.microbatch_id], reverse=True)
+        # if self.exe_num_b > 0:
+        #     executable_workoads.sort(key=lambda x: self.mid_priority[x.microbatch_id], reverse=True)
         
         return executable_workoads
     
@@ -342,7 +348,7 @@ class Device:
                         stage_id=sid, 
                         layer_num=1,
                         workload_type=workload_type,
-                        workload_type_num=3 if SPLIT_BACKPROP else 2, 
+                        workload_type_num=WORKLOAD_TYPE_NUM, 
                         layer_wise=True,
                         recomp=self.stages[sid].recomp,
                     )

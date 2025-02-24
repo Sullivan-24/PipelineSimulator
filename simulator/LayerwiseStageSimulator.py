@@ -215,7 +215,7 @@ class LayerwiseSimulator:
                 _pp_vars += self._stage_f_offsets[pp] + self._stage_b_offsets[pp]
                 if SPLIT_BACKPROP:
                     _pp_vars += self._stage_w_offsets[pp]
-            type_of_workload = 3 if SPLIT_BACKPROP else 2
+            type_of_workload = WORKLOAD_TYPE_NUM
             group_size = self._num_microbatches * type_of_workload
             for i, _ in enumerate(_pp_vars):
                 i_pp = stages_within_device[i // group_size]

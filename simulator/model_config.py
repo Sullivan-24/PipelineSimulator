@@ -1,0 +1,60 @@
+
+G = 1024 * 1024 * 1024
+M = 1024 * 1024
+K = 1024
+B = G
+DEVICE_NUM = 4 * 2
+# 自定义模型
+VOCAB_SIZE = 92544
+NUM_ATTENTION_HEAD = 32
+SEQ_LEN = 4 * K
+HIDDEN_SIZE = 4 * K
+LAYER_NUM = 4 * 4 * 4
+MICRO_BATCH_SIZE = 1
+MICRO_BATCH_NUM = 4 * 4 * 1
+
+WORLD_SIZE = DEVICE_NUM
+PP_SIZE = DEVICE_NUM
+TP_SIZE = 4
+
+# # Qwen 72B I1F1B --------------
+# VOCAB_SIZE = 152064
+# HIDDEN_SIZE = 8 * K
+# SEQ_LEN = 4 * K
+# LAYER_NUM = 80
+# NUM_ATTENTION_HEAD=64
+# PP_SIZE = DEVICE_NUM
+# TP_SIZE = 8
+# # Qwen 72B I1F1B --------------
+
+# # #Qwen 32B I1F1B --------------
+# VOCAB_SIZE = 152064
+# HIDDEN_SIZE = 5 * K
+# SEQ_LEN = 4 * K
+# LAYER_NUM = 64
+# NUM_ATTENTION_HEAD=40
+# PP_SIZE = DEVICE_NUM
+# TP_SIZE = 4
+# # #Qwen 32B I1F1B --------------
+
+# # #Qwen 14B I1F1B --------------
+# VOCAB_SIZE = 152064
+# HIDDEN_SIZE = 5 * K
+# SEQ_LEN = 4 * K
+# LAYER_NUM = 48
+# NUM_ATTENTION_HEAD=40
+# PP_SIZE = DEVICE_NUM
+# TP_SIZE = 4
+# # #Qwen 14B I1F1B --------------
+
+# # #Qwen 7(8)B I1F1B --------------
+# VOCAB_SIZE = 152064
+# HIDDEN_SIZE = 3.5 * K
+# SEQ_LEN = 4 * K
+# LAYER_NUM = 32
+# NUM_ATTENTION_HEAD=40
+# PP_SIZE = DEVICE_NUM
+# TP_SIZE = 2
+# # #Qwen 7(8)B I1F1B --------------
+CHUNK_NUM = LAYER_NUM // DEVICE_NUM
+# CHUNK_NUM = 2
