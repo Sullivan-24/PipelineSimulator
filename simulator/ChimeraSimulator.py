@@ -74,7 +74,9 @@ class ChimeraSimulator:
             for did in range(self._num_device):
                 for lid in stream._devices[did]:
                     for mid in range(self._num_microbatches):
-                        pivot = stream._layer_w_offsets[lid][mid]
+                        pivot = stream._layer_b_offsets[lid][mid]
+                        if SPLIT_BACKPROP:
+                            pivot = stream._layer_w_offsets[lid][mid]
                         for o_stream_idx, o_stream in enumerate(self.streams):
                             for o_lid in o_stream._devices[did]:
                                 for o_mid in range(o_stream._num_microbatches):
@@ -82,7 +84,8 @@ class ChimeraSimulator:
                                         continue 
                                     binary_f = self.model.addVar(vtype=GRB.BINARY, name=f'cwi_{stream._chimera_way_idx}_binary_f_{lid}_{mid}_{o_lid}_{o_mid}')
                                     binary_b = self.model.addVar(vtype=GRB.BINARY, name=f'cwi_{stream._chimera_way_idx}_binary_b_{lid}_{mid}_{o_lid}_{o_mid}')
-                                    binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'cwi_{stream._chimera_way_idx}_binary_w_{lid}_{mid}_{o_lid}_{o_mid}')
+                                    if SPLIT_BACKPROP:
+                                        binary_w = self.model.addVar(vtype=GRB.BINARY, name=f'cwi_{stream._chimera_way_idx}_binary_w_{lid}_{mid}_{o_lid}_{o_mid}')
 
                                     eps = 0.1
                                     # M = 10000
@@ -145,6 +148,8 @@ class ChimeraSimulator:
 
     def _get_accumulated_input_gradients(self, stream_idx, did, lid, mid):
         accumulated_input_gradients = 0
+        if not SPLIT_BACKPROP:
+            return accumulated_input_gradients
         orders = self._orders[stream_idx][did][lid][mid]
         for idx, stream in enumerate(self.streams):
             for o_lid in stream._devices[did]:
@@ -166,7 +171,10 @@ class ChimeraSimulator:
                 for o_mid in range(self._num_microbatches):
                     if o_lid == lid and o_mid == mid: # necessary
                         continue
-                    released_memory += orders[o_lid]['w'][o_mid] * (Gradient.INPUT + Activation.FULL)
+                    if SPLIT_BACKPROP:
+                        released_memory += orders[o_lid]['w'][o_mid] * (Gradient.INPUT + Activation.FULL)
+                    else:
+                        released_memory += orders[o_lid]['b'][o_mid] * (Gradient.INPUT)
         return released_memory
 
     def _serial_computation_within_device_constraint(self):
@@ -286,10 +294,11 @@ class ChimeraSimulator:
         for i in range(self._num_layer):
             self.streams[0]._layer_f_length[i] = self.model_result[f"cwi_0_s{i}_f"]
             self.streams[0]._layer_b_length[i] = self.model_result[f"cwi_0_s{i}_b"] 
-            self.streams[0]._layer_w_length[i] = self.model_result[f"cwi_0_s{i}_w"] 
             self.streams[1]._layer_f_length[i] = self.model_result[f"cwi_1_s{i}_f"]
             self.streams[1]._layer_b_length[i] = self.model_result[f"cwi_1_s{i}_b"] 
-            self.streams[1]._layer_w_length[i] = self.model_result[f"cwi_1_s{i}_w"] 
+            if SPLIT_BACKPROP:
+                self.streams[0]._layer_w_length[i] = self.model_result[f"cwi_0_s{i}_w"] 
+                self.streams[1]._layer_w_length[i] = self.model_result[f"cwi_1_s{i}_w"] 
         
         # print(self.model_result)
         if draw:
@@ -327,8 +336,8 @@ class ChimeraSimulator:
             "device_num": self.streams[0]._num_device,
             "devices": [stream._devices for stream in self.streams],
             "stage_num": self.streams[0]._pp_size,
-            "pp_height": 50,
-            "pp_align": 10,
+            "pp_height": PP_HEIGHT,
+            "pp_align": PP_ALIGN,
             "pixel_base": PIXEL_BASE,
             "nmb": self.streams[0]._num_microbatches,
             "forward_length": [stream._layer_f_length for stream in self.streams],

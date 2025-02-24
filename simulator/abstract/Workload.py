@@ -74,7 +74,7 @@ class Workload:
             self._generate_communication(constraint)
 
     def is_executable(self):
-        return len(self.constraints) == 0 and self.ready_time <= GET_TIME()
+        return len(self.constraints) == 0 and self.ready_time <= GET_TIME() and self.state == Workload.NOT_STARTED
     
     def execute(self) -> bool:
         if self.state == Workload.NOT_STARTED:

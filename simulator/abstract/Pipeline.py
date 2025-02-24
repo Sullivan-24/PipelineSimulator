@@ -191,7 +191,7 @@ class PipelineScheduler:
                 for pid in range(STAGE_NUM):
                     self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
             else:
-                assert STAGE_NUM <= LAYER_NUM, "STAGE should be less than LAYER"                
+                assert STAGE_NUM <= LAYER_NUM, f"STAGE should be less than LAYER ({STAGE_NUM} >= {LAYER_NUM})"                
                 offset = DEVICE_NUM if REVERSE_LAST_STAGES else 0
                 for pid in range(STAGE_NUM - offset):
                     if (pid // DEVICE_NUM) % 2 == 0:
@@ -203,9 +203,8 @@ class PipelineScheduler:
 
         for device in self.devices:
             device.init_required_mem_for_each_microbatch()
-            
-        #     mm = MemoryMonitor(device.nmb, device.stages)
-        #     mm.init_monitor()
+            device.init_memory_monitor()
+
 
         for did in range(DEVICE_NUM):
             print(list(self.devices[did].stages.keys()))

@@ -73,10 +73,20 @@ def main():
         "file_path": None,
         "base_solution" : BASE_SOLUTION,
         "schedule_method": SCHEDULE_METHOD,
-        "emb_head_ce": SPLIT_EMB_HEAD_CE,
+        "emb_head_ce": LAYERWISE,
     }
     set_workload_length(config=config)
 
+    if os.path.exists(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt"):
+        os.remove(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt")
+        print("delete file:{}".format(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt"))
+    
+    for did in range(DEVICE_NUM):
+        filepath = f"schedule_results/device{did}.txt"
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            print("delete file:{}".format(filepath))
+     
     print("SEQ={},HID={}".format(SEQ_LEN,HIDDEN_SIZE))
     print("Activation Layer={},Activation Input={},Activation Loss={}".format(Activation.FULL, Activation.INPUT, Activation.LOSS))
     print("Gradient Input={},Gradient Parameters={},Gradient Head={}".format(Gradient.INPUT,Gradient.PARAMETER, Gradient.HEAD))
@@ -154,7 +164,7 @@ if __name__ == "__main__":
     #     "file_path": None,
     #     "base_solution" : BASE_SOLUTION,
     #     "schedule_method": SCHEDULE_METHOD,
-    #     "emb_head_ce": SPLIT_EMB_HEAD_CE,
+    #     "emb_head_ce": LAYERWISE,
     #     "split_backprop": True,
     #     "pixel_base":1,
     # }

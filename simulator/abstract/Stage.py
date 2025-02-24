@@ -192,7 +192,7 @@ class Stage:
                 if self.stage_id == STAGE_NUM - 1:
                     self.memory_usage -= Activation.LOSS
         
-    def execute_workload(self, mid=None, workload_type=None):
+    def execute_workload(self, mid=None, workload_type=None)->Workload:
         if mid is not None and workload_type is not None and workload_type in self.workloads[mid]:
             w = self.workloads[mid][workload_type]
             if w.execute():

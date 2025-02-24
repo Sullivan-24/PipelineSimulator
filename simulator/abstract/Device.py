@@ -1,5 +1,6 @@
 from .Stage import *
 import queue 
+from ..utils import print_to_file
 
 def get_required_memory_by_workload(workload:Workload):
         stage_id = workload.stage_id
@@ -117,7 +118,7 @@ class MemoryMonitor:
 
     def init_memory_usage(self):
         optimizer_mem = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)
-        model_mem = len(self.stages.keys()) * LAYER_MEMORY * LAYER_NUM // DEVICE_NUM
+        model_mem = sum(stage.memory_usage for stage in self.stages.values())
         self.allocated_memory = optimizer_mem + model_mem
 
     def init_required_mem_for_each_microbatch(self):
@@ -192,8 +193,14 @@ class Device:
         self.memory_monitor = None
         self.wait_for_schedule = 0
 
+        self.situations = 1
+        self.mid_priority = [3 * CHUNK_NUM for _ in range(self.nmb)]
+
     def init_memory_monitor(self):
         self.memory_monitor = MemoryMonitor(self.nmb, self.stages)
+        self.memory_monitor.init_monitor()
+        print(f"Device {self.device_id} init MemoryMonitor.")
+        print(self.memory_monitor.allocated_memory)
 
     def init_required_mem_for_each_microbatch(self):
         for mid in range(self.nmb):
@@ -217,14 +224,27 @@ class Device:
                     return True
         return False
 
+    def sort_executable_workload(self, executable_workoads)->list[Workload]:
+        sorted(executable_workoads,)
+
     def get_executable_workload(self)->list[Workload]:
         executable_workoads = []
-        for workload_type in [WorkloadType.B,WorkloadType.F,WorkloadType.W]:
+        if self.exe_num_b == 0:
+            workload_type_order = [WorkloadType.B,WorkloadType.F,WorkloadType.W]
+        else:
+            workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
+        
+
+        for workload_type in workload_type_order:
             for mid in range(self.nmb):
                 for stage_id in self.stages:
                     workloads = self.stages[stage_id].workloads
                     if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
                         executable_workoads.append(workloads[mid][workload_type])
+    
+        if self.exe_num_b > 0:
+            executable_workoads.sort(key=lambda x: self.mid_priority[x.microbatch_id], reverse=True)
+        
         return executable_workoads
     
     def reorder_executable_workload_with_workload_type(self):
@@ -310,6 +330,8 @@ class Device:
     def execute_workload(self, run_schedule=False) -> None:
         if self.state == Device.IDLE:
             if TEMP_TEST:
+                self.situations *= len(self.executable_workloads)
+                print_to_file(f"schedule_results/device{self.device_id}.txt",f"{GET_TIME()},{len(self.executable_workloads)}\n")
                 for workload in self.executable_workloads:
                     workload_type = workload.workload_type
                     sid = workload.stage_id
@@ -336,16 +358,18 @@ class Device:
                     if proc_workload:
                         self.last_workload_type = workload_type
                         if workload_type == WorkloadType.F:
-                            if self.stages[sid].stage_type == StageType.LAYER:
+                            # if self.stages[sid].stage_type == StageType.LAYER:
                                 self.exe_num_f += 1
                         elif workload_type == WorkloadType.B:
-                            if self.stages[sid].stage_type == StageType.LAYER:
+                            # if self.stages[sid].stage_type == StageType.LAYER:
                                 self.exe_num_b += 1
                         elif workload_type == WorkloadType.W:
-                            if self.stages[sid].stage_type == StageType.LAYER:
+                            # if self.stages[sid].stage_type == StageType.LAYER:
                                 self.exe_num_w += 1
                         else:
                             raise Exception("Error workload type.")
+                        
+                        self.mid_priority[proc_workload.microbatch_id] -= 1
                         self.proc_workload = proc_workload
                         self.update_memory_usage()
                         self.state = Device.BUSY

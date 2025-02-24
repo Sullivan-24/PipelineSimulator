@@ -5,6 +5,8 @@ import tkinter as tk
 from tkinter import font
 from .chimera_utils import parse_microbatch_key, print_to_file
 from .abstract.mutils import *
+from .PainterColor import set_color
+
 class LayerwiseSchedulingPainter:
     """Scheduling Painter"""
 
@@ -49,33 +51,33 @@ class LayerwiseSchedulingPainter:
                 return did
         raise Exception("Layer/Stage has not been assigned to any device!")
     
-    def _set_color(self, pid, k):
-        color = None
-        if k == 'f':    #颜色设置，加上w的情况
-            color = "#00AFFF"
-        elif k == 'b':
-            color = "#00FFFF" 
-        else:
-            color = "#00FF6F"
+    # def _set_color(self, pid, k):
+    #     color = None
+    #     if k == 'f':    #颜色设置，加上w的情况
+    #         color = "#00AFFF"
+    #     elif k == 'b':
+    #         color = "#00FFFF" 
+    #     else:
+    #         color = "#00FF6F"
 
-        if self._emb_head_ce:
-            if pid == 0:
-                color = "#FF0000" # 红色: #FF0000
-            elif pid == self._num_layer - 2:
-                if k == 'f':
-                    color = "#800080" # 紫色: #800080
-                elif k == 'b':
-                    color = "#EE82EE"
-                else:
-                    color = "#FF00FF"
-            elif pid == self._num_layer - 1:
-                if k == 'f':
-                    color = "#FFA500" # 橙色: #FFA500
-                elif k == 'b':
-                    color = "#FF4500"
-                else:
-                    color = "#FF7F50"
-        return color
+    #     if self._emb_head_ce:
+    #         if pid == 0:
+    #             color = "#FF0000" # 红色: #FF0000
+    #         elif pid == self._num_layer - 2:
+    #             if k == 'f':
+    #                 color = "#800080" # 紫色: #800080
+    #             elif k == 'b':
+    #                 color = "#EE82EE"
+    #             else:
+    #                 color = "#FF00FF"
+    #         elif pid == self._num_layer - 1:
+    #             if k == 'f':
+    #                 color = "#FFA500" # 橙色: #FFA500
+    #             elif k == 'b':
+    #                 color = "#FF4500"
+    #             else:
+    #                 color = "#FF7F50"
+    #     return color
     
     def draw(self, data: dict) -> None:
         """draw with tkinter"""
@@ -106,7 +108,7 @@ class LayerwiseSchedulingPainter:
                 self._num_layer,
                 self._forward_length[0][1], 
                 self._backward_b_length[0][1], 
-                self._backward_w_length[0][1], 
+                self._backward_w_length[0][1] if SPLIT_BACKPROP else 0, 
                 COMM_TIME
             ),
         )
@@ -143,15 +145,15 @@ class LayerwiseSchedulingPainter:
             y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
             filename = f"{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}"
             if RUN_MODE == RunMode.CHIMERA:
-                filename += f"_{SPLIT_EMB_HEAD_CE}"
+                filename += f"_{LAYERWISE}"
             elif RunMode == RunMode.LAYERWISE_GUROBI_SOLVE:
                 filename += f"_{True}"
 
-            print_to_file(f"{filename}.txt", "{}_{}_{}_{},{},{}\n".format(stream_idx,k,mid,pid,offset,offset+block_width))
+            print_to_file(f"schedule_results/{filename}.txt", "{}_{}_{}_{},{},{}\n".format(stream_idx,k,mid,pid,offset,offset+block_width))
 
             mid = mid + stream_idx * self._num_microbatches
             tag = f"p_{pid}_m_{mid}_{k}"
-            color = self._set_color(pid=pid, k=k)
+            color = set_color(sid=pid, workload_type=k, layer_num=self._num_layer)
             if x0 == x1:
                 continue
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)

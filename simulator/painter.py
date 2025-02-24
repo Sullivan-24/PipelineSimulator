@@ -6,6 +6,8 @@ from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
 from .abstract.mutils import COMM_TIME, SPLIT_BACKPROP, MICRO_BATCH_NUM, DEVICE_NUM,SCHEDULE_METHOD,RUN_MODE,LAYER_NUM,SHOW_WORKLOAD_TEXT
 from .PainterToImage import save_canvas_as_image
+from .PainterColor import set_color
+
 class SchedulingPainter:
     """Scheduling Painter"""
 
@@ -125,12 +127,7 @@ class SchedulingPainter:
             print_to_file(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
 
             tag = f"p_{pid}_m_{mid}_{k}"
-            if k == 'f':    #颜色设置，加上w的情况
-                color = "#00AFFF"
-            elif k == 'b':
-                color = "#00FFFF" 
-            else:
-                color = "#00FF6F"
+            color = set_color(pid,workload_type=k,layer_num=self._pp_size)
 
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况

@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
 from .abstract.mutils import *
+from .PainterColor import set_color
 class LayerwiseSchedulingPainter:
     """Scheduling Painter"""
 
@@ -51,33 +52,33 @@ class LayerwiseSchedulingPainter:
                 return did
         raise Exception("Layer/Stage has not been assigned to any device!")
     
-    def _set_color(self, pid, k):
-        color = None
-        if k == 'f':    #颜色设置，加上w的情况
-            color = "#00AFFF"
-        elif k == 'b':
-            color = "#00FFFF" 
-        else:
-            color = "#00FF6F"
+    # def _set_color(self, pid, k):
+    #     color = None
+    #     if k == 'f':    #颜色设置，加上w的情况
+    #         color = "#00AFFF"
+    #     elif k == 'b':
+    #         color = "#00FFFF" 
+    #     else:
+    #         color = "#00FF6F"
 
-        if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE or LAYERWISE:
-            if pid == 0:
-                color = "#FF0000" # 红色: #FF0000
-            elif pid == self._num_layer - 2:
-                if k == 'f':
-                    color = "#800080" # 紫色: #800080
-                elif k == 'b':
-                    color = "#EE82EE"
-                else:
-                    color = "#FF00FF"
-            elif pid == self._num_layer - 1:
-                if k == 'f':
-                    color = "#FFA500" # 橙色: #FFA500
-                elif k == 'b':
-                    color = "#FF4500"
-                else:
-                    color = "#FF7F50"
-        return color
+    #     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE or LAYERWISE:
+    #         if pid == 0:
+    #             color = "#FF0000" # 红色: #FF0000
+    #         elif pid == self._num_layer - 2:
+    #             if k == 'f':
+    #                 color = "#800080" # 紫色: #800080
+    #             elif k == 'b':
+    #                 color = "#EE82EE"
+    #             else:
+    #                 color = "#FF00FF"
+    #         elif pid == self._num_layer - 1:
+    #             if k == 'f':
+    #                 color = "#FFA500" # 橙色: #FFA500
+    #             elif k == 'b':
+    #                 color = "#FF4500"
+    #             else:
+    #                 color = "#FF7F50"
+    #     return color
     
     def draw(self, data: dict) -> None:
         """draw with tkinter"""
@@ -152,7 +153,7 @@ class LayerwiseSchedulingPainter:
             y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
 
             tag = f"p_{pid}_m_{mid}_{k}"
-            color = self._set_color(pid=pid, k=k)
+            color = set_color(sid=pid, workload_type=k, layer_num=self._num_layer)
             if x0 == x1:
                 continue
 

@@ -325,7 +325,7 @@ if __name__ == "__main__":
         "file_path": None,
         "base_solution" : BASE_SOLUTION,
         "schedule_method": SCHEDULE_METHOD,
-        "emb_head_ce": SPLIT_EMB_HEAD_CE,
+        "emb_head_ce": LAYERWISE,
     }
     sim = CompCommSimulator(config=config)
     sim.run()
