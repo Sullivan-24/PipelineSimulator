@@ -20,7 +20,7 @@ class Stage:
         self.sid: int = stage_id
         self.nmb: int = microbatch_num
         self.memory_usage: int = memory_usage
-        self.workloads: dict[int, {WorkloadType, Workload}] = {}  
+        self.workloads: dict[int, dict[WorkloadType, Workload]] = {}  
         self.stage_type: StageType = stage_type
         self.recomp = recomp
         self.layerwise = layerwise
