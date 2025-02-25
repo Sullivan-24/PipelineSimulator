@@ -8,32 +8,16 @@ def get_required_memory_by_workload(workload:Workload):
         workload_type_num = WORKLOAD_TYPE_NUM
         layer_wise=LAYERWISE
         recomp=workload.recomp
-
-        assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type!"
-        if workload_type ==WorkloadType.F:
-            required_memory = Activation.FULL * layer_num 
-            if recomp:
-                required_memory = layer_num * (Activation.FULL * (1 - recomp) + Activation.INPUT * recomp)
-            if layer_wise and stage_id == LAYER_NUM + 1:
-                required_memory = Activation.LOSS
-            elif not layer_wise and stage_id == STAGE_NUM - 1:
-                    required_memory += Activation.LOSS
-        elif workload_type == WorkloadType.B:
-            required_memory = Gradient.INPUT * layer_num
-            if recomp:
-                required_memory += layer_num * (Activation.FULL - Activation.INPUT) * recomp 
-            if workload_type_num == 2:
-                required_memory += Gradient.PARAMETER * layer_num
-        elif workload_type == WorkloadType.W:
-            assert workload_type_num == 3, "Workload number error!"
-            required_memory = Gradient.PARAMETER * layer_num
-        else:
-            raise ValueError("Unsupported workload type!")
-
-        if layer_wise and (stage_id == 0 or stage_id == LAYER_NUM + 2):
-            required_memory = 0
-        return required_memory
-
+        # wrapper of get required memory
+        return get_required_memory(
+            stage_id=stage_id,
+            layer_num=layer_num,
+            workload_type=workload_type,
+            workload_type_num=workload_type_num,
+            layer_wise=layer_wise,
+            recomp=recomp
+        )
+# TODO rethinking the head memory cost
 def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True, recomp=None):
         assert workload_type_num == WORKLOAD_TYPE_NUM, "Mismatch in number of workload type!"
         if workload_type ==WorkloadType.F:
@@ -50,9 +34,13 @@ def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 
                 required_memory += layer_num * (Activation.FULL - Activation.INPUT) * recomp 
             if workload_type_num == 2:
                 required_memory += Gradient.PARAMETER * layer_num
+            if layer_wise and stage_id == LAYER_NUM + 1 and SPLIT_BACKPROP:
+                required_memory = Gradient.HEAD_INPUT
         elif workload_type == WorkloadType.W:
             assert workload_type_num == 3, "Workload number error!"
             required_memory = Gradient.PARAMETER * layer_num
+            if layer_wise and stage_id == LAYER_NUM + 1:
+                required_memory = Gradient.HEAD_PARA
         else:
             raise ValueError("Unsupported workload type!")
 
@@ -80,7 +68,8 @@ class MemoryMonitor:
                 workload = self.stages[sid].workloads[mid][workload_type]
                 required_mem = get_required_memory_by_workload(workload)
                 self.workloads_reserved_mem[mid] += required_mem
-            self.workloads_reserved_mem[mid] += Gradient.INPUT + Gradient.PARAMETER
+            # TODO rethinking the head memory cost
+            self.workloads_reserved_mem[mid] += Gradient.INPUT + Gradient.PARAMETER + Gradient.HEAD_INPUT + Gradient.HEAD_PARA
             print(f"Device {self.did} Reserve {self.workloads_reserved_mem[mid]}G for mid {mid}")
 
     def trace_workload(self,workload:Workload):
@@ -101,7 +90,10 @@ class MemoryMonitor:
                 continue
             if self.workloads_reserved_mem[mid] + required_mem + current_mem <= self.max_memory:
                 safe_count += 1
-
+        # TODO what about F and B? in SPLIT or not?
+        # memory friendly and critical
+        if workload.workload_type == WorkloadType.W and required_mem + current_mem <= self.max_memory:
+            safe_count += 1
         self.workloads_reserved_mem[workload.mid] += required_mem
         return safe_count > 0
 
@@ -168,18 +160,6 @@ class Device:
 
     def get_executable_workload(self)->list[Workload]:
         executable_workoads = []
-        if self.exe_num_b == 0:
-            workload_type_order = [WorkloadType.B,WorkloadType.F,WorkloadType.W]
-        else:
-            if self.last_workload_type == WorkloadType.W:
-                workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
-            elif self.last_workload_type == WorkloadType.B:
-                workload_type_order = [WorkloadType.W,WorkloadType.F,WorkloadType.B]
-            elif self.last_workload_type == WorkloadType.F:
-                workload_type_order = [WorkloadType.B,WorkloadType.W,WorkloadType.F]
-            else:
-                raise Exception("Wrong workload type")
-        
         workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
         if self.last_workload_type == WorkloadType.B:
             workload_type_order = [WorkloadType.F,WorkloadType.W,WorkloadType.B]
@@ -193,22 +173,30 @@ class Device:
             workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W]
 
         # workload_type_order = [WorkloadType.B,WorkloadType.F,WorkloadType.W]
+        
+        # raise priority of head and ce
+        for workload_type in [WorkloadType.W, WorkloadType.B,WorkloadType.F]:
+            for mid in range(self.nmb):
+                for stage_id in self.stages:
+                    if stage_id > LAYER_NUM and LAYERWISE:
+                        workloads = self.stages[stage_id].workloads
+                        if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
+                            executable_workoads = [workloads[mid][workload_type]] + executable_workoads
+        # ensure head to be executed as quickly as possible
+        if len(executable_workoads) > 0:
+            if self.current_mem_usage + Activation.LOSS >= GPU_MAX_MEM:
+                workload_type_order = [WorkloadType.W,WorkloadType.B,WorkloadType.F]
 
         for workload_type in workload_type_order:
             for mid in range(self.nmb):
-                sids = list(self.stages.keys())
-                if LAYERWISE and (LAYER_NUM + 1 in sids):
-                    sids.remove(LAYER_NUM + 1)
-                    sids = [LAYER_NUM + 1] + sids
-                if LAYERWISE and (LAYER_NUM + 2 in sids):
-                    sids.remove(LAYER_NUM + 2)
-                    sids = [LAYER_NUM + 2] + sids
-
                 for stage_id in self.stages:
+                    if stage_id > LAYER_NUM and LAYERWISE:
+                        continue
                     workloads = self.stages[stage_id].workloads
                     if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
                         executable_workoads.append(workloads[mid][workload_type])
-    
+        
+        
         # if self.exe_num_b > 0:
         #     executable_workoads.sort(key=lambda x: self.mid_priority[x.microbatch_id], reverse=True)
         
@@ -295,10 +283,6 @@ class Device:
         if self.state == Device.IDLE:
             if TEMP_TEST:
                 self.executable_workloads = self.get_executable_workload()
-                # for workload in self.executable_workloads:
-                #     if workload.workload_type == WorkloadType.B:
-                #         print(workload.mid)
-                #         input()
                 print_to_file(f"schedule_results/device{self.did}.txt",f"{GET_TIME()},{len(self.executable_workloads)}\n")
                 for workload in self.executable_workloads:
                     workload_type = workload.workload_type

@@ -89,7 +89,7 @@ def main():
      
     print("SEQ={},HID={}".format(SEQ_LEN,HIDDEN_SIZE))
     print("Activation Layer={},Activation Input={},Activation Loss={}".format(Activation.FULL, Activation.INPUT, Activation.LOSS))
-    print("Gradient Input={},Gradient Parameters={},Gradient Head={}".format(Gradient.INPUT,Gradient.PARAMETER, Gradient.HEAD))
+    print("Gradient Input={},Gradient Parameters={},Gradient Head={}".format(Gradient.INPUT,Gradient.PARAMETER, Gradient.HEAD_INPUT))
     print("LOSS={},VOC={}".format(Activation.LOSS,VOCAB_SIZE))
 
     print("LAYER_MEM:{}".format(LAYER_MEMORY))

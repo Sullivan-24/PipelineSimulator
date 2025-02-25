@@ -14,10 +14,10 @@ SCHEDULE_METHOD = Schedule.Layerwise
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.INTERLEAVED
 # SCHEDULE_METHOD = Schedule.ZBV
-STAGE_PLACEMENT = Placement.WAVELIKE
 STAGE_PLACEMENT = Placement.CROSS
 # STAGE_PLACEMENT = Placement.RECURRENT
 STAGE_PLACEMENT = Placement.INTERLEAVED
+# STAGE_PLACEMENT = Placement.WAVELIKE
 
 # --------------------- Solver config ---------------------
 
@@ -25,7 +25,7 @@ STAGE_PLACEMENT = Placement.INTERLEAVED
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
 TEMP_TEST= True
-TIME_LIMIT = 4500
+TIME_LIMIT = 5000
 
 EMB_TIME = 1
 HEAD_F_TIME = 2
@@ -87,7 +87,10 @@ class Activation:
 class Gradient:
     INPUT: int = DATA_TYPE * LAYER_PARA_NUM / G
     PARAMETER: int = DATA_TYPE * LAYER_PARA_NUM / G
-    HEAD: int = DATA_TYPE * HEAD_PARA_NUM / G
+    # HEAD_INPUT: int = DATA_TYPE * HEAD_PARA_NUM / G
+    # HEAD_PARA: int = DATA_TYPE * HEAD_PARA_NUM / G
+    HEAD_INPUT: int = 0
+    HEAD_PARA: int = 0
 
 
 
