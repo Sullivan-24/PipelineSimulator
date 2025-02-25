@@ -92,7 +92,7 @@ class Gradient:
 
 
 # --------------------- Painter Config ---------------------
-PIXEL_BASE = 4
+PIXEL_BASE = 2
 PP_HEIGHT = 35
 PP_ALIGN = 5
 SHOW_WORKLOAD_TEXT = True

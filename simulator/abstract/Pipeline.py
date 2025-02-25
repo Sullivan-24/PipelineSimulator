@@ -420,8 +420,8 @@ class PipelineScheduler:
                 device.state = Device.IDLE
 
 
-        for device in self.devices:
-            device.executable_workloads = device.get_executable_workload()
+        # for device in self.devices:
+        #     device.executable_workloads = device.get_executable_workload()
 
         # for device in self.devices:
         #     if device.proc_workload and device.proc_workload.state == Workload.COMPLETED:
@@ -590,7 +590,8 @@ class PipelineScheduler:
             print_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did))
             last_mem_record = 0
             for t, mem_record in device.mem_usage_record.items():
-                print_to_file(aim_file_path, "Time {}, mem = {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2)))
+                oom_flag = "" if mem_record <= 80 else "OOM"
+                print_to_file(aim_file_path, "Time {}, mem = {}, {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2), oom_flag))
                 last_mem_record = mem_record
                 max_mem_usage = max(max_mem_usage, mem_record)
         

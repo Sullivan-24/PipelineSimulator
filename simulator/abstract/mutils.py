@@ -47,7 +47,7 @@ def RESET_TIME():
 
 
 def is_head_layer(sid, total_layer_num=LAYER_NUM, layerwise=LAYERWISE):
-    if layerwise and total_layer_num - 2 == sid:
+    if layerwise and total_layer_num + 1 == sid:
         return True
     return False
 
