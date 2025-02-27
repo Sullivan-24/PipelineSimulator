@@ -157,7 +157,7 @@ class LayerwiseSchedulingPainter:
             if x0 == x1:
                 continue
 
-            print_to_file(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+            print_to_file(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}_{SPLIT_BACKPROP}_{LAYERWISE}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
 
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况

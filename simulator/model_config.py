@@ -27,6 +27,18 @@ PP_SIZE = DEVICE_NUM
 TP_SIZE = 8
 # Qwen 72B I1F1B --------------
 
+# Qwen 72B I1F1B 400TGS --------------
+DEVICE_NUM = 8
+VOCAB_SIZE = 152064
+HIDDEN_SIZE = 8 * K
+SEQ_LEN = 4 * K
+LAYER_NUM = 80
+NUM_ATTENTION_HEAD=64
+PP_SIZE = DEVICE_NUM
+TP_SIZE = 8
+ZERO_SIZE = 1
+# Qwen 72B I1F1B --------------
+
 # # #Qwen 32B I1F1B --------------
 # VOCAB_SIZE = 152064
 # HIDDEN_SIZE = 5 * K

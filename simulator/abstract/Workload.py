@@ -89,11 +89,29 @@ class Workload:
         """完成任务并更新状态"""
         if self.state == Workload.IN_PROGRESS and self.end_time <= GET_TIME():
             self.state = Workload.COMPLETED
+        
+    def is_head_w(self):
+        if self.workload_type == WorkloadType.F:
+            if LAYERWISE and self.sid == LAYER_NUM + 1:
+                return True
+        return False
 
+    @property
+    def is_w(self):
+        return self.workload_type == WorkloadType.W
+    
+    @property
+    def is_b(self):
+        return self.workload_type == WorkloadType.B
+    
+    @property
+    def is_f(self):
+        return self.workload_type == WorkloadType.F
+    
     def __repr__(self):
-        return (f"{self.__class__.__name__}(device_id={self.did}, "
-            f"microbatch_id={self.mid}, stage_id={self.sid}, "
+        return (f"{self.__class__.__name__}(did={self.did}, "
+            f"mid={self.mid}, sid={self.sid}, workload_type={self.workload_type.name}, "
             f"duration={self.duration}, start_time={self.start_time}, "
             f"end_time={self.end_time}, state={self.state}, "
             f"ready_time={self.ready_time}, total_stages={self.total_stages}, "
-            f"workload_type={self.workload_type}, constraints={self.constraints})")
+            f"constraints={self.constraints})")

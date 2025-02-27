@@ -11,7 +11,7 @@ RUN_MODE = RunMode.SIM_SOLVE
 
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
-# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.INTERLEAVED
 # SCHEDULE_METHOD = Schedule.ZBV
 STAGE_PLACEMENT = Placement.CROSS
@@ -25,14 +25,14 @@ STAGE_PLACEMENT = Placement.INTERLEAVED
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
 TEMP_TEST= True
-TIME_LIMIT = 5000
+TIME_LIMIT = 2500
 
 EMB_TIME = 1
-HEAD_F_TIME = 2
-HEAD_B_TIME = 1
+HEAD_F_TIME = 3
+HEAD_B_TIME = 2
 HEAD_W_TIME = 1
-CE_F_TIME = 2
-CE_B_TIME = 2
+CE_F_TIME = 3
+CE_B_TIME = 3
 CE_W_TIME = 0
 F_TIME = 4
 B_TIME = 4
@@ -85,12 +85,12 @@ class Activation:
     LOSS: int = (2*FP32*b*s*v)/G
 @dataclass
 class Gradient:
-    INPUT: int = DATA_TYPE * LAYER_PARA_NUM / G
-    PARAMETER: int = DATA_TYPE * LAYER_PARA_NUM / G
-    # HEAD_INPUT: int = DATA_TYPE * HEAD_PARA_NUM / G
-    # HEAD_PARA: int = DATA_TYPE * HEAD_PARA_NUM / G
-    HEAD_INPUT: int = 0
-    HEAD_PARA: int = 0
+    INPUT: int = DATA_TYPE * LAYER_PARA_NUM / G / TP_SIZE
+    PARAMETER: int = DATA_TYPE * LAYER_PARA_NUM / G / TP_SIZE
+    HEAD_INPUT: int = DATA_TYPE * HEAD_PARA_NUM / G / TP_SIZE
+    HEAD_PARA: int = DATA_TYPE * HEAD_PARA_NUM / G / TP_SIZE
+    # HEAD_INPUT: int = 0
+    # HEAD_PARA: int = 0
 
 
 

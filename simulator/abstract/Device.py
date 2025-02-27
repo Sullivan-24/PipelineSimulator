@@ -42,7 +42,7 @@ def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 
             if layer_wise and stage_id == LAYER_NUM + 1:
                 required_memory = Gradient.HEAD_PARA
         else:
-            raise ValueError("Unsupported workload type!")
+            raise ValueError("get_required_memory: Unsupported workload type!")
 
         if layer_wise and (stage_id == 0 or stage_id == LAYER_NUM + 2):
             required_memory = 0
@@ -69,13 +69,42 @@ class MemoryMonitor:
                 required_mem = get_required_memory_by_workload(workload)
                 self.workloads_reserved_mem[mid] += required_mem
             # TODO rethinking the head memory cost
-            self.workloads_reserved_mem[mid] += Gradient.INPUT + Gradient.PARAMETER + Gradient.HEAD_INPUT + Gradient.HEAD_PARA
+            # 应该是是动态变化的，而非一成不变，memory monitor需要保证至少剩余的显存容量足够完成一个mid的所有workload
+            # 每次发生memory usage减少的时候都应该重新修改reserved mem的值
+            # 并且还要判断显存开销的最高峰，比如loss的显存开销大于 input+para时要以loss为准，反之要以input+para为准
+            # self.workloads_reserved_mem[mid] += Gradient.INPUT + Gradient.PARAMETER + Gradient.HEAD_INPUT + Gradient.HEAD_PARA
+            self.workloads_reserved_mem[mid] += Gradient.INPUT + Gradient.PARAMETER
+            if self.have_head_layer() and Gradient.HEAD_INPUT + Gradient.HEAD_PARA > Gradient.INPUT + Gradient.PARAMETER:
+                self.workloads_reserved_mem[mid] -= Gradient.INPUT + Gradient.PARAMETER
+                self.workloads_reserved_mem[mid] += Gradient.HEAD_INPUT + Gradient.HEAD_PARA
+
             print(f"Device {self.did} Reserve {self.workloads_reserved_mem[mid]}G for mid {mid}")
 
+    def have_head_layer(self):
+        if LAYERWISE and (LAYER_NUM + 1 in list(self.stages.keys())):
+            return True
+        elif not LAYERWISE and (STAGE_NUM - 1 in list(self.stages.keys())):
+            return True
+        return False
+    
+    def is_last_w(self, workload:Workload):
+        if workload.workload_type == WorkloadType.W:
+            sorted_sids = sorted(list(self.stages.keys()))
+            # Consider the embeding layer
+            min_sid_idx = 0 if LAYERWISE and 0 not in sorted_sids else 1
+            if workload.sid == sorted_sids[min_sid_idx]:
+                return True
+        return False
+    
     def trace_workload(self,workload:Workload):
         self.tracing_workloads.append(workload)
         required_mem = get_required_memory_by_workload(workload)
         self.workloads_reserved_mem[workload.mid] -= required_mem
+        # if workload.is_w:
+        #     if self.is_last_w(workload=workload):
+        #         self.safe_workload_mids.append(workload.mid)
+        #     else:
+        #         self.workloads_reserved_mem[workload.mid] += Gradient.INPUT + Gradient.PARAMETER
         if self.workloads_reserved_mem[workload.mid] <= 0:
             self.safe_workload_mids.append(workload.mid)
     
@@ -92,7 +121,7 @@ class MemoryMonitor:
                 safe_count += 1
         # TODO what about F and B? in SPLIT or not?
         # memory friendly and critical
-        if workload.workload_type == WorkloadType.W and required_mem + current_mem <= self.max_memory:
+        if workload.is_w and required_mem + current_mem <= self.max_memory:
             safe_count += 1
         self.workloads_reserved_mem[workload.mid] += required_mem
         return safe_count > 0
@@ -107,7 +136,7 @@ class Device:
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
         self.proc_workload: Workload = None
-        self.optimizer_mem_usage: int = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)
+        self.optimizer_mem_usage: int = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) / ZERO_SIZE
         self.current_mem_usage: int = self.optimizer_mem_usage
         self.nmb: int = nmb
         self.max_activation_counts: int = max_activation_counts
@@ -172,7 +201,6 @@ class Device:
         if self.exe_num_f == CHUNK_NUM * MICRO_BATCH_NUM:
             workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W]
 
-        # workload_type_order = [WorkloadType.B,WorkloadType.F,WorkloadType.W]
         
         # raise priority of head and ce
         for workload_type in [WorkloadType.W, WorkloadType.B,WorkloadType.F]:
@@ -290,17 +318,10 @@ class Device:
                     mid = workload.mid
                     did = workload.did
                     
-                    required_memory = get_required_memory(
-                        stage_id=sid, 
-                        layer_num=1,
-                        workload_type=workload_type,
-                        workload_type_num=WORKLOAD_TYPE_NUM, 
-                        layer_wise=True,
-                        recomp=self.stages[sid].recomp,
-                    )
+                    required_memory = get_required_memory_by_workload(workload=workload)
 
                     # TODO DEBUG code
-                    if self.exe_num_f < CHUNK_NUM * MICRO_BATCH_NUM:
+                    if self.exe_num_f < CHUNK_NUM * MICRO_BATCH_NUM * 0.9: #critical
                         # if workload.mid == 0 and workload.sid == 81 and workload.workload_type == WorkloadType.B:
                         #     input("WAIT")
                         if not self.memory_monitor.is_executable_workload(workload=workload, current_mem=self.current_mem_usage):
