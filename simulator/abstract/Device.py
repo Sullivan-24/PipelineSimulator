@@ -203,14 +203,16 @@ class Device:
 
         
         # raise priority of head and ce
+        head_ce_workloads = []
         for workload_type in [WorkloadType.W, WorkloadType.B,WorkloadType.F]:
             for mid in range(self.nmb):
                 for stage_id in self.stages:
                     if stage_id > LAYER_NUM and LAYERWISE:
                         workloads = self.stages[stage_id].workloads
                         if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
-                            executable_workoads = [workloads[mid][workload_type]] + executable_workoads
+                            head_ce_workloads.append(workloads[mid][workload_type])
         # ensure head to be executed as quickly as possible
+        executable_workoads += head_ce_workloads
         if len(executable_workoads) > 0:
             if self.current_mem_usage + Activation.LOSS >= GPU_MAX_MEM:
                 workload_type_order = [WorkloadType.W,WorkloadType.B,WorkloadType.F]
@@ -224,7 +226,7 @@ class Device:
                     if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
                         executable_workoads.append(workloads[mid][workload_type])
         
-        
+
         # if self.exe_num_b > 0:
         #     executable_workoads.sort(key=lambda x: self.mid_priority[x.microbatch_id], reverse=True)
         
@@ -272,6 +274,7 @@ class Device:
             layer_per_stage = 1 
             if stage_id == 0:
                 stage_type = StageType.EMBD
+                basic_memory = StateMemory.EMB
             elif stage_id == LAYER_NUM + 1:
                 stage_type = StageType.HEAD
                 basic_memory = StateMemory.HEAD
@@ -282,7 +285,9 @@ class Device:
                 basic_memory = StateMemory.LAYER
         else:
             basic_memory = StateMemory.LAYER * layer_per_stage
-            if stage_id == STAGE_NUM - 1:
+            if stage_id == 0:
+                basic_memory += StateMemory.EMB
+            elif stage_id == STAGE_NUM - 1:
                 basic_memory += StateMemory.HEAD
         stage = Stage(
                 device_id=self.did, 
