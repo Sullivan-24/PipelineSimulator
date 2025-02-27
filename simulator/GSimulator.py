@@ -252,7 +252,7 @@ class GSimulator:
                     )
                     contain_head = LAYER_NUM + 1 in self._devices[did]
                     layer_per_stage = LAYER_NUM//DEVICE_NUM//CHUNK_NUM
-                    base_memory = StateMemory.OPTIMIZER + StateMemory.LAYER * layer_per_stage + contain_head * HEAD_MEMORY
+                    base_memory = StateMemory.OPTIMIZER + StateMemory.LAYER * layer_per_stage + contain_head * StateMemory.HEAD
                     accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid) * layer_per_stage
                     accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid) * layer_per_stage
                     released_memory = self._get_released_memory(did=did, lid=lid, mid=mid) * layer_per_stage

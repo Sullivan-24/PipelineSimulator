@@ -251,7 +251,7 @@ class LayerwiseSimulator:
                         recomp=self._layer_recomp_rate[lid],
                     )
                     contain_head = LAYER_NUM + 1 in self._devices[did]
-                    base_memory = StateMemory.OPTIMIZER + StateMemory.LAYER * len([l for l in self._devices[did] if l not in (0, LAYER_NUM + 1, LAYER_NUM + 2)]) + contain_head * HEAD_MEMORY
+                    base_memory = StateMemory.OPTIMIZER + StateMemory.LAYER * len([l for l in self._devices[did] if l not in (0, LAYER_NUM + 1, LAYER_NUM + 2)]) + contain_head * StateMemory.HEAD
                     accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid)
                     accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid)
                     released_memory = self._get_released_memory(did=did, lid=lid, mid=mid)

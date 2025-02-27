@@ -274,7 +274,7 @@ class Device:
                 stage_type = StageType.EMBD
             elif stage_id == LAYER_NUM + 1:
                 stage_type = StageType.HEAD
-                basic_memory = HEAD_MEMORY
+                basic_memory = StateMemory.HEAD
             elif stage_id == LAYER_NUM + 2:
                 stage_type = StageType.CE
             else:
@@ -283,11 +283,11 @@ class Device:
         else:
             basic_memory = StateMemory.LAYER * layer_per_stage
             if stage_id == STAGE_NUM - 1:
-                basic_memory += HEAD_MEMORY
+                basic_memory += StateMemory.HEAD
         stage = Stage(
                 device_id=self.did, 
                 stage_id=stage_id,
-                memory_usage=basic_memory/TP_SIZE, 
+                memory_usage=basic_memory, 
                 stage_type=stage_type,
                 recomp=recomp,
                 layerwise=layerwise,
