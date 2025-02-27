@@ -279,9 +279,9 @@ class Device:
                 stage_type = StageType.CE
             else:
                 stage_type = StageType.LAYER
-                basic_memory = LAYER_MEMORY
+                basic_memory = ModelState.LAYER
         else:
-            basic_memory = LAYER_MEMORY * layer_per_stage
+            basic_memory = ModelState.LAYER * layer_per_stage
             if stage_id == STAGE_NUM - 1:
                 basic_memory += HEAD_MEMORY
         stage = Stage(

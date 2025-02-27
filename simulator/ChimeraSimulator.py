@@ -120,7 +120,7 @@ class ChimeraSimulator:
                         )
                         base_memory = 0
                         for s in self.streams:
-                            base_memory += (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + LAYER_MEMORY * len([l for l in s._devices[did] if l not in (0, LAYER_NUM - 1, LAYER_NUM - 2)])
+                            base_memory += (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + ModelState.LAYER * len([l for l in s._devices[did] if l not in (0, LAYER_NUM - 1, LAYER_NUM - 2)])
                         accumulated_activations = self._get_accumulated_activations(stream_idx=stream_idx, did=did, lid=lid, mid=mid)
                         accumulated_input_gradients = self._get_accumulated_input_gradients(stream_idx=stream_idx, did=did, lid=lid, mid=mid)
                         released_memory = self._get_released_memory(stream_idx=stream_idx, did=did, lid=lid, mid=mid)

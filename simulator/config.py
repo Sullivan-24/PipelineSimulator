@@ -79,6 +79,12 @@ HEAD_MEMORY = DATA_TYPE * HEAD_PARA_NUM / G
 OPTIMIZER_MEMORY = PARAMETER_NUM * FP32 * 3 / G # Optimizer status * 2, gradients * 1, model parameters * 1
 MAX_ACTIVATION_TIMES_OF_STAGE_NUM = 3
 @dataclass
+class ModelState:
+    EMB_IN: int = DATA_TYPE * (v * h) / G
+    EMB_OUT: int = DATA_TYPE * (v * h) / G
+    LAYER: int = DATA_TYPE * (12 * h * h + 13 * h) / G
+
+@dataclass
 class Activation:
     INPUT: int = (2*b*s*h)/G
     FULL: int = (34*b*s*h + 5*b*s*s*a)/G/TP_SIZE
