@@ -234,7 +234,7 @@ class PipelineSchedulerSolver:
                         layer_wise=True,
                         recomp=self._layer_recomp_rate[lid],
                     )
-                    base_memory = (OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE)) + ModelState.LAYER * len([l for l in self._devices[did] if l not in (0, LAYER_NUM - 1, LAYER_NUM - 2)])
+                    base_memory = StateMemory.OPTIMIZER + StateMemory.LAYER * len([l for l in self._devices[did] if l not in (0, LAYER_NUM - 1, LAYER_NUM - 2)])
                     accumulated_activations = self._get_accumulated_activations(did=did, lid=lid, mid=mid)
                     accumulated_input_gradients = self._get_accumulated_input_gradients(did=did, lid=lid, mid=mid)
                     released_memory = self._get_released_memory(did=did, lid=lid, mid=mid)

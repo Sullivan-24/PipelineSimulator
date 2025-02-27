@@ -78,23 +78,33 @@ HEAD_MEMORY = DATA_TYPE * HEAD_PARA_NUM / G
 
 OPTIMIZER_MEMORY = PARAMETER_NUM * FP32 * 3 / G # Optimizer status * 2, gradients * 1, model parameters * 1
 MAX_ACTIVATION_TIMES_OF_STAGE_NUM = 3
+
 @dataclass
-class ModelState:
-    EMB_IN: int = DATA_TYPE * (v * h) / G
-    EMB_OUT: int = DATA_TYPE * (v * h) / G
-    LAYER: int = DATA_TYPE * (12 * h * h + 13 * h) / G
+class Parameter:
+    EMB: int = v * h
+    HEAD: int = v * h
+    LAYER: int = 12 * h * h + 13 * h
+
+@dataclass
+class StateMemory:
+    EMB: int = DATA_TYPE * Parameter.EMB / G / TP_SIZE
+    HEAD: int = DATA_TYPE * Parameter.HEAD / G / TP_SIZE
+    LAYER: int = DATA_TYPE * Parameter.LAYER / G / TP_SIZE
+    # Optimizer M + V, gradients * 1, model * 1
+    OPTIMIZER: int = FP32 * 4 * (Parameter.LAYER * l + Parameter.EMB + Parameter.HEAD) / G / (TP_SIZE * PP_SIZE) / ZERO_SIZE
 
 @dataclass
 class Activation:
-    INPUT: int = (2*b*s*h)/G
-    FULL: int = (34*b*s*h + 5*b*s*s*a)/G/TP_SIZE
-    LOSS: int = (2*FP32*b*s*v)/G
+    INPUT: int = (2*b*s*h) / G / TP_SIZE
+    FULL: int = (34*b*s*h + 5*b*s*s*a) / G / TP_SIZE
+    LOSS: int = (2*FP32*b*s*v) / G / TP_SIZE
+    
 @dataclass
 class Gradient:
-    INPUT: int = DATA_TYPE * LAYER_PARA_NUM / G / TP_SIZE
-    PARAMETER: int = DATA_TYPE * LAYER_PARA_NUM / G / TP_SIZE
-    HEAD_INPUT: int = DATA_TYPE * HEAD_PARA_NUM / G / TP_SIZE
-    HEAD_PARA: int = DATA_TYPE * HEAD_PARA_NUM / G / TP_SIZE
+    INPUT: int = DATA_TYPE * Parameter.LAYER / G / TP_SIZE
+    PARAMETER: int = DATA_TYPE * Parameter.LAYER / G / TP_SIZE
+    HEAD_INPUT: int = DATA_TYPE * Parameter.HEAD / G / TP_SIZE
+    HEAD_PARA: int = DATA_TYPE * Parameter.HEAD / G / TP_SIZE
     # HEAD_INPUT: int = 0
     # HEAD_PARA: int = 0
 

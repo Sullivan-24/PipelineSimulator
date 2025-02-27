@@ -136,7 +136,7 @@ class Device:
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
         self.proc_workload: Workload = None
-        self.optimizer_mem_usage: int = OPTIMIZER_MEMORY / (PP_SIZE * TP_SIZE) / ZERO_SIZE
+        self.optimizer_mem_usage: int = StateMemory.OPTIMIZER
         self.current_mem_usage: int = self.optimizer_mem_usage
         self.nmb: int = nmb
         self.max_activation_counts: int = max_activation_counts
@@ -279,9 +279,9 @@ class Device:
                 stage_type = StageType.CE
             else:
                 stage_type = StageType.LAYER
-                basic_memory = ModelState.LAYER
+                basic_memory = StateMemory.LAYER
         else:
-            basic_memory = ModelState.LAYER * layer_per_stage
+            basic_memory = StateMemory.LAYER * layer_per_stage
             if stage_id == STAGE_NUM - 1:
                 basic_memory += HEAD_MEMORY
         stage = Stage(

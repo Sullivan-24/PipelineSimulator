@@ -36,7 +36,7 @@ LAYER_NUM = 80
 NUM_ATTENTION_HEAD=64
 PP_SIZE = DEVICE_NUM
 TP_SIZE = 8
-ZERO_SIZE = 4
+ZERO_SIZE = 1
 # Qwen 72B I1F1B --------------
 
 # # #Qwen 32B I1F1B --------------

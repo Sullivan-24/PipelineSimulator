@@ -92,9 +92,9 @@ def main():
     print("Gradient Input={},Gradient Parameters={},Gradient Head={}".format(Gradient.INPUT,Gradient.PARAMETER, Gradient.HEAD_INPUT))
     print("LOSS={},VOC={}".format(Activation.LOSS,VOCAB_SIZE))
 
-    print("LAYER_MEM:{}".format(ModelState.LAYER))
-    print("MODEL MEM:{}".format(ModelState.LAYER * LAYER_NUM // DEVICE_NUM))
-    print("OPT MEM:{}".format(OPTIMIZER_MEMORY // DEVICE_NUM // DEVICE_NUM))
+    print("LAYER_MEM:{}".format(StateMemory.LAYER))
+    print("MODEL MEM:{}".format(StateMemory.LAYER * LAYER_NUM // DEVICE_NUM))
+    print("OPT MEM:{}".format(StateMemory.OPTIMIZER))
     # input()
 
     if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
