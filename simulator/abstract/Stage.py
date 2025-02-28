@@ -71,6 +71,7 @@ class Stage:
         
     def _add_workload(self) -> None:
         for mid in range(self.nmb):
+            self.workloads[mid] = {}
             fpw = Workload(
                 device_id=self.did,
                 stage_id=self.sid,
@@ -84,12 +85,10 @@ class Stage:
                     recomp=self.recomp
                 ),
                 recomp=self.recomp,
-                total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,
+                total_stages=LAYER_NUM+3 if self.layerwise else STAGE_NUM,
             )
-            if self.sid == 0 and LAYERWISE:
-                self.workloads[mid]={
-                    WorkloadType.F: fpw,
-                }
+            self.workloads[mid][WorkloadType.F] = fpw
+            if self.sid == 0 and self.layerwise: # Embedding layer only has F
                 continue
 
             igw = Workload(
@@ -105,12 +104,9 @@ class Stage:
                     recomp=self.recomp
                 ), 
                 recomp=self.recomp,
-                total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,   
+                total_stages=LAYER_NUM+3 if self.layerwise else STAGE_NUM,   
             )
-            self.workloads[mid]={
-                WorkloadType.F: fpw,
-                WorkloadType.B: igw,
-            }
+            self.workloads[mid][WorkloadType.B] = igw
             if SPLIT_BACKPROP:
                 pgw = Workload(
                     device_id=self.did,
@@ -125,10 +121,11 @@ class Stage:
                         recomp=self.recomp
                     ),
                     recomp=self.recomp,
-                    total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,
+                    total_stages=LAYER_NUM+3 if self.layerwise else STAGE_NUM,
                 )
-                if self.stage_type != StageType.CE:
-                    self.workloads[mid][WorkloadType.W] = pgw
+                if self.stage_type == StageType.CE: # Cross-entropy layer has no W for parameter training
+                    continue
+                self.workloads[mid][WorkloadType.W] = pgw
 
     def update_constraints(self, constraint: Workload):
         for mid in self.workloads:
@@ -143,7 +140,7 @@ class Stage:
                 ) 
 
     def update_memory_usage(self, workload:Workload):
-        if LAYERWISE:
+        if self.layerwise:
             if self.stage_type == StageType.EMBD:
                 return
             if workload.workload_type == WorkloadType.F:
