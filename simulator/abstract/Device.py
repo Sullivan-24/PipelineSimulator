@@ -264,14 +264,16 @@ class Device:
                         for wlt in self.stages[sid].workloads[mid]:
                             print(self.stages[sid].workloads[mid][wlt])
 
-    def add_stage(self, stage_id: int, recomp:bool = False, layerwise:bool = False) -> None:
-        layer_per_stage = LAYER_NUM // STAGE_NUM
+    def add_stage(self, stage_id: int, 
+                  recomp:bool = False, 
+                  layerwise:bool = LAYERWISE, 
+                  layer_num = LAYER_NUM // STAGE_NUM, 
+                  basic_memory = 0) -> None:
+        
         stage_type = StageType.LAYERS
-        basic_memory = 0
-        layerwise = LAYERWISE
 
         if layerwise:
-            layer_per_stage = 1 
+            assert layer_num == 1 and CHUNK_NUM == LAYER_NUM // PP_SIZE, f"LAYERWISE require 1 layer per stage (CHUNK_NUM == LAYER_NUM // PP_SIZE) but got {layer_num} per stage"
             if stage_id == 0:
                 stage_type = StageType.EMBD
                 basic_memory = StateMemory.EMB
@@ -284,7 +286,7 @@ class Device:
                 stage_type = StageType.LAYER
                 basic_memory = StateMemory.LAYER
         else:
-            basic_memory = StateMemory.LAYER * layer_per_stage
+            basic_memory = StateMemory.LAYER * layer_num
             if stage_id == 0:
                 basic_memory += StateMemory.EMB
             elif stage_id == STAGE_NUM - 1:
@@ -296,9 +298,10 @@ class Device:
                 stage_type=stage_type,
                 recomp=recomp,
                 layerwise=layerwise,
+                layer_num=layer_num,
             )
         self.stages[stage.sid] = stage
-        self.total_layers+=layer_per_stage
+        self.total_layers+=layer_num
 
     def update_constraints(self, constraint):
         for sid in self.stages:

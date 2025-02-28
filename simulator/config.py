@@ -25,7 +25,7 @@ STAGE_PLACEMENT = Placement.INTERLEAVED
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
 TEMP_TEST= True
-TIME_LIMIT = 2500
+TIME_LIMIT = 5000
 
 EMB_TIME = 1
 HEAD_F_TIME = 3

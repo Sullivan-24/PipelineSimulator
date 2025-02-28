@@ -9,13 +9,53 @@ class StageType:
     CE = 4
     LAYERS = 5
 
+def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:WorkloadType, recomp)->float:
+    if layer_wise:
+        assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}."
+    if wtype == WorkloadType.F:
+        duration = F_TIME * layer_num
+        if layer_wise:
+            if sid == 0:
+                duration = EMB_TIME
+            elif sid == LAYER_NUM + 1: # Single Head Layer
+                duration = HEAD_F_TIME
+            elif sid == LAYER_NUM + 2:
+                duration = CE_F_TIME
+        else:
+            if sid == 0:
+                duration += EMB_TIME
+            elif sid == STAGE_NUM - 1:
+                duration += HEAD_F_TIME + CE_F_TIME
+    elif wtype == WorkloadType.B: # Consider recomputation
+        duration = (B_TIME + F_TIME * recomp) * layer_num
+        if layer_wise:
+            if sid == LAYER_NUM + 1: # Single Head Layer
+                duration = HEAD_B_TIME + HEAD_F_TIME * recomp
+            elif sid == LAYER_NUM + 2:
+                duration = CE_B_TIME + CE_F_TIME * recomp
+        else:
+            if sid == STAGE_NUM - 1:
+                duration += HEAD_B_TIME + CE_B_TIME + (HEAD_F_TIME + CE_F_TIME) * recomp
+    elif wtype == WorkloadType.W:
+        duration = W_TIME * layer_num
+        if layer_wise:
+            if sid == LAYER_NUM + 1: # Cross-entropy Layer has no parameter to train
+                duration = HEAD_W_TIME
+        else:
+            if sid == STAGE_NUM - 1:
+                duration += HEAD_W_TIME
+    else:
+        raise ValueError(f"Wrong workload type: {wtype}.")
+    
+    return duration
+
 class Stage:
     
     INTERLEAVED = 1
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False):
+    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, layer_num: int = LAYER_NUM // STAGE_NUM, layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False):
         self.did: int = device_id
         self.sid: int = stage_id
         self.nmb: int = microbatch_num
@@ -24,54 +64,10 @@ class Stage:
         self.stage_type: StageType = stage_type
         self.recomp = recomp
         self.layerwise = layerwise
+        self.layer_num = layer_num
+        if layerwise: 
+            assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}"
         self._add_workload()
-    
-    def _get_workload_duration(self, stage_id, stage_type, workload_type, recomp):
-        if self.layerwise:
-            if workload_type == WorkloadType.F:
-                duration = F_TIME
-                if stage_type == StageType.EMBD:
-                    duration = EMB_TIME
-                elif stage_type == StageType.CE:
-                    duration = CE_F_TIME
-                elif stage_type == StageType.HEAD:
-                    duration = HEAD_F_TIME
-
-            elif workload_type == WorkloadType.B:
-                duration = B_TIME if not recomp else B_TIME + F_TIME
-                if stage_type == StageType.CE:
-                    duration = CE_B_TIME if not recomp else CE_B_TIME + CE_F_TIME
-                elif stage_type == StageType.HEAD:
-                    duration = HEAD_B_TIME if not recomp else HEAD_B_TIME + HEAD_F_TIME
-            elif workload_type == WorkloadType.W:
-                duration = W_TIME
-                if stage_type == StageType.CE:
-                    duration = CE_W_TIME
-                elif stage_type == StageType.HEAD:
-                    duration = HEAD_W_TIME
-            else:
-                raise Exception("Wrong workload type!")
-        else:
-            layer_per_stage = LAYER_NUM // STAGE_NUM
-            if workload_type == WorkloadType.F:
-                duration = F_TIME * layer_per_stage
-                if stage_id == 0:
-                    duration += EMB_TIME
-                elif stage_id == STAGE_NUM - 1:
-                    duration += HEAD_F_TIME + CE_F_TIME
-            elif workload_type == WorkloadType.B:
-                duration = B_TIME * layer_per_stage if not recomp else (F_TIME + B_TIME) * layer_per_stage
-                if stage_id == STAGE_NUM - 1:
-                    duration += HEAD_B_TIME + CE_B_TIME 
-                    if recomp:
-                        duration += HEAD_F_TIME + CE_F_TIME
-            elif workload_type == WorkloadType.W:
-                duration = W_TIME * layer_per_stage
-                if stage_id == STAGE_NUM - 1:
-                    duration += HEAD_W_TIME + CE_W_TIME
-            else:
-                raise Exception("Wrong workload type!")
-        return duration
         
     def _add_workload(self) -> None:
         for mid in range(self.nmb):
@@ -80,12 +76,13 @@ class Stage:
                 stage_id=self.sid,
                 microbatch_id=mid,
                 workload_type=WorkloadType.F,
-                duration=self._get_workload_duration(
-                    stage_id=self.sid,
-                    stage_type=self.stage_type,
-                    workload_type=WorkloadType.F,
-                    recomp=self.recomp,
-                ),    
+                duration=get_workload_duration(
+                    sid=self.sid,
+                    layer_wise=self.layerwise,
+                    layer_num=self.layer_num,
+                    wtype=WorkloadType.F,
+                    recomp=self.recomp
+                ),
                 recomp=self.recomp,
                 total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,
             )
@@ -100,12 +97,13 @@ class Stage:
                 stage_id=self.sid,
                 microbatch_id=mid,
                 workload_type=WorkloadType.B,
-                duration=self._get_workload_duration(
-                    stage_id=self.sid,
-                    stage_type=self.stage_type,
-                    workload_type=WorkloadType.B,
-                    recomp=self.recomp,
-                ),   
+                duration=get_workload_duration(
+                    sid=self.sid,
+                    layer_wise=self.layerwise,
+                    layer_num=self.layer_num,
+                    wtype=WorkloadType.B,
+                    recomp=self.recomp
+                ), 
                 recomp=self.recomp,
                 total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,   
             )
@@ -119,12 +117,13 @@ class Stage:
                     stage_id=self.sid,
                     microbatch_id=mid,
                     workload_type=WorkloadType.W,
-                    duration=self._get_workload_duration(
-                        stage_id=self.sid,
-                        stage_type=self.stage_type,
-                        workload_type=WorkloadType.W,
-                        recomp=self.recomp,
-                    ),     
+                    duration=get_workload_duration(
+                        sid=self.sid,
+                        layer_wise=self.layerwise,
+                        layer_num=self.layer_num,
+                        wtype=WorkloadType.W,
+                        recomp=self.recomp
+                    ),
                     recomp=self.recomp,
                     total_stages=LAYER_NUM+3 if LAYERWISE else STAGE_NUM,
                 )
