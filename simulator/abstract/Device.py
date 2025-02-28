@@ -328,13 +328,10 @@ class Device:
                     
                     required_memory = get_required_memory_by_workload(workload=workload)
 
-                    # TODO DEBUG code
-                    if self.exe_num_f < CHUNK_NUM * MICRO_BATCH_NUM * 0.9: #critical
-                        # if workload.mid == 0 and workload.sid == 81 and workload.workload_type == WorkloadType.B:
-                        #     input("WAIT")
+                    # TODO More optimizations?
+                    if self.exe_num_f < CHUNK_NUM * MICRO_BATCH_NUM * 1: #critical coefficient
+                        # MemoryMonitor: ensure workloads are safely launched
                         if not self.memory_monitor.is_executable_workload(workload=workload, current_mem=self.current_mem_usage):
-                            if workload.mid == 0 and workload.sid == 81 and workload.workload_type == WorkloadType.B:
-                                input("WRONG")
                             continue
 
                     else:
