@@ -11,8 +11,8 @@ RUN_MODE = RunMode.SIM_SOLVE
 
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
-SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
-# SCHEDULE_METHOD = Schedule.INTERLEAVED
+# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+# SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.ZBV
 STAGE_PLACEMENT = Placement.CROSS
 # STAGE_PLACEMENT = Placement.RECURRENT
@@ -40,14 +40,13 @@ W_TIME = 4
 COMM_TIME = 0
 
 SPLIT_BACKPROP = True
-LAYERWISE = True
+LAYERWISE = False
 RECOMP = False
 RUN_SCHEDULE = False
-RUN_STANDARD_ZBV = True
+RUN_STANDARD_ZBV = False
 AUTO_RECOMP_SEARCH = False
 SCHEDULE_UNIT = MICRO_BATCH_NUM // 1
 REVERSE_LAST_STAGES = False
-
 # Run standard ZBV ---------------------
 # SCHEDULE_METHOD = Schedule.ZBV
 # RUN_SCHEDULE = False
@@ -93,11 +92,12 @@ class StateMemory:
     # Optimizer M + V, gradients * 1, model * 1
     OPTIMIZER: int = FP32 * 4 * (Parameter.LAYER * l + Parameter.EMB + Parameter.HEAD) / G / (TP_SIZE * PP_SIZE) / ZERO_SIZE
 
+ACT_OPT_COE = 0.5 # adjust by profiling results, seq 4k hid 8k Theoretical 5.625G Realistic 2.5G
 @dataclass
 class Activation:
-    INPUT: int = (2*b*s*h) / G / TP_SIZE
-    FULL: int = (34*b*s*h + 5*b*s*s*a) / G / TP_SIZE
-    LOSS: int = (2*FP32*b*s*v) / G / TP_SIZE
+    INPUT: int = (2*b*s*h) * ACT_OPT_COE / G / TP_SIZE
+    FULL: int = (34*b*s*h + 5*b*s*s*a) * ACT_OPT_COE / G / TP_SIZE
+    LOSS: int = (2*FP32*b*s*v) * ACT_OPT_COE / G / TP_SIZE
     
 @dataclass
 class Gradient:

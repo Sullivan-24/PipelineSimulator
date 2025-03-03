@@ -38,7 +38,7 @@ class PipelineScheduler:
         self.temp_results = {}
         self.recomp_set_traverser = self.generate_binary_combinations()
         self.last_workload: Workload = None
-
+        self.workload_execute_queue: list = [[] for _ in range(DEVICE_NUM)]
         if run_schedule:
             print("Read schedule generated before...")
             self.file2result()
@@ -60,12 +60,6 @@ class PipelineScheduler:
             did = self._sid2did(sid=sid)
             t = self.results[key]
             self.schedule[did].append((workload_type_mapping[k], mid, sid, t))
-        
-        # for did, schedule in enumerate(self.schedule):
-            
-        #     print(f"{did}, Schedule",self.schedule[did][:5])
-        
-        # input()
         print("Result to schedule successfully.")
 
     def result2file(self, filepath=None):
@@ -181,6 +175,10 @@ class PipelineScheduler:
             if SCHEDULE_METHOD in (Schedule.INTERLEAVED, Schedule.STANDARD_INTERLEAVED):
                 for pid in range(STAGE_NUM):
                     self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
+            elif STAGE_PLACEMENT == Placement.INTERLEAVED:
+                print("Use Interleaved placement")
+                for pid in range(STAGE_NUM):
+                    self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
             else:
                 assert STAGE_NUM <= LAYER_NUM, f"STAGE should be less than LAYER ({STAGE_NUM} >= {LAYER_NUM})"                
                 offset = DEVICE_NUM if REVERSE_LAST_STAGES else 0
@@ -191,7 +189,7 @@ class PipelineScheduler:
                         self.devices[DEVICE_NUM - 1 - pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
                 for pid in range(STAGE_NUM - offset, STAGE_NUM):
                     self.devices[pid % DEVICE_NUM].add_stage(pid, recomp=self.recomp_set[pid])
-
+        # Launch MemoryMonitors
         for device in self.devices:
             device.init_required_mem_for_each_microbatch()
             device.init_memory_monitor()

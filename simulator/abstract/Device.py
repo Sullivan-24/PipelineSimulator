@@ -78,7 +78,7 @@ class MemoryMonitor:
                 self.workloads_reserved_mem[mid] -= Gradient.INPUT + Gradient.PARAMETER
                 self.workloads_reserved_mem[mid] += Gradient.HEAD_INPUT + Gradient.HEAD_PARA
 
-            print(f"Device {self.did} Reserve {self.workloads_reserved_mem[mid]}G for mid {mid}")
+            # print(f"Device {self.did} Reserve {self.workloads_reserved_mem[mid]}G for mid {mid}")
 
     def have_head_layer(self):
         if LAYERWISE and (LAYER_NUM + 1 in list(self.stages.keys())):
@@ -333,7 +333,6 @@ class Device:
                         # MemoryMonitor: ensure workloads are safely launched
                         if not self.memory_monitor.is_executable_workload(workload=workload, current_mem=self.current_mem_usage):
                             continue
-
                     else:
                         if workload.workload_type != WorkloadType.W:
                             if required_memory + self.current_mem_usage > GPU_MAX_MEM - Gradient.PARAMETER:
