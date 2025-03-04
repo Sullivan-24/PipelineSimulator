@@ -131,7 +131,7 @@ class Device:
     BUSY = 1
     IDLE = 2
 
-    def __init__(self, device_id: int, max_activation_counts: int, nmb:int, static_schedule: list = None, memory_usage_constrain_rate: float = 1):
+    def __init__(self, device_id: int, max_activation_counts: int, nmb:int, static_schedule: list = None, memory_usage_constrain_rate: float = 1, max_mem: int = GPU_MAX_MEM, comp_power: float = 1, layer_density: list = None):
         self.did = device_id
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
@@ -156,7 +156,6 @@ class Device:
         self.order_balance = True
         self.next_workload_type = None
         self.memory_usage_constrain_rate = memory_usage_constrain_rate
-        print(self.memory_usage_constrain_rate)
         self.executable_workloads:list[Workload] = []
 
         self.workload_type_traverse_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
@@ -172,9 +171,15 @@ class Device:
 
         self.situations = 1
         self.mid_priority = [3 * CHUNK_NUM for _ in range(self.nmb)]
+        self.max_memory = max_mem
+        self.comp_power = comp_power
+        if layer_density is None:
+            self.layer_density = [1 for _ in range(LAYER_NUM)]
+        else:
+            self.layer_density = layer_density
 
     def init_memory_monitor(self):
-        self.memory_monitor = MemoryMonitor(self.nmb, self.stages, self.did, max_memory=GPU_MAX_MEM)
+        self.memory_monitor = MemoryMonitor(self.nmb, self.stages, self.did, max_memory=self.max_memory)
         self.memory_monitor.init_monitor()
 
     def init_required_mem_for_each_microbatch(self):
@@ -214,7 +219,7 @@ class Device:
         # ensure head to be executed as quickly as possible
         executable_workoads += head_ce_workloads
         if len(executable_workoads) > 0:
-            if self.current_mem_usage + Activation.LOSS >= GPU_MAX_MEM:
+            if self.current_mem_usage + Activation.LOSS >= self.max_memory:
                 workload_type_order = [WorkloadType.W,WorkloadType.B,WorkloadType.F]
 
         for workload_type in workload_type_order:
@@ -299,6 +304,8 @@ class Device:
                 recomp=recomp,
                 layerwise=layerwise,
                 layer_num=layer_num,
+                comp_power=self.comp_power,
+                layer_density=self.layer_density,
             )
         self.stages[stage.sid] = stage
         self.total_layers+=layer_num
@@ -335,7 +342,7 @@ class Device:
                             continue
                     else:
                         if workload.workload_type != WorkloadType.W:
-                            if required_memory + self.current_mem_usage > GPU_MAX_MEM - Gradient.PARAMETER:
+                            if required_memory + self.current_mem_usage > self.max_memory - Gradient.PARAMETER:
                                 continue
 
                     proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
@@ -358,8 +365,8 @@ class Device:
                         self.update_memory_usage()
                         self.state = Device.BUSY
                         self.memory_monitor.trace_workload(workload=workload)
-                        if self.did == 0:
-                            print(self.memory_monitor.workloads_reserved_mem)
+                        # if self.did == 0:
+                        #     print(self.memory_monitor.workloads_reserved_mem)
                         return proc_workload
             elif LAYERWISE or SCHEDULE_METHOD in (Schedule.ONE_F_ONE_B, Schedule.ZBH1, Schedule.Layerwise):  
                 # Method 1 6661   
@@ -368,7 +375,7 @@ class Device:
                     now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
                 elif self.last_workload_type == WorkloadType.F:
                     now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-                if self.current_mem_usage > GPU_MAX_MEM * self.memory_usage_constrain_rate:
+                if self.current_mem_usage > self.max_memory * self.memory_usage_constrain_rate:
                     now_workload_priority_order = [WorkloadType.W, WorkloadType.B, WorkloadType.F]
                 mb_range = self.mid_traverse_order
                 
@@ -389,7 +396,7 @@ class Device:
 
                 #                 if mid != self.executing_mid_idx:
                 #                     try:
-                #                         if self.executing_mid_idx < self.nmb and GPU_MAX_MEM - required_memory - self.current_mem_usage - Activation.FULL < self.executing_workload_required_mem[self.executing_mid_idx + 1]:
+                #                         if self.executing_mid_idx < self.nmb and self.max_memory - required_memory - self.current_mem_usage - Activation.FULL < self.executing_workload_required_mem[self.executing_mid_idx + 1]:
                 #                             mid = self.executing_mid_idx
                 #                     except Exception as e:
                 #                         print(self.executing_mid_idx)
@@ -446,7 +453,7 @@ class Device:
                                 recomp=self.stages[sid].recomp,
                             )
 
-                            if workload_type == WorkloadType.F and required_memory + self.current_mem_usage > GPU_MAX_MEM - Gradient.PARAMETER - Gradient.INPUT:
+                            if workload_type == WorkloadType.F and required_memory + self.current_mem_usage > self.max_memory - Gradient.PARAMETER - Gradient.INPUT:
                                 continue
                             
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
@@ -527,10 +534,10 @@ class Device:
                     now_workload_priority_order = [WorkloadType.F, WorkloadType.B]
                 if SPLIT_BACKPROP:
                     now_workload_priority_order.append(WorkloadType.W)
-                    if self.current_mem_usage > GPU_MAX_MEM * self.memory_usage_constrain_rate:
+                    if self.current_mem_usage > self.max_memory * self.memory_usage_constrain_rate:
                         now_workload_priority_order = [WorkloadType.W, WorkloadType.B, WorkloadType.F]
                 else:
-                    if self.current_mem_usage > GPU_MAX_MEM * self.memory_usage_constrain_rate:
+                    if self.current_mem_usage > self.max_memory * self.memory_usage_constrain_rate:
                         now_workload_priority_order = [WorkloadType.B, WorkloadType.F]
                 mb_range = self.mid_traverse_order
 
@@ -560,7 +567,7 @@ class Device:
                                 workload_type=workload_type,
                                 required_memory=required_memory,
                                 current_mem_usage=self.current_mem_usage,
-                                max_memory=GPU_MAX_MEM,
+                                max_memory=self.max_memory,
                             )
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
                             if proc_workload:
@@ -644,7 +651,7 @@ class Device:
                             workload_type=workload_type,
                             required_memory=required_memory,
                             current_mem_usage=self.current_mem_usage,
-                            max_memory=GPU_MAX_MEM,
+                            max_memory=self.max_memory,
                         )
 
                         proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
@@ -681,7 +688,7 @@ class Device:
                                 workload_type=workload_type,
                                 required_memory=required_memory,
                                 current_mem_usage=self.current_mem_usage,
-                                max_memory=GPU_MAX_MEM,
+                                max_memory=self.max_memory,
                             )
 
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
@@ -730,7 +737,7 @@ class Device:
                             workload_type=workload_type,
                             required_memory=required_memory,
                             current_mem_usage=self.current_mem_usage,
-                            max_memory=GPU_MAX_MEM,
+                            max_memory=self.max_memory,
                         )
 
                         proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
@@ -767,7 +774,7 @@ class Device:
                             #     workload_type=workload_type,
                             #     required_memory=required_memory,
                             #     current_mem_usage=self.current_mem_usage,
-                            #     max_memory=GPU_MAX_MEM,
+                            #     max_memory=self.max_memory,
                             # )
 
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
@@ -806,7 +813,7 @@ class Device:
                                 workload_type=workload_type,
                                 required_memory=required_memory,
                                 current_mem_usage=self.current_mem_usage,
-                                max_memory=GPU_MAX_MEM,
+                                max_memory=self.max_memory,
                             )
 
                             proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
@@ -899,7 +906,7 @@ class Device:
     #                     workload_type=workload_type,
     #                     required_memory=required_memory,
     #                     current_mem_usage=self.current_mem_usage,
-    #                     max_memory=GPU_MAX_MEM,
+    #                     max_memory=self.max_memory,
     #                 )
 
     #                 proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)

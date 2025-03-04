@@ -9,7 +9,7 @@ class StageType:
     CE = 4
     LAYERS = 5
 
-def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:WorkloadType, recomp)->float:
+def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:WorkloadType, recomp, comp_power:float = 1)->float:
     if layer_wise:
         assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}."
     if wtype == WorkloadType.F:
@@ -36,6 +36,8 @@ def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:Workloa
         else:
             if sid == STAGE_NUM - 1:
                 duration += HEAD_B_TIME + CE_B_TIME + (HEAD_F_TIME + CE_F_TIME) * recomp
+                if not SPLIT_BACKPROP:
+                    duration += HEAD_W_TIME
     elif wtype == WorkloadType.W:
         duration = W_TIME * layer_num
         if layer_wise:
@@ -47,7 +49,7 @@ def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:Workloa
     else:
         raise ValueError(f"Wrong workload type: {wtype}.")
     
-    return duration
+    return int(duration / comp_power)
 
 class Stage:
     
@@ -55,7 +57,7 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, layer_num: int = LAYER_NUM // STAGE_NUM, layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False):
+    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, layer_num: int = LAYER_NUM // STAGE_NUM, layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
         self.did: int = device_id
         self.sid: int = stage_id
         self.nmb: int = microbatch_num
@@ -65,8 +67,13 @@ class Stage:
         self.recomp = recomp
         self.layerwise = layerwise
         self.layer_num = layer_num
+        self.comp_power = comp_power
         if layerwise: 
             assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}"
+        if layer_density is None:
+            self.layer_density = [1 for _ in range(LAYER_NUM)]
+        else:
+            self.layer_density = layer_density
         self._add_workload()
         
     def _add_workload(self) -> None:
@@ -82,7 +89,8 @@ class Stage:
                     layer_wise=self.layerwise,
                     layer_num=self.layer_num,
                     wtype=WorkloadType.F,
-                    recomp=self.recomp
+                    recomp=self.recomp,
+                    comp_power=self.comp_power,
                 ),
                 recomp=self.recomp,
                 total_stages=LAYER_NUM+3 if self.layerwise else STAGE_NUM,
@@ -101,7 +109,8 @@ class Stage:
                     layer_wise=self.layerwise,
                     layer_num=self.layer_num,
                     wtype=WorkloadType.B,
-                    recomp=self.recomp
+                    recomp=self.recomp,
+                    comp_power=self.comp_power,
                 ), 
                 recomp=self.recomp,
                 total_stages=LAYER_NUM+3 if self.layerwise else STAGE_NUM,   
@@ -118,7 +127,8 @@ class Stage:
                         layer_wise=self.layerwise,
                         layer_num=self.layer_num,
                         wtype=WorkloadType.W,
-                        recomp=self.recomp
+                        recomp=self.recomp,
+                        comp_power=self.comp_power,
                     ),
                     recomp=self.recomp,
                     total_stages=LAYER_NUM+3 if self.layerwise else STAGE_NUM,

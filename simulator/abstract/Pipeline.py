@@ -30,6 +30,14 @@ class PipelineScheduler:
         self.manual_recomp_set = []
         self.fail_indexes = set()
         self.manual_recomp_set = []
+        min_value = min(list(reversed(range(LAYER_NUM))))
+        max_value = max(list(reversed(range(LAYER_NUM))))
+
+        # 缩放到 DENSITY_MIN 和 DENSITY_MAX 之间
+        self.layer_density = [
+            DENSITY_MIN + (value - min_value) * (DENSITY_MAX - DENSITY_MIN) / (max_value - min_value)
+            for value in list(reversed(range(LAYER_NUM)))
+        ]
         self._init_stage()
         self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
         self.schedule = [[] for _ in range(DEVICE_NUM)]
@@ -114,11 +122,15 @@ class PipelineScheduler:
 
     def _init_stage(self):
         for did in range(DEVICE_NUM):
-            device = Device(device_id = did, 
-                            max_activation_counts=MAX_ACTIVATION_COUNTS, 
-                            nmb=MICRO_BATCH_NUM,
-                            memory_usage_constrain_rate=0.85
-                            )
+            device = Device(
+                        device_id = did, 
+                        max_activation_counts=MAX_ACTIVATION_COUNTS, 
+                        nmb=MICRO_BATCH_NUM,
+                        memory_usage_constrain_rate=0.85,
+                        max_mem=GPU_MAX_MEM//2 if did >= DEVICE_NUM // 1 else GPU_MAX_MEM,
+                        comp_power=1 if did < DEVICE_NUM // 1 else 0.5,
+                        layer_density=self.layer_density,
+                    )
             self.devices.append(device)
         self.set_recomp()
 
@@ -130,8 +142,14 @@ class PipelineScheduler:
         elif LAYERWISE:
             if STAGE_PLACEMENT == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
-                for pid in range(LAYER_NUM):
-                    self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                if HOMO_DEVICE:
+                    for pid in range(LAYER_NUM):
+                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                else:
+                    for pid in range(LAYER_NUM - DEVICE_NUM * 3):
+                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                    for pid in range(LAYER_NUM - DEVICE_NUM * 3, LAYER_NUM):
+                        self.devices[pid % (DEVICE_NUM // 2)].add_stage(pid + 1, recomp=self.recomp_set[pid])
             elif STAGE_PLACEMENT == Placement.RECURRENT:
                 print("Use Recurrent placement")
                 unit = range(DEVICE_NUM)
@@ -576,42 +594,29 @@ class PipelineScheduler:
 
 
     def show_mem_usage(self, device_id=(0,1, DEVICE_NUM-1), show_all=False):
-        max_mem_usage = -1
+        max_mem_usages = [0 for _ in range(len(self.devices))]
         for device in self.devices:
             aim_file_path = "schedule_results/did{}_mem_usage.txt".format(device.did)
             if os.path.exists(aim_file_path):  # 判断文件是否存在
                 with open(aim_file_path, "w") as file:  # 以写入模式打开文件（会清空文件内容）
                     file.truncate(0)  # 清空文件内容
-                print(f"文件 {aim_file_path} 已存在，内容已清除。")
-            else:
-                print(f"文件 {aim_file_path} 不存在，无需清除。")
+                print(f"Writing memory record to {aim_file_path}.")
             print_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did))
             last_mem_record = 0
             for t, mem_record in device.mem_usage_record.items():
-                oom_flag = "" if mem_record <= 80 else "OOM"
+                oom_flag = "" if mem_record <= device.max_memory else "OOM"
                 print_to_file(aim_file_path, "Time {}, mem = {}, {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2), oom_flag))
                 last_mem_record = mem_record
-                max_mem_usage = max(max_mem_usage, mem_record)
+                max_mem_usages[device.did] = max(max_mem_usages[device.did], mem_record)
         
-        if show_all:
-            max_mem_usages = [0 for _ in range(len(self.devices))]
-            for did, device in enumerate(self.devices):
-                for t, mem_record in device.mem_usage_record.items():
-                    max_mem_usages[did] = max(max_mem_usages[did], mem_record)
-            print(max_mem_usages)
+        oom = False
+        for did, device in enumerate(self.devices):
+            if device.max_memory < max_mem_usages[did]:
+                print(f"Out of Memory in Device {device.did}. ({max_mem_usages[did]} > {device.max_memory})")
+                oom = True
 
-        if max_mem_usage > GPU_MAX_MEM:
-            print("OOM!!!!")
-            return False
-            raise ValueError("Error: Out of Memory.")
-        
-        if show_all:
-            max_mem_usage = [0 for _ in range(len(self.devices))]
-            for did, device in enumerate(self.devices):
-                for t, mem_record in device.mem_usage_record.items():
-                    max_mem_usage[did] = max(max_mem_usage[did], mem_record)
-            print(max_mem_usage)
-        return True
+        print(max_mem_usages)
+        return not oom
     
     def get_workloadload_duration(self):
         fwd_time = [F_TIME for _ in range(LAYER_NUM+3)]

@@ -11,40 +11,40 @@ RUN_MODE = RunMode.SIM_SOLVE
 
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
-# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.ZBV
 STAGE_PLACEMENT = Placement.CROSS
 # STAGE_PLACEMENT = Placement.RECURRENT
 STAGE_PLACEMENT = Placement.INTERLEAVED
-# STAGE_PLACEMENT = Placement.WAVELIKE
+STAGE_PLACEMENT = Placement.WAVELIKE
 
 # --------------------- Solver config ---------------------
 
 
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
-TEMP_TEST= True
-TIME_LIMIT = 5000
+TEMP_TEST= False
+TIME_LIMIT = 11000
 
-EMB_TIME = 1
-HEAD_F_TIME = 3
-HEAD_B_TIME = 2
-HEAD_W_TIME = 1
-CE_F_TIME = 3
-CE_B_TIME = 3
+EMB_TIME = 0
+HEAD_F_TIME = 0
+HEAD_B_TIME = 0
+HEAD_W_TIME = 0
+CE_F_TIME = 0
+CE_B_TIME = 0
 CE_W_TIME = 0
 F_TIME = 4
 B_TIME = 4
 W_TIME = 4
 COMM_TIME = 0
 
-SPLIT_BACKPROP = True
+SPLIT_BACKPROP = False
 LAYERWISE = False
 RECOMP = False
+AUTO_RECOMP_SEARCH = RECOMP
 RUN_SCHEDULE = False
 RUN_STANDARD_ZBV = False
-AUTO_RECOMP_SEARCH = False
 SCHEDULE_UNIT = MICRO_BATCH_NUM // 1
 REVERSE_LAST_STAGES = False
 # Run standard ZBV ---------------------
@@ -52,8 +52,11 @@ REVERSE_LAST_STAGES = False
 # RUN_SCHEDULE = False
 # RUN_STANDARD_ZBV = True
 # Run standard ZBV ---------------------
-
+DENSITY_MAX = 1
+DENSITY_MIN = 1
 # --------------------- Simulator config ---------------------
+
+HOMO_DEVICE = True
 
 # Memory overhead calculation
 GPU_MAX_MEM = 80 * G / G
@@ -95,9 +98,9 @@ class StateMemory:
 ACT_OPT_COE = 0.5 # adjust by profiling results, seq 4k hid 8k Theoretical 5.625G Realistic 2.5G
 @dataclass
 class Activation:
-    INPUT: int = (2*b*s*h) * ACT_OPT_COE / G / TP_SIZE
+    INPUT: int = (2*b*s*h) / G / TP_SIZE
     FULL: int = (34*b*s*h + 5*b*s*s*a) * ACT_OPT_COE / G / TP_SIZE
-    LOSS: int = (2*FP32*b*s*v) * ACT_OPT_COE / G / TP_SIZE
+    LOSS: int = (2*FP32*b*s*v) / G / TP_SIZE
     
 @dataclass
 class Gradient:

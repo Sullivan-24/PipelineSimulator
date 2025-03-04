@@ -77,9 +77,9 @@ def main():
     }
     set_workload_length(config=config)
 
-    if os.path.exists(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt"):
-        os.remove(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt")
-        print("delete file:{}".format(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}.txt"))
+    if os.path.exists(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}_{SPLIT_BACKPROP}_{LAYERWISE}.txt"):
+        os.remove(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}_{SPLIT_BACKPROP}_{LAYERWISE}.txt")
+        print("delete file:{}".format(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}_{SPLIT_BACKPROP}_{LAYERWISE}.txt"))
     
     for did in range(DEVICE_NUM):
         filepath = f"schedule_results/device{did}.txt"
