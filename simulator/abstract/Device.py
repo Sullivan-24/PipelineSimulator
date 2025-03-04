@@ -233,7 +233,8 @@ class Device:
                     workloads = self.stages[stage_id].workloads
                     if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
                         workload = workloads[mid][workload_type]
-                        if OVERLAP_AWARE_SCHEDULE and self.should_delay_for_overlap(workload=workload):
+                        # make sure warmup is finished as quickly as possible
+                        if OVERLAP_AWARE_SCHEDULE and self.exe_num_b > 0 and self.should_delay_for_overlap(workload=workload):
                             delayed_workload.append(workload)
                         else:
                             executable_workoads.append(workloads[mid][workload_type])

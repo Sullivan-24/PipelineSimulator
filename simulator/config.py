@@ -11,7 +11,7 @@ RUN_MODE = RunMode.SIM_SOLVE
 
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
-# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.ZBV
 STAGE_PLACEMENT = Placement.CROSS
@@ -20,11 +20,11 @@ STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 
 # --------------------- Solver config ---------------------
-
-OVERLAP_AWARE_SCHEDULE = True
+test_upp = True
+OVERLAP_AWARE_SCHEDULE = test_upp
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
-TEMP_TEST= True
+TEMP_TEST= test_upp
 TIME_LIMIT = 11000
 
 EMB_TIME = 1
@@ -39,8 +39,8 @@ B_TIME = 4
 W_TIME = 4
 COMM_TIME = 0
 
-SPLIT_BACKPROP = True
-LAYERWISE = True
+SPLIT_BACKPROP = test_upp
+LAYERWISE = test_upp
 RECOMP = False
 AUTO_RECOMP_SEARCH = RECOMP
 RUN_SCHEDULE = False
@@ -59,7 +59,7 @@ DENSITY_MIN = 1
 HOMO_DEVICE = True
 
 # Memory overhead calculation
-GPU_MAX_MEM = 80 * G / G
+GPU_MAX_MEM = 80 * G / G + 3
 FP32 = 4 # 4 Bytes
 FP16 = 2 # 2 Bytes
 MIX_TRAINING = True
@@ -95,7 +95,7 @@ class StateMemory:
     # Optimizer M + V, gradients * 1, model * 1
     OPTIMIZER: int = FP32 * 4 * (Parameter.LAYER * l + Parameter.EMB + Parameter.HEAD) / G / (TP_SIZE * PP_SIZE) / ZERO_SIZE
 
-ACT_OPT_COE = 0.45 # adjust by profiling results, seq 4k hid 8k Theoretical 5.625G Realistic 2.5G
+ACT_OPT_COE = 0.15 # adjust by profiling results, seq 4k hid 8k Theoretical 5.625G Realistic 2.5G
 @dataclass
 class Activation:
     INPUT: int = (2*b*s*h) / G / TP_SIZE
