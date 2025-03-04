@@ -400,8 +400,6 @@ class PipelineScheduler:
             sid = workload.sid
             k = '{}_{}_{}'.format(wlt,mid,sid)
             self.results[k] = workload.start_time
-            self.workload_execute_record[workload.did].append(workload)
-            self.update_workload_execution_record()
             if self.last_workload is None or workload.start_time + workload.duration > self.last_workload.start_time + self.last_workload.duration:
                 self.last_workload = workload
 
@@ -435,6 +433,8 @@ class PipelineScheduler:
                     else:
                         if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
                             self.finish_flag = True 
+                self.workload_execute_record[device.proc_workload.did].append(device.proc_workload)
+                self.update_workload_execution_record()
 
                 device.proc_workload.complete()
                 self.update_constraints(constraint=device.proc_workload)

@@ -225,7 +225,7 @@ class Device:
                 workload_type_order = [WorkloadType.W,WorkloadType.B,WorkloadType.F]
 
         for workload_type in workload_type_order:
-            overlap_delay_workload = []
+            delayed_workload = []
             for mid in range(self.nmb):
                 for stage_id in self.stages:
                     if stage_id > LAYER_NUM and LAYERWISE:
@@ -234,11 +234,11 @@ class Device:
                     if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
                         workload = workloads[mid][workload_type]
                         if OVERLAP_AWARE_SCHEDULE and self.should_delay_for_overlap(workload=workload):
-                            overlap_delay_workload.append(workload)
+                            delayed_workload.append(workload)
                         else:
                             executable_workoads.append(workloads[mid][workload_type])
             #decrease priority of the same mb
-            executable_workoads = executable_workoads + overlap_delay_workload
+            executable_workoads = executable_workoads + delayed_workload
 
         # if self.exe_num_b > 0:
         #     executable_workoads.sort(key=lambda x: self.mid_priority[x.microbatch_id], reverse=True)

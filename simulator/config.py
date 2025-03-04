@@ -17,7 +17,7 @@ SCHEDULE_METHOD = Schedule.Layerwise
 STAGE_PLACEMENT = Placement.CROSS
 # STAGE_PLACEMENT = Placement.RECURRENT
 STAGE_PLACEMENT = Placement.INTERLEAVED
-STAGE_PLACEMENT = Placement.WAVELIKE
+# STAGE_PLACEMENT = Placement.WAVELIKE
 
 # --------------------- Solver config ---------------------
 
@@ -95,7 +95,7 @@ class StateMemory:
     # Optimizer M + V, gradients * 1, model * 1
     OPTIMIZER: int = FP32 * 4 * (Parameter.LAYER * l + Parameter.EMB + Parameter.HEAD) / G / (TP_SIZE * PP_SIZE) / ZERO_SIZE
 
-ACT_OPT_COE = 0.5 # adjust by profiling results, seq 4k hid 8k Theoretical 5.625G Realistic 2.5G
+ACT_OPT_COE = 0.45 # adjust by profiling results, seq 4k hid 8k Theoretical 5.625G Realistic 2.5G
 @dataclass
 class Activation:
     INPUT: int = (2*b*s*h) / G / TP_SIZE
