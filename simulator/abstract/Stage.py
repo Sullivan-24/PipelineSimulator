@@ -83,7 +83,7 @@ class Stage:
                 device_id=self.did,
                 stage_id=self.sid,
                 microbatch_id=mid,
-                workload_type=WorkloadType.F,
+                wtype=WorkloadType.F,
                 duration=get_workload_duration(
                     sid=self.sid,
                     layer_wise=self.layerwise,
@@ -103,7 +103,7 @@ class Stage:
                 device_id=self.did,
                 stage_id=self.sid,
                 microbatch_id=mid,
-                workload_type=WorkloadType.B,
+                wtype=WorkloadType.B,
                 duration=get_workload_duration(
                     sid=self.sid,
                     layer_wise=self.layerwise,
@@ -121,7 +121,7 @@ class Stage:
                     device_id=self.did,
                     stage_id=self.sid,
                     microbatch_id=mid,
-                    workload_type=WorkloadType.W,
+                    wtype=WorkloadType.W,
                     duration=get_workload_duration(
                         sid=self.sid,
                         layer_wise=self.layerwise,
@@ -145,7 +145,7 @@ class Stage:
                         device_id=constraint.did,
                         stage_id=constraint.sid, 
                         microbatch_id=constraint.mid, 
-                        workload_type=constraint.workload_type
+                        workload_type=constraint.wtype
                     )
                 ) 
 
@@ -153,7 +153,7 @@ class Stage:
         if self.layerwise:
             if self.stage_type == StageType.EMBD:
                 return
-            if workload.workload_type == WorkloadType.F:
+            if workload.wtype == WorkloadType.F:
                 if self.stage_type == StageType.HEAD:
                     self.memory_usage += Activation.LOSS
                 # TODO CE memory cost
@@ -164,7 +164,7 @@ class Stage:
                         self.memory_usage += Activation.INPUT
                         return
                     self.memory_usage += Activation.FULL
-            elif workload.workload_type == WorkloadType.B:
+            elif workload.wtype == WorkloadType.B:
                 if self.stage_type == StageType.HEAD:                    
                     self.memory_usage -= Activation.LOSS
                 elif self.stage_type == StageType.CE:
@@ -176,24 +176,24 @@ class Stage:
                             self.memory_usage += (Activation.FULL - Activation.INPUT)
                     else:
                         self.memory_usage -= Activation.FULL
-            elif workload.workload_type == WorkloadType.W:
+            elif workload.wtype == WorkloadType.W:
                 if self.stage_type in (StageType.HEAD, StageType.CE):
                     return
                 if SPLIT_BACKPROP:
                     self.memory_usage -= Gradient.INPUT + Activation.FULL
         else:
             layers_per_stage = LAYER_NUM // STAGE_NUM
-            if workload.workload_type == WorkloadType.F:
+            if workload.wtype == WorkloadType.F:
                 self.memory_usage += (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
                 if self.sid == STAGE_NUM - 1:
                     self.memory_usage += Activation.LOSS
-            elif workload.workload_type == WorkloadType.W:
+            elif workload.wtype == WorkloadType.W:
                 self.memory_usage -= (Activation.FULL + Gradient.INPUT) * layers_per_stage
                 if self.sid == STAGE_NUM - 1:
                     self.memory_usage -= Activation.LOSS
-            elif SPLIT_BACKPROP and workload.workload_type == WorkloadType.B:
+            elif SPLIT_BACKPROP and workload.wtype == WorkloadType.B:
                 self.memory_usage += ((Activation.FULL - Activation.INPUT) * self.recomp + Gradient.INPUT) * layers_per_stage
-            elif SPLIT_BACKPROP == False and workload.workload_type == WorkloadType.B:
+            elif SPLIT_BACKPROP == False and workload.wtype == WorkloadType.B:
                 self.memory_usage -= (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
                 if self.sid == STAGE_NUM - 1:
                     self.memory_usage -= Activation.LOSS

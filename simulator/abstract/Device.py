@@ -4,7 +4,7 @@ from ..utils import print_to_file
 def get_required_memory_by_workload(workload:Workload):
         stage_id = workload.sid
         layer_num = LAYER_NUM // DEVICE_NUM // CHUNK_NUM
-        workload_type = workload.workload_type
+        workload_type = workload.wtype
         workload_type_num = WORKLOAD_TYPE_NUM
         layer_wise=LAYERWISE
         recomp=workload.recomp
@@ -88,7 +88,7 @@ class MemoryMonitor:
         return False
     
     def is_last_w(self, workload:Workload):
-        if workload.workload_type == WorkloadType.W:
+        if workload.wtype == WorkloadType.W:
             sorted_sids = sorted(list(self.stages.keys()))
             # Consider the embeding layer
             min_sid_idx = 0 if LAYERWISE and 0 not in sorted_sids else 1
@@ -178,6 +178,8 @@ class Device:
         else:
             self.layer_density = layer_density
 
+        self.workload_execute_record: list[list[Workload]] = [[] for _ in range(DEVICE_NUM)]
+
     def init_memory_monitor(self):
         self.memory_monitor = MemoryMonitor(self.nmb, self.stages, self.did, max_memory=self.max_memory)
         self.memory_monitor.init_monitor()
@@ -223,25 +225,44 @@ class Device:
                 workload_type_order = [WorkloadType.W,WorkloadType.B,WorkloadType.F]
 
         for workload_type in workload_type_order:
+            overlap_delay_workload = []
             for mid in range(self.nmb):
                 for stage_id in self.stages:
                     if stage_id > LAYER_NUM and LAYERWISE:
                         continue
                     workloads = self.stages[stage_id].workloads
                     if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
-                        executable_workoads.append(workloads[mid][workload_type])
-        
+                        workload = workloads[mid][workload_type]
+                        if OVERLAP_AWARE_SCHEDULE and self.should_delay_for_overlap(workload=workload):
+                            overlap_delay_workload.append(workload)
+                        else:
+                            executable_workoads.append(workloads[mid][workload_type])
+            #decrease priority of the same mb
+            executable_workoads = executable_workoads + overlap_delay_workload
 
         # if self.exe_num_b > 0:
         #     executable_workoads.sort(key=lambda x: self.mid_priority[x.microbatch_id], reverse=True)
         
         return executable_workoads
 
+    def should_delay_for_overlap(self, workload:Workload):
+        for did,executed_workloads in enumerate(self.workload_execute_record):
+            if did == self.did or len(executed_workloads) == 0:
+                continue
+            pivot_workload = executed_workloads[-1]
+            if pivot_workload.sid == workload.sid - 1 and pivot_workload.wtype == workload.wtype == WorkloadType.F:
+                print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
+                return True
+            if pivot_workload.sid == workload.sid + 1 and pivot_workload.wtype == workload.wtype == WorkloadType.B:
+                print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
+                return True
+        return False
+
     def overlap_aware_executable_workload_reorder(self, workload:Workload):
         if workload:
-            if workload.workload_type ==  WorkloadType.F:
+            if workload.wtype ==  WorkloadType.F:
                 next_stage_id = workload.sid + 1
-            elif workload.workload_type == WorkloadType.B:
+            elif workload.wtype == WorkloadType.B:
                 next_stage_id = workload.sid - 1
             else:
                 return
@@ -250,7 +271,7 @@ class Device:
                 head = []
                 tail = []
                 for wl in self.executable_workloads:
-                    if wl.mid == workload.mid and wl.workload_type == workload.workload_type and wl.sid == next_stage_id:
+                    if wl.mid == workload.mid and wl.wtype == workload.wtype and wl.sid == next_stage_id:
                         tail.append(wl)
                     else:
                         head.append(wl)
@@ -328,7 +349,7 @@ class Device:
                 self.executable_workloads = self.get_executable_workload()
                 print_to_file(f"schedule_results/device{self.did}.txt",f"{GET_TIME()},{len(self.executable_workloads)}\n")
                 for workload in self.executable_workloads:
-                    workload_type = workload.workload_type
+                    workload_type = workload.wtype
                     sid = workload.sid
                     mid = workload.mid
                     did = workload.did
@@ -341,7 +362,7 @@ class Device:
                         if not self.memory_monitor.is_executable_workload(workload=workload, current_mem=self.current_mem_usage):
                             continue
                     else:
-                        if workload.workload_type != WorkloadType.W:
+                        if workload.wtype != WorkloadType.W:
                             if required_memory + self.current_mem_usage > self.max_memory - Gradient.PARAMETER:
                                 continue
 
@@ -845,9 +866,9 @@ class Device:
         return False
 
     def update_memory_usage(self) -> int:
-        if self.proc_workload.state == Workload.IN_PROGRESS and self.proc_workload.workload_type in (WorkloadType.F, WorkloadType.B):
+        if self.proc_workload.state == Workload.IN_PROGRESS and self.proc_workload.wtype in (WorkloadType.F, WorkloadType.B):
             self.stages[self.proc_workload.sid].update_memory_usage(workload=self.proc_workload)
-        elif self.proc_workload.state == Workload.COMPLETED and self.proc_workload.workload_type == WorkloadType.W:
+        elif self.proc_workload.state == Workload.COMPLETED and self.proc_workload.wtype == WorkloadType.W:
             self.stages[self.proc_workload.sid].update_memory_usage(workload=self.proc_workload)
             
         self.current_mem_usage = self.optimizer_mem_usage + sum(stage.memory_usage for stage in self.stages.values())

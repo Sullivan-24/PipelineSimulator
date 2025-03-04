@@ -46,7 +46,7 @@ class PipelineScheduler:
         self.temp_results = {}
         self.recomp_set_traverser = self.generate_binary_combinations()
         self.last_workload: Workload = None
-        self.workload_execute_queue: list = [[] for _ in range(DEVICE_NUM)]
+        self.workload_execute_record: list[list[Workload]] = [[] for _ in range(DEVICE_NUM)]
         if run_schedule:
             print("Read schedule generated before...")
             self.file2result()
@@ -395,13 +395,19 @@ class PipelineScheduler:
 
     def record_workload(self, workload: Workload):
         if workload:
-            wlt = workload.workload_type.value.lower()
+            wlt = workload.wtype.value.lower()
             mid = workload.mid
             sid = workload.sid
             k = '{}_{}_{}'.format(wlt,mid,sid)
             self.results[k] = workload.start_time
+            self.workload_execute_record[workload.did].append(workload)
+            self.update_workload_execution_record()
             if self.last_workload is None or workload.start_time + workload.duration > self.last_workload.start_time + self.last_workload.duration:
                 self.last_workload = workload
+
+    def update_workload_execution_record(self):
+        for device in self.devices:
+            device.workload_execute_record = self.workload_execute_record
 
     def change_mid_traverse_order(self, workload: Workload):
         if workload:
@@ -411,7 +417,7 @@ class PipelineScheduler:
     def check_workload_status(self):
         for device in self.devices:
             if device._finish_proc_workload():
-                if device.proc_workload.workload_type == WorkloadType.W:
+                if device.proc_workload.wtype == WorkloadType.W:
                     self.num_finished_microbatch += 1
                     self.acc_finished_mb += 1
                     if LAYERWISE:
@@ -420,7 +426,7 @@ class PipelineScheduler:
                     else:
                         if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
                             self.finish_flag = True
-                if not SPLIT_BACKPROP and device.proc_workload.workload_type == WorkloadType.B:
+                if not SPLIT_BACKPROP and device.proc_workload.wtype == WorkloadType.B:
                     self.num_finished_microbatch += 1
                     self.acc_finished_mb += 1
                     if LAYERWISE:
@@ -435,14 +441,6 @@ class PipelineScheduler:
                 device.update_memory_usage()
                 device.state = Device.IDLE
 
-
-        # for device in self.devices:
-        #     device.executable_workloads = device.get_executable_workload()
-
-        # for device in self.devices:
-        #     if device.proc_workload and device.proc_workload.state == Workload.COMPLETED:
-        #         self.change_mid_traverse_order(device.proc_workload)
-
         if self.num_finished_microbatch == (1 + LAYER_NUM) * len(self.microbatch_schedule_range):
             self.num_finished_microbatch = 0
             self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < MICRO_BATCH_NUM]
@@ -452,8 +450,6 @@ class PipelineScheduler:
         for device in self.devices:
             processing_workload = device.execute_workload(run_schedule=self.run_schedule)
             self.record_workload(processing_workload)
-        # if GET_TIME()==302:
-        #     print(self.devices[1].stages[15].workloads[0])
             
     def reduce_recomp_degree(self):
         

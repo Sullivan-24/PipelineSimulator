@@ -6,7 +6,7 @@ class Workload:
     IN_PROGRESS = 2
     COMPLETED = 3
 
-    def __init__(self, device_id:int, microbatch_id: int, stage_id: int, duration: int, total_stages:int, workload_type: WorkloadType, recomp:bool):
+    def __init__(self, device_id:int, microbatch_id: int, stage_id: int, duration: int, total_stages:int, wtype: WorkloadType, recomp:bool):
         self.did = device_id
         self.mid: int = microbatch_id  # 微批次编号
         self.sid: int = stage_id              # 阶段编号
@@ -19,12 +19,12 @@ class Workload:
         self.recomp:bool = recomp
         if self.mid == 0 and self.sid == 0:
             self.ready_time = 0
-        self.workload_type: WorkloadType = workload_type  # 工作负载类型
+        self.wtype: WorkloadType = wtype  # 工作负载类型
         self.constraints: set = set()               # {(i1, j1, C1), ...}表示Stage i1 上的Microbatch j1 的 C1 操作是前置约束
         self._generate_constraints()
 
     def _generate_constraints(self):
-        if self.workload_type == WorkloadType.F:
+        if self.wtype == WorkloadType.F:
             if self.sid > 0:
                 self.constraints.add(
                     WorkloadConstraint(
@@ -33,7 +33,7 @@ class Workload:
                         stage_id = self.sid - 1,
                         workload_type = WorkloadType.F)
                 )
-        elif self.workload_type == WorkloadType.B:
+        elif self.wtype == WorkloadType.B:
             if self.sid + 1 < self.total_stages:
                 self.constraints.add(
                     WorkloadConstraint(
@@ -50,7 +50,7 @@ class Workload:
                         microbatch_id=self.mid, 
                         workload_type = WorkloadType.F)
                 )
-        elif self.workload_type == WorkloadType.W:
+        elif self.wtype == WorkloadType.W:
             self.constraints.add(
                 WorkloadConstraint(
                     device_id = self.did,
@@ -91,26 +91,26 @@ class Workload:
             self.state = Workload.COMPLETED
         
     def is_head_w(self):
-        if self.workload_type == WorkloadType.F:
+        if self.wtype == WorkloadType.F:
             if LAYERWISE and self.sid == LAYER_NUM + 1:
                 return True
         return False
 
     @property
     def is_w(self):
-        return self.workload_type == WorkloadType.W
+        return self.wtype == WorkloadType.W
     
     @property
     def is_b(self):
-        return self.workload_type == WorkloadType.B
+        return self.wtype == WorkloadType.B
     
     @property
     def is_f(self):
-        return self.workload_type == WorkloadType.F
+        return self.wtype == WorkloadType.F
     
     def __repr__(self):
         return (f"{self.__class__.__name__}(did={self.did}, "
-            f"mid={self.mid}, sid={self.sid}, workload_type={self.workload_type.name}, "
+            f"mid={self.mid}, sid={self.sid}, workload_type={self.wtype.name}, "
             f"duration={self.duration}, start_time={self.start_time}, "
             f"end_time={self.end_time}, state={self.state}, "
             f"ready_time={self.ready_time}, total_stages={self.total_stages}, "

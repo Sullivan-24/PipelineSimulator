@@ -103,12 +103,12 @@ class ChimeraPipelineScheduler:
         if workload:
             print("did={}({}), {}, sid={}, mid={}, s={}, e={}".format(
                 workload.did%DEVICE_NUM, workload.did, 
-                workload.workload_type.value, workload.sid, workload.mid,
+                workload.wtype.value, workload.sid, workload.mid,
                 workload.start_time, workload.end_time,
                 )
             )
             input()
-            wlt = workload.workload_type.value.lower()
+            wlt = workload.wtype.value.lower()
             mid = workload.mid
             sid = workload.sid
             # NOTE new key for Chimera results
@@ -120,7 +120,7 @@ class ChimeraPipelineScheduler:
     def check_workload_status(self):
         for device in self.devices:
             if device._finish_proc_workload():
-                if device.proc_workload.workload_type == WorkloadType.W:
+                if device.proc_workload.wtype == WorkloadType.W:
                     self.num_finished_microbatch += 1
                 device.proc_workload.complete()
                 self.update_constraints(constraint=device.proc_workload)
