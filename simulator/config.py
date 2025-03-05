@@ -28,11 +28,11 @@ TEMP_TEST= test_upp
 TIME_LIMIT = 11000
 
 EMB_TIME = 1
-HEAD_F_TIME = 2
-HEAD_B_TIME = 2
-HEAD_W_TIME = 2
-CE_F_TIME = 2
-CE_B_TIME = 2
+HEAD_F_TIME = 4
+HEAD_B_TIME = 4
+HEAD_W_TIME = 4
+CE_F_TIME = 4
+CE_B_TIME = 4
 CE_W_TIME = 0
 F_TIME = 4
 B_TIME = 4
@@ -70,6 +70,7 @@ h = HIDDEN_SIZE
 a = NUM_ATTENTION_HEAD
 l = LAYER_NUM
 v = VOCAB_SIZE
+i = INTER_SIZE
 
 LAYER_PARA_NUM = 12 * h * h + 13 * h
 HEAD_PARA_NUM = v * h
@@ -85,7 +86,7 @@ MAX_ACTIVATION_TIMES_OF_STAGE_NUM = 3
 class Parameter:
     EMB: int = v * h
     HEAD: int = v * h
-    LAYER: int = 12 * h * h + 13 * h
+    LAYER: int = 4 * h * h + 3 * h * i + 2 * h if MODEL_TYPE == "LLAMA" else 12 * h * h + 13 * h 
 
 @dataclass
 class StateMemory:
@@ -95,7 +96,7 @@ class StateMemory:
     # Optimizer M + V, gradients * 1, model * 1
     OPTIMIZER: int = FP32 * 4 * (Parameter.LAYER * l + Parameter.EMB + Parameter.HEAD) / G / (TP_SIZE * PP_SIZE) / ZERO_SIZE
 
-ACT_OPT_COE = 0.15 # adjust by profiling results, seq 4k hid 8k Theoretical 5.625G Realistic 2.5G
+ACT_OPT_COE = 0.15 # adjust by profiling results
 @dataclass
 class Activation:
     INPUT: int = (2*b*s*h) / G / TP_SIZE

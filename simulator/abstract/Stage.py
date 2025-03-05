@@ -57,11 +57,15 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, memory_usage: int, stage_type: StageType, layer_num: int = LAYER_NUM // STAGE_NUM, layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
+    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, layer_num: int = LAYER_NUM // STAGE_NUM, layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
         self.did: int = device_id
         self.sid: int = stage_id
         self.nmb: int = microbatch_num
-        self.memory_usage: int = memory_usage
+        self.para_num: int = para_num / G
+        self.model_memory_usage = self.para_num * FP16 / TP_SIZE
+        self.grad_memory_usage = self.para_num * FP16 / TP_SIZE
+        self.opt_memory_usage = self.para_num * 3 * FP32 / TP_SIZE / ZERO_SIZE
+        self.memory_usage: int = self.model_memory_usage + self.grad_memory_usage + self.opt_memory_usage
         self.workloads: dict[int, dict[WorkloadType, Workload]] = {}  
         self.stage_type: StageType = stage_type
         self.recomp = recomp
