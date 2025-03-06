@@ -50,7 +50,7 @@ class LayerwiseSchedulingPainter:
         for did in range(len(self._devices)):
             if pid in self._devices[did]:
                 return did
-        raise Exception("Layer/Stage has not been assigned to any device!")
+        raise Exception(f"Layer/Stage {pid} has not been assigned to any device!")
     
     # def _set_color(self, pid, k):
     #     color = None

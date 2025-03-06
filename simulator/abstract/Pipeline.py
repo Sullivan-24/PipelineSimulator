@@ -21,6 +21,29 @@ class PipelineScheduler:
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
+        self.dsa = [
+            # [0, 4, 12, 16, 24, 28, 36, 40, 48, 52, 60, 64, 72, 76],
+            # [1, 5, 13, 17, 25, 29, 37, 41, 49, 53, 61, 65, 73, 77],
+            # [2, 6, 14, 18, 26, 30, 38, 42, 50, 54, 62, 66, 74, 78],
+            # [3, 7, 15, 19, 27, 31, 39, 43, 51, 55, 63, 67, 75, 79],
+            # [8, 20, 32, 44, 56, 68, 80],
+            # [9, 21, 33, 45, 57, 69, 81],
+            # [10, 22, 34, 46, 58, 70],
+            # [11, 23, 35, 47, 59, 71],
+            [4, 16, 28, 40, 52, 64, 76],
+            [5, 17, 29, 41, 53, 65, 77],
+            [6, 18, 30, 42, 54, 66, 78],
+            [7, 19, 31, 43, 55, 67, 79],
+            [0, 8, 12, 20, 24, 32, 36, 44, 48, 56, 60, 68, 72, 80],
+            [1, 9, 13, 21, 25, 33, 37, 45, 49, 57, 61, 69, 73, 81],
+            [2, 10, 14, 22, 26, 34, 38, 46, 50, 58, 62, 70, 74],
+            [3, 11, 15, 23, 27, 35, 39, 47, 51, 59, 63, 71, 75],
+        ]
+        for i in range(len(self.dsa)):
+            for j in range(len(self.dsa[i])):
+                self.dsa[i][j] += 1
+        self.dsa[-1].append(0)
+
         self.microbatch_schedule_range = range(0,min(SCHEDULE_UNIT, MICRO_BATCH_NUM))
         # self.microbatch_schedule_range = range(0,min(8, MICRO_BATCH_NUM))
         self.acc_finished_mb = 0
@@ -29,7 +52,15 @@ class PipelineScheduler:
         self.run_schedule = run_schedule
         self.manual_recomp_set = []
         self.fail_indexes = set()
-        self.manual_recomp_set = []
+        # pp4 tp4 zero4 I1F1B recomp set
+        # self.manual_recomp_set = [0 for _ in range(LAYER_NUM)]
+        # self.manual_recomp_set[2] = 1
+        # self.manual_recomp_set[3] = 1
+        # self.manual_recomp_set[6] = 1
+        # self.manual_recomp_set[7] = 1
+        # self.manual_recomp_set[11] = 1
+        # self.manual_recomp_set[15] = 1
+
         min_value = min(list(reversed(range(LAYER_NUM))))
         max_value = max(list(reversed(range(LAYER_NUM))))
 
@@ -128,7 +159,7 @@ class PipelineScheduler:
                         nmb=MICRO_BATCH_NUM,
                         memory_usage_constrain_rate=0.85,
                         max_mem=GPU_MAX_MEM//2 if did >= DEVICE_NUM // 1 else GPU_MAX_MEM,
-                        comp_power=1 if did < DEVICE_NUM // 1 else 0.5,
+                        comp_power=0.5 if did < DEVICE_NUM // 2 else 1,
                         layer_density=self.layer_density,
                     )
             self.devices.append(device)
@@ -139,6 +170,7 @@ class PipelineScheduler:
                 for pid in self.dsa[did]:
                     self.record_recomp_set()
                     self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
+            self.devices[DEVICE_NUM - 1].add_stage(0, recomp=self.recomp_set[0])
         elif LAYERWISE:
             if STAGE_PLACEMENT == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
@@ -146,10 +178,14 @@ class PipelineScheduler:
                     for pid in range(LAYER_NUM):
                         self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
                 else:
-                    for pid in range(LAYER_NUM - DEVICE_NUM * 3):
-                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
-                    for pid in range(LAYER_NUM - DEVICE_NUM * 3, LAYER_NUM):
+                    for pid in range(DEVICE_NUM * 0):
                         self.devices[pid % (DEVICE_NUM // 2)].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                    for pid in range(DEVICE_NUM * 0, LAYER_NUM):
+                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                    # for pid in range(LAYER_NUM - DEVICE_NUM * 3):
+                    #     self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                    # for pid in range(LAYER_NUM - DEVICE_NUM * 3, LAYER_NUM):
+                    #     self.devices[pid % (DEVICE_NUM // 2)].add_stage(pid + 1, recomp=self.recomp_set[pid])
             elif STAGE_PLACEMENT == Placement.RECURRENT:
                 print("Use Recurrent placement")
                 unit = range(DEVICE_NUM)

@@ -56,10 +56,10 @@ DENSITY_MAX = 1
 DENSITY_MIN = 1
 # --------------------- Simulator config ---------------------
 
-HOMO_DEVICE = True
+HOMO_DEVICE = False
 
 # Memory overhead calculation
-GPU_MAX_MEM = 80 * G / G + 3
+GPU_MAX_MEM = 80 * G / G
 FP32 = 4 # 4 Bytes
 FP16 = 2 # 2 Bytes
 MIX_TRAINING = True
