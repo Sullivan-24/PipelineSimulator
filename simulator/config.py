@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from .abstract.variables import *
 from .model_config import *
-
 # --------------------- Solver config ---------------------
 BASE_SOLUTION = True
 RUN_MODE = RunMode.LAYERWISE_GUROBI_SOLVE
@@ -11,13 +10,13 @@ RUN_MODE = RunMode.SIM_SOLVE
 
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
-SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.ZBV
 STAGE_PLACEMENT = Placement.CROSS
 # STAGE_PLACEMENT = Placement.RECURRENT
 STAGE_PLACEMENT = Placement.INTERLEAVED
-# STAGE_PLACEMENT = Placement.WAVELIKE
+STAGE_PLACEMENT = Placement.WAVELIKE
 
 # --------------------- Solver config ---------------------
 test_upp = True
@@ -27,7 +26,7 @@ FIND_OPTIMAL_RECOMP = True
 TEMP_TEST= test_upp
 TIME_LIMIT = 11000
 
-EMB_TIME = 1
+EMB_TIME = 0
 HEAD_F_TIME = 4
 HEAD_B_TIME = 4
 HEAD_W_TIME = 4
@@ -39,8 +38,8 @@ B_TIME = 4
 W_TIME = 4
 COMM_TIME = 0
 
-SPLIT_BACKPROP = test_upp
-LAYERWISE = test_upp
+SPLIT_BACKPROP = True
+LAYERWISE = False
 RECOMP = False
 AUTO_RECOMP_SEARCH = RECOMP
 RUN_SCHEDULE = False
@@ -56,7 +55,7 @@ DENSITY_MAX = 1
 DENSITY_MIN = 1
 # --------------------- Simulator config ---------------------
 
-HOMO_DEVICE = False
+HOMO_DEVICE = True
 
 # Memory overhead calculation
 GPU_MAX_MEM = 80 * G / G
@@ -96,7 +95,7 @@ class StateMemory:
     # Optimizer M + V, gradients * 1, model * 1
     OPTIMIZER: int = FP32 * 4 * (Parameter.LAYER * l + Parameter.EMB + Parameter.HEAD) / G / (TP_SIZE * PP_SIZE) / ZERO_SIZE
 
-ACT_OPT_COE = 0.15 # adjust by profiling results
+ACT_OPT_COE = 0.35 # adjust by profiling results
 @dataclass
 class Activation:
     INPUT: int = (2*b*s*h) / G / TP_SIZE
@@ -121,4 +120,7 @@ PP_ALIGN = 5
 SHOW_WORKLOAD_TEXT = True
 # --------------------- Painter Config ---------------------
 
-
+# --------------------- Save File Config ---------------------
+RES_FILE_PATH = f"schedule_results/schedules/{RUN_MODE.name}_{SCHEDULE_METHOD.name}_mb{MICRO_BATCH_NUM}_pp{PP_SIZE}tp{TP_SIZE}zr{ZERO_SIZE}_l{LAYER_NUM}_{SPLIT_BACKPROP}_{LAYERWISE}.txt"
+PLA_FILE_PATH = f"schedule_results/placement.txt"
+TEMP_RES_PATH = f"schedule_results/result.txt"

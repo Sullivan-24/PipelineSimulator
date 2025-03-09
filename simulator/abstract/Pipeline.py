@@ -5,6 +5,7 @@ from .mutils import *
 from ..painter import SchedulingPainter as SP
 from ..LayerwisePainter import LayerwiseSchedulingPainter as LSP
 from ..utils import print_to_file
+from .Placement import PipelinePlacement
 import itertools
 import json
 import os
@@ -21,29 +22,6 @@ class PipelineScheduler:
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
-        self.dsa = [
-            # [0, 4, 12, 16, 24, 28, 36, 40, 48, 52, 60, 64, 72, 76],
-            # [1, 5, 13, 17, 25, 29, 37, 41, 49, 53, 61, 65, 73, 77],
-            # [2, 6, 14, 18, 26, 30, 38, 42, 50, 54, 62, 66, 74, 78],
-            # [3, 7, 15, 19, 27, 31, 39, 43, 51, 55, 63, 67, 75, 79],
-            # [8, 20, 32, 44, 56, 68, 80],
-            # [9, 21, 33, 45, 57, 69, 81],
-            # [10, 22, 34, 46, 58, 70],
-            # [11, 23, 35, 47, 59, 71],
-            [4, 16, 28, 40, 52, 64, 76],
-            [5, 17, 29, 41, 53, 65, 77],
-            [6, 18, 30, 42, 54, 66, 78],
-            [7, 19, 31, 43, 55, 67, 79],
-            [0, 8, 12, 20, 24, 32, 36, 44, 48, 56, 60, 68, 72, 80],
-            [1, 9, 13, 21, 25, 33, 37, 45, 49, 57, 61, 69, 73, 81],
-            [2, 10, 14, 22, 26, 34, 38, 46, 50, 58, 62, 70, 74],
-            [3, 11, 15, 23, 27, 35, 39, 47, 51, 59, 63, 71, 75],
-        ]
-        for i in range(len(self.dsa)):
-            for j in range(len(self.dsa[i])):
-                self.dsa[i][j] += 1
-        self.dsa[-1].append(0)
-
         self.microbatch_schedule_range = range(0,min(SCHEDULE_UNIT, MICRO_BATCH_NUM))
         # self.microbatch_schedule_range = range(0,min(8, MICRO_BATCH_NUM))
         self.acc_finished_mb = 0
@@ -152,25 +130,45 @@ class PipelineScheduler:
             self.results[f"theta_{idx}"] = r
 
     def _init_stage(self):
+        dev_compute_power = []
         for did in range(DEVICE_NUM):
+            max_mem = GPU_MAX_MEM
+            comp_power = 1
+            if not HOMO_DEVICE:
+                if did >= DEVICE_NUM // 2:
+                    max_mem = GPU_MAX_MEM / 2 
+                    comp_power = comp_power / 2
             device = Device(
                         device_id = did, 
                         max_activation_counts=MAX_ACTIVATION_COUNTS, 
                         nmb=MICRO_BATCH_NUM,
                         memory_usage_constrain_rate=0.85,
-                        max_mem=GPU_MAX_MEM//2 if did >= DEVICE_NUM // 1 else GPU_MAX_MEM,
-                        comp_power=0.5 if did < DEVICE_NUM // 2 else 1,
+                        max_mem=max_mem,
+                        comp_power=comp_power,
                         layer_density=self.layer_density,
                     )
+            dev_compute_power.append(comp_power)
             self.devices.append(device)
         self.set_recomp()
-
+        if not HOMO_DEVICE and not self.dsa:
+            layer_computation_cost = [1 for _ in range(LAYER_NUM)]
+            self.pipeline_placement_solver = PipelinePlacement(
+                layer_num=LAYER_NUM,
+                layer_computation_cost=layer_computation_cost,
+                layer_para=[1 for _ in range(LAYER_NUM)],
+                dev_num=DEVICE_NUM,
+                dev_max_memory=[100000 for _ in range(DEVICE_NUM)],
+                dev_compute_power=dev_compute_power,
+            )
+            self.dsa = self.pipeline_placement_solver.get_placements()
+            if LAYERWISE:
+                assert False, 'Layerwise test not ready'
         if self.dsa:
             for did in range(DEVICE_NUM):
                 for pid in self.dsa[did]:
-                    self.record_recomp_set()
                     self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
-            self.devices[DEVICE_NUM - 1].add_stage(0, recomp=self.recomp_set[0])
+            if LAYERWISE:
+                self.devices[DEVICE_NUM - 1].add_stage(0, recomp=self.recomp_set[0])
         elif LAYERWISE:
             if STAGE_PLACEMENT == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
@@ -253,6 +251,11 @@ class PipelineScheduler:
             print(list(self.devices[did].stages.keys()))
             if len(self.dsa) < DEVICE_NUM:
                 self.dsa.append(list(self.devices[did].stages.keys()))
+
+        if os.path.exists(PLA_FILE_PATH):
+            os.remove(PLA_FILE_PATH)
+            print("delete file:{}".format(PLA_FILE_PATH))
+        print_to_file(PLA_FILE_PATH,str(self.dsa))
 
     def set_recomp(self):
         if LAYERWISE:
@@ -555,7 +558,7 @@ class PipelineScheduler:
 
     def run_pipeline_parallelism(self, time_limit = TIME_LIMIT):
         # self.run_schedule = False
-
+        RESET_TIME()
         while GET_TIME() <= time_limit and not self.finish_flag:
             self.check_workload_status()
             self.execute_workload()
@@ -628,11 +631,7 @@ class PipelineScheduler:
     def show_mem_usage(self, device_id=(0,1, DEVICE_NUM-1), show_all=False):
         max_mem_usages = [0 for _ in range(len(self.devices))]
         for device in self.devices:
-            aim_file_path = "schedule_results/did{}_mem_usage.txt".format(device.did)
-            if os.path.exists(aim_file_path):  # 判断文件是否存在
-                with open(aim_file_path, "w") as file:  # 以写入模式打开文件（会清空文件内容）
-                    file.truncate(0)  # 清空文件内容
-                print(f"Writing memory record to {aim_file_path}.")
+            aim_file_path = "schedule_results/memory/device{}.txt".format(device.did)
             print_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did))
             last_mem_record = 0
             for t, mem_record in device.mem_usage_record.items():

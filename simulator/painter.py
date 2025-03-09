@@ -1,10 +1,11 @@
 """
 painter package
 """
+import os
 import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, print_to_file
-from .abstract.mutils import COMM_TIME, SPLIT_BACKPROP, MICRO_BATCH_NUM, DEVICE_NUM,SCHEDULE_METHOD,RUN_MODE,LAYER_NUM,SHOW_WORKLOAD_TEXT, LAYERWISE
+from .abstract.mutils import *
 from .PainterToImage import save_canvas_as_image
 from .PainterColor import set_color
 
@@ -124,7 +125,8 @@ class SchedulingPainter:
             # y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
             y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
 
-            print_to_file(f"schedule_results/{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}_{SPLIT_BACKPROP}_{LAYERWISE}.txt", "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+            print_to_file(RES_FILE_PATH, "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+            print_to_file(TEMP_RES_PATH, "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
 
             tag = f"p_{pid}_m_{mid}_{k}"
             color = set_color(pid,workload_type=k,layer_num=self._pp_size)

@@ -1,5 +1,6 @@
 import math
 import itertools
+from collections import deque
 
 def generate_unique_placement_mapping(n):
     if n < 0:
@@ -38,28 +39,136 @@ class PipelinePlacement:
         self.dev_max_memory = dev_max_memory
         self.dev_compute_power = dev_compute_power
 
-    def get_placement1s(self):
-        dsa = [[] for _ in range(self.dev_num)]
-        """
-            实现将self.layer_num个layer分配到self.pp_size个device上
-            例如：
-            dsa = [
-                [0, 1],
-                [2, 4],
-                [3, 5],
-                [6, 7],
-                [8, 9, 11],
-                [10, 12, 13],
-            ]
-            第i个layer的计算开销是self.layer_computation_cost[i]
-            使用第j个device计算的时间为 
-            time = 0
-            for lid in dsa[j]
-                time += self.layer_computation_cost[lid] / self.pp_compute_power[j]
+    def get_reduced_possilble_placements(self):
+        base, rem = divmod(self.layer_num, self.dev_num)
+        s = [base + 1] * rem + [base] * (self.dev_num - rem)
+        
+        # 初始化状态：当前分配，剩余可用层号
+        from collections import deque
+        stack = deque([(tuple([] for _ in range(self.dev_num)), set(range(self.layer_num)))])
+        seen = set()
+
+        while stack:
+            current, available = stack.pop()
             
-            要求给出所有device上计算时间方差最小的layer分配结果，即dsa
-        """
-        return dsa
+            # 终止条件：所有层分配完成
+            if not available:
+                if all(len(dev) == s[i] for i, dev in enumerate(current)):
+                    yield [list(dev) for dev in current]
+                continue
+            
+            # 修复后的列索引计算
+            active_columns = []
+            for i, dev in enumerate(current):
+                if len(dev) < s[i]:
+                    active_columns.append(len(dev))
+            if not active_columns:
+                continue
+            col = min(active_columns)
+            
+            # 获取需要分配当前列的设备
+            active_devices = [i for i, dev in enumerate(current) if len(dev) == col and len(dev) < s[i]]
+            k = len(active_devices)
+            
+            # 生成候选连续数字块
+            sorted_avail = sorted(available)
+            candidates = []
+            for start in range(len(sorted_avail) - k + 1):
+                block = sorted_avail[start:start+k]
+                if all(block[i+1] - block[i] == 1 for i in range(k-1)):
+                    candidates.append(block)
+                    candidates.append(block[::-1])  # 添加反向序列
+            
+            # 验证并生成新状态
+            for block in candidates:
+                # 检查设备内部递增性
+                valid = True
+                new_assignment = [list(dev) for dev in current]
+                new_available = set(available)
+                for i, dev_idx in enumerate(active_devices):
+                    if new_assignment[dev_idx] and block[i] <= new_assignment[dev_idx][-1]:
+                        valid = False
+                        break
+                    new_assignment[dev_idx].append(block[i])
+                    new_available.remove(block[i])
+                if not valid:
+                    continue
+                
+                # 转换为不可变类型用于哈希
+                frozen = tuple(tuple(dev) for dev in new_assignment)
+                if frozen not in seen:
+                    seen.add(frozen)
+                    stack.append( (frozen, new_available) )
+    
+    def get_possible_placements(self):
+        """生成器：每次调用返回一个新的合法placement"""
+        base = self.layer_num // self.dev_num
+        remainder = self.layer_num % self.dev_num
+        s = [base + 1 if i < remainder else base for i in range(self.dev_num)]
+        
+        def is_monotonic(sequence, direction):
+            """验证序列是否符合严格单调性"""
+            if direction == 'asc':
+                return all(x < y for x, y in zip(sequence, sequence[1:]))
+            return all(x > y for x, y in zip(sequence, sequence[1:]))
+
+        def validate(placement):
+            """验证所有设备的对应位置满足严格单调性"""
+            for pos in range(max(len(dev) for dev in placement)):
+                layers = []
+                for dev in placement:
+                    if pos < len(dev):
+                        layers.append(dev[pos])
+                if len(layers) < 2:
+                    continue
+                direction = 'asc' if layers[0] < layers[1] else 'desc'
+                if not all(layers[i] < layers[i+1] for i in range(len(layers)-1)) if direction == 'asc' \
+                   else not all(layers[i] > layers[i+1] for i in range(len(layers)-1)):
+                    return False
+            return True
+
+        def backtrack(position, remaining, current_placement):
+            if not remaining:
+                if all(len(current_placement[d]) == s[d] for d in range(self.dev_num)) and validate(current_placement):
+                    yield [tuple(dev) for dev in current_placement]  # 返回不可变对象确保唯一性
+                return
+
+            active_devices = [d for d in range(self.dev_num) if s[d] > position]
+            if not active_devices:
+                return
+
+            # 生成所有可能的组合分配
+            for combo in itertools.permutations(remaining, len(active_devices)):
+                # 尝试两种排序方向
+                for direction in ['asc', 'desc']:
+                    sorted_combo = sorted(combo) if direction == 'asc' else sorted(combo, reverse=True)
+                    new_placement = [list(dev) for dev in current_placement]
+                    for dev, layer in zip(active_devices, sorted_combo):
+                        new_placement[dev].append(layer)
+                    
+                    # 立即验证当前层单调性
+                    current_layers = [new_placement[dev][position] for dev in active_devices]
+                    if len(current_layers) >= 2:
+                        if direction == 'asc' and not is_monotonic(current_layers, 'asc'):
+                            continue
+                        if direction == 'desc' and not is_monotonic(current_layers, 'desc'):
+                            continue
+                    
+                    # 剪枝：剩余层必须足够后续分配
+                    remaining_layers = [x for x in remaining if x not in combo]
+                    required_layers = sum(s[d] - (position + 1) for d in range(self.dev_num))
+                    if len(remaining_layers) < required_layers:
+                        continue
+                    
+                    yield from backtrack(position + 1, remaining_layers, new_placement)
+
+        # 使用集合去重
+        seen = set()
+        for placement in backtrack(0, list(range(self.layer_num)), [[] for _ in range(self.dev_num)]):
+            key = tuple(tuple(dev) for dev in placement)
+            if key not in seen:
+                seen.add(key)
+                yield [list(dev) for dev in placement]
     
     def get_placements(self):
         # Sort layers by computation cost in descending order, keeping their original indices
@@ -258,16 +367,15 @@ if __name__ == "__main__":
     
     # print("\n每个chunk的最大时间:", chunk_max)
     # print("流水线整体最大时间:", total_max)
-    pp_size = 8
-    layer_num = 82
+    pp_size = 4
+    layer_num = 8
     layer_computation_cost = [1 for _ in range(layer_num)]
-    layer_computation_cost[1] = 1
-    layer_computation_cost[2] = 1
+    layer_computation_cost[-1] = 2
     pp_compute_power = [1 for _ in range(pp_size)]
-    pp_compute_power[0] = 0.5
-    pp_compute_power[1] = 0.5
-    pp_compute_power[2] = 0.5
-    pp_compute_power[3] = 0.5
+    pp_compute_power[0] = 2
+    pp_compute_power[1] = 2
+    pp_compute_power[2] = 2
+    pp_compute_power[3] = 2
     
     test_placement = PipelinePlacement(layer_num=layer_num, 
                                     layer_computation_cost=layer_computation_cost,
@@ -276,6 +384,10 @@ if __name__ == "__main__":
                                     dev_max_memory=[100000 for _ in range(layer_num)],
                                     dev_compute_power=pp_compute_power,
                                     )
-    test_placement.get_placements()
+    
+    pg = test_placement.get_reduced_possilble_placements()
+    for p in pg:
+        print(p)
+    # test_placement.get_placements()
     # pp4 layer8 也不行
     # test_placement.get_placements_dp()

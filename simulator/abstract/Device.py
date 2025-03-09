@@ -196,13 +196,22 @@ class Device:
     def get_executable_workload(self)->list[Workload]:
         executable_workoads = []
         workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
-        if self.last_workload_type == WorkloadType.B:
-            workload_type_order = [WorkloadType.F,WorkloadType.W,WorkloadType.B]
-        elif self.last_workload_type == WorkloadType.F:
-            workload_type_order = [WorkloadType.B,WorkloadType.W,WorkloadType.F]
-        elif self.last_workload_type == WorkloadType.W:
-            workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
-            
+        # if self.current_mem_usage <= 0.75 * self.max_memory: cause too much memory pressure leading to low performance
+        if self.current_mem_usage <= 0.0 * self.max_memory:
+            if self.last_workload_type == WorkloadType.B:
+                workload_type_order = [WorkloadType.F,WorkloadType.W,WorkloadType.B]
+            elif self.last_workload_type == WorkloadType.F:
+                workload_type_order = [WorkloadType.B,WorkloadType.W,WorkloadType.F]
+            elif self.last_workload_type == WorkloadType.W:
+                workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
+        else:
+            if self.last_workload_type == WorkloadType.B:
+                workload_type_order = [WorkloadType.W,WorkloadType.F,WorkloadType.B]
+            elif self.last_workload_type == WorkloadType.F:
+                workload_type_order = [WorkloadType.B,WorkloadType.W,WorkloadType.F]
+            elif self.last_workload_type == WorkloadType.W:
+                workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
+
         # deal with long tail
         if self.exe_num_f == CHUNK_NUM * MICRO_BATCH_NUM:
             workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W]
@@ -251,10 +260,10 @@ class Device:
                 continue
             pivot_workload = executed_workloads[-1]
             if pivot_workload.sid == workload.sid - 1 and pivot_workload.wtype == workload.wtype == WorkloadType.F:
-                print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
+                # print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
                 return True
             if pivot_workload.sid == workload.sid + 1 and pivot_workload.wtype == workload.wtype == WorkloadType.B:
-                print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
+                # print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
                 return True
         return False
 
@@ -359,7 +368,7 @@ class Device:
         if self.state == Device.IDLE:
             if TEMP_TEST:
                 self.executable_workloads = self.get_executable_workload()
-                print_to_file(f"schedule_results/device{self.did}.txt",f"{GET_TIME()},{len(self.executable_workloads)}\n")
+                print_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{GET_TIME()},{len(self.executable_workloads)}\n")
                 for workload in self.executable_workloads:
                     workload_type = workload.wtype
                     sid = workload.sid
