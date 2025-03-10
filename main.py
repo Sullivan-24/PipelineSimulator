@@ -52,6 +52,11 @@ def check_standard_zbv_conditions():
         return False
 
 def clear_old_file(filepath:str):
+    directory = os.path.dirname(filepath)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print("Create directory:{}".format(directory))
+
     if os.path.exists(filepath):
         os.remove(filepath)
         print("delete file:{}".format(filepath))

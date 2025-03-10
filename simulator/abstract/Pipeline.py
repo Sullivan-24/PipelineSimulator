@@ -463,15 +463,16 @@ class PipelineScheduler:
                     else:
                         if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
                             self.finish_flag = True
-                if not SPLIT_BACKPROP and device.proc_workload.wtype == WorkloadType.B:
-                    self.num_finished_microbatch += 1
-                    self.acc_finished_mb += 1
-                    if LAYERWISE:
-                        if self.acc_finished_mb == (1 + LAYER_NUM) * MICRO_BATCH_NUM:
-                            self.finish_flag = True
-                    else:
-                        if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
-                            self.finish_flag = True 
+                # if not SPLIT_BACKPROP and device.proc_workload.wtype == WorkloadType.B:
+                #     if device.proc_workload.sid == 0:
+                #         self.num_finished_microbatch += 1
+                #         self.acc_finished_mb += 1
+                #     if LAYERWISE:
+                #         if self.acc_finished_mb == (1 + LAYER_NUM) * MICRO_BATCH_NUM:
+                #             self.finish_flag = True
+                #     else:
+                #         if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
+                #             self.finish_flag = True 
                 self.workload_execute_record[device.proc_workload.did].append(device.proc_workload)
                 self.update_workload_execution_record()
 

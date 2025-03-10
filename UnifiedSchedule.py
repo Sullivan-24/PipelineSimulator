@@ -23,15 +23,23 @@ class UnifiedScheduler:
         self.best_schedule = None
         self.best_time_cost = 1000000
 
+    def save_to_file(self):
+        with open("searched_schedule", 'w') as file:
+            file.write(str(self.best_schedule))
+        with open("searched_placement", 'w') as file:
+            file.write(str(self.best_placement))    
+
     def is_better_schedule(self, schedule_result:dict, placement:list):
         time_cost = -1
         for k, v in schedule_result.items():
             if str(k).startswith(("f_","b_","w_")):
                 time_cost = max(time_cost, float(v))
         if time_cost < self.best_time_cost:
+            print("Update result from {} -> {}".format(self.best_time_cost, time_cost))
             self.best_time_cost = time_cost
             self.best_schedule = schedule_result
             self.best_placement = placement
+            self.save_to_file()
             return True
         return False
 
@@ -40,7 +48,8 @@ class UnifiedScheduler:
             self.generate_placement()
         if not self.placements:
             print("Generate possible placements...")
-            self.placements = self.placement_solver.get_reduced_possilble_placements()
+            self.placements = self.placement_solver.get_reduced_placements()
+            print(f"{len(self.placements)} Placements found.")
 
         print("Searching schedules on different placements...")
         for placement in self.placements:

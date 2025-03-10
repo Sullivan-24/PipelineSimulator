@@ -10,21 +10,24 @@ RUN_MODE = RunMode.SIM_SOLVE
 
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
-# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
-# SCHEDULE_METHOD = Schedule.STANDARD_1F1B
-# SCHEDULE_METHOD = Schedule.ZBV
-STAGE_PLACEMENT = Placement.CROSS
-# STAGE_PLACEMENT = Placement.RECURRENT
+SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+SCHEDULE_METHOD = Schedule.UnifiedPP
 STAGE_PLACEMENT = Placement.INTERLEAVED
 STAGE_PLACEMENT = Placement.WAVELIKE
+if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
+    STAGE_PLACEMENT = Placement.INTERLEAVED
 
 # --------------------- Solver config ---------------------
-test_upp = True
+test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
 OVERLAP_AWARE_SCHEDULE = test_upp
+HOMO_DEVICE = True
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
-TEMP_TEST= test_upp
 TIME_LIMIT = 11000
+
+# [1, 2, 100, None]
+OVERLAP_DEGREE = 2
+MEMORY_CONSTRAIN = 1
 
 EMB_TIME = 0
 HEAD_F_TIME = 4
@@ -38,7 +41,7 @@ B_TIME = 4
 W_TIME = 4
 COMM_TIME = 0
 
-SPLIT_BACKPROP = True
+SPLIT_BACKPROP = test_upp
 LAYERWISE = False
 RECOMP = False
 AUTO_RECOMP_SEARCH = RECOMP
@@ -55,7 +58,6 @@ DENSITY_MAX = 1
 DENSITY_MIN = 1
 # --------------------- Simulator config ---------------------
 
-HOMO_DEVICE = True
 
 # Memory overhead calculation
 GPU_MAX_MEM = 80 * G / G
@@ -95,7 +97,7 @@ class StateMemory:
     # Optimizer M + V, gradients * 1, model * 1
     OPTIMIZER: int = FP32 * 4 * (Parameter.LAYER * l + Parameter.EMB + Parameter.HEAD) / G / (TP_SIZE * PP_SIZE) / ZERO_SIZE
 
-ACT_OPT_COE = 0.35 # adjust by profiling results
+ACT_OPT_COE = 0.15 # adjust by profiling results
 @dataclass
 class Activation:
     INPUT: int = (2*b*s*h) / G / TP_SIZE
@@ -121,6 +123,6 @@ SHOW_WORKLOAD_TEXT = True
 # --------------------- Painter Config ---------------------
 
 # --------------------- Save File Config ---------------------
-RES_FILE_PATH = f"schedule_results/schedules/{RUN_MODE.name}_{SCHEDULE_METHOD.name}_mb{MICRO_BATCH_NUM}_pp{PP_SIZE}tp{TP_SIZE}zr{ZERO_SIZE}_l{LAYER_NUM}_{SPLIT_BACKPROP}_{LAYERWISE}.txt"
+RES_FILE_PATH = f"schedule_results/schedules/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}.txt"
 PLA_FILE_PATH = f"schedule_results/placement.txt"
 TEMP_RES_PATH = f"schedule_results/result.txt"

@@ -180,7 +180,7 @@ class Device:
         self.workload_execute_record: list[list[Workload]] = [[] for _ in range(DEVICE_NUM)]
 
     def init_memory_monitor(self):
-        self.memory_monitor = MemoryMonitor(self.nmb, self.stages, self.did, max_memory=self.max_memory)
+        self.memory_monitor = MemoryMonitor(self.nmb, self.stages, self.did, max_memory=self.max_memory * MEMORY_CONSTRAIN)
         self.memory_monitor.init_monitor()
 
     def init_required_mem_for_each_microbatch(self):
@@ -197,7 +197,7 @@ class Device:
         executable_workoads = []
         workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
         # if self.current_mem_usage <= 0.75 * self.max_memory: cause too much memory pressure leading to low performance
-        if self.current_mem_usage <= 0.0 * self.max_memory:
+        if self.current_mem_usage <= 0.00 * self.max_memory:
             if self.last_workload_type == WorkloadType.B:
                 workload_type_order = [WorkloadType.F,WorkloadType.W,WorkloadType.B]
             elif self.last_workload_type == WorkloadType.F:
@@ -243,7 +243,8 @@ class Device:
                         workload = workloads[mid][workload_type]
                         # make sure warmup is finished as quickly as possible
                         if OVERLAP_AWARE_SCHEDULE and self.exe_num_b > 0 and self.should_delay_for_overlap(workload=workload):
-                            delayed_workload.append(workload)
+                            # delayed_workload.append(workload)
+                            pass
                         else:
                             executable_workoads.append(workloads[mid][workload_type])
         #decrease priority of the same mb
@@ -261,10 +262,16 @@ class Device:
             pivot_workload = executed_workloads[-1]
             if pivot_workload.sid == workload.sid - 1 and pivot_workload.wtype == workload.wtype == WorkloadType.F:
                 # print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
-                return True
+                if not OVERLAP_DEGREE:
+                    return True
+                if OVERLAP_DEGREE and pivot_workload.end_time + pivot_workload.duration // OVERLAP_DEGREE >= GET_TIME():
+                    return True
             if pivot_workload.sid == workload.sid + 1 and pivot_workload.wtype == workload.wtype == WorkloadType.B:
                 # print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
-                return True
+                if not OVERLAP_DEGREE:
+                    return True
+                if OVERLAP_DEGREE and pivot_workload.end_time + pivot_workload.duration // OVERLAP_DEGREE >= GET_TIME():
+                    return True
         return False
 
     def overlap_aware_executable_workload_reorder(self, workload:Workload):
@@ -366,7 +373,7 @@ class Device:
     
     def execute_workload(self, run_schedule=False) -> None:
         if self.state == Device.IDLE:
-            if TEMP_TEST:
+            if SCHEDULE_METHOD == Schedule.UnifiedPP:
                 self.executable_workloads = self.get_executable_workload()
                 print_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{GET_TIME()},{len(self.executable_workloads)}\n")
                 for workload in self.executable_workloads:
