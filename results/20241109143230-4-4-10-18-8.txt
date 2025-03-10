@@ -1,4 +1,0 @@
-Traversing every stage alignment...
-DSA results exists.
-Traversing over. 1080 situations found.
-Stage alignment:['{'].
