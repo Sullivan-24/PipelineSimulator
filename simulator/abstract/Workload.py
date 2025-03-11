@@ -59,35 +59,35 @@ class Workload:
                     workload_type=WorkloadType.B)
             )
 
-    def _generate_communication(self, constraint: WorkloadConstraint):
+    def _generate_communication(self, time, constraint: WorkloadConstraint):
         if constraint.did != self.did:
-            self.ready_time = max(self.ready_time, GET_TIME() + COMM_TIME)
+            self.ready_time = max(self.ready_time, time + COMM_TIME)
         else:
-            self.ready_time = max(self.ready_time, GET_TIME())
+            self.ready_time = max(self.ready_time, time)
 
-    def update_constraints(self, constraint: WorkloadConstraint):
+    def update_constraints(self, time, constraint: WorkloadConstraint):
         origin_len = len(self.constraints)
         self.constraints.discard(constraint)
         now_len = len(self.constraints)
 
         if origin_len != now_len:
-            self._generate_communication(constraint)
+            self._generate_communication(time, constraint)
 
-    def is_executable(self):
-        return len(self.constraints) == 0 and self.ready_time <= GET_TIME() and self.state == Workload.NOT_STARTED
+    def is_executable(self, time):
+        return len(self.constraints) == 0 and self.ready_time <= time and self.state == Workload.NOT_STARTED
     
-    def execute(self) -> bool:
+    def execute(self, time) -> bool:
         if self.state == Workload.NOT_STARTED:
-            if self.is_executable():
+            if self.is_executable(time=time):
                 self.state = Workload.IN_PROGRESS
-                self.start_time = GET_TIME()
+                self.start_time = time
                 self.end_time = self.start_time + self.duration
                 return True
         return False
 
-    def complete(self) -> None:
+    def complete(self, time) -> None:
         """完成任务并更新状态"""
-        if self.state == Workload.IN_PROGRESS and self.end_time <= GET_TIME():
+        if self.state == Workload.IN_PROGRESS and self.end_time <= time:
             self.state = Workload.COMPLETED
         
     def is_head_w(self):

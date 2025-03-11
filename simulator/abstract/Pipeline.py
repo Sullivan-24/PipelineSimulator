@@ -19,6 +19,9 @@ workload_type_mapping = {
 class PipelineScheduler:
 
     def __init__(self, dsa = None, run_schedule=False) -> None:
+        
+        self.time = 0
+
         self.results = {}
         self.devices: list[Device] = []
         self.dsa = [] if not dsa else dsa 
@@ -428,9 +431,9 @@ class PipelineScheduler:
         for k in self.results:
             print(k, self.results[k])
 
-    def update_constraints(self, constraint):
+    def update_constraints(self, time, constraint):
         for device in self.devices:
-            device.update_constraints(constraint=constraint)
+            device.update_constraints(time, constraint=constraint)
 
     def record_workload(self, workload: Workload):
         if workload:
@@ -451,9 +454,9 @@ class PipelineScheduler:
             for device in self.devices:
                 device.overlap_aware_executable_workload_reorder(workload=workload)         
 
-    def check_workload_status(self):
+    def check_workload_status(self, time):
         for device in self.devices:
-            if device._finish_proc_workload():
+            if device._finish_proc_workload(time=time):
                 if device.proc_workload.wtype == WorkloadType.W:
                     self.num_finished_microbatch += 1
                     self.acc_finished_mb += 1
@@ -476,8 +479,8 @@ class PipelineScheduler:
                 self.workload_execute_record[device.proc_workload.did].append(device.proc_workload)
                 self.update_workload_execution_record()
 
-                device.proc_workload.complete()
-                self.update_constraints(constraint=device.proc_workload)
+                device.proc_workload.complete(time=time)
+                self.update_constraints(time=time, constraint=device.proc_workload)
                 device.update_memory_usage()
                 device.state = Device.IDLE
 
@@ -486,9 +489,9 @@ class PipelineScheduler:
             self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < MICRO_BATCH_NUM]
             self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
 
-    def execute_workload(self):
+    def execute_workload(self, time):
         for device in self.devices:
-            processing_workload = device.execute_workload(run_schedule=self.run_schedule)
+            processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
             self.record_workload(processing_workload)
             
     def reduce_recomp_degree(self):
@@ -521,7 +524,7 @@ class PipelineScheduler:
         self.finish_flag = False
         self.num_finished_microbatch = 0
         self._init_stage()
-        RESET_TIME()
+        self.reset_time()
     
     def generate_binary_combinations(self):
         """
@@ -557,13 +560,22 @@ class PipelineScheduler:
                 last_recomp_num = sum(layer_num_wo_recomp)
         return True
 
+    def update_time(self):
+        self.time += 1
+
+    def reset_time(self):
+        self.time = 0
+
+    def get_time(self):
+        return self.time
+
     def run_pipeline_parallelism(self, time_limit = TIME_LIMIT):
         # self.run_schedule = False
-        RESET_TIME()
-        while GET_TIME() <= time_limit and not self.finish_flag:
-            self.check_workload_status()
-            self.execute_workload()
-            UPDATE_TIME()
+        self.reset_time()
+        while self.get_time() <= time_limit and not self.finish_flag:
+            self.check_workload_status(time=self.time)
+            self.execute_workload(time=self.time)
+            self.update_time()
         if self.finish_flag:
             print("Success")
             self.record_recomp_set()
@@ -573,8 +585,7 @@ class PipelineScheduler:
                 self.temp_results = copy.deepcopy(self.results)
         else:
             print("Fail")
-        # print(self.results)
-        # input("RUN OVER")
+
         if AUTO_RECOMP_SEARCH:
             # self.record_recomp_set()
             # self.result2file()
@@ -592,10 +603,10 @@ class PipelineScheduler:
 
                 print(self.recomp_set)
                 
-                while GET_TIME() <= time_limit and not self.finish_flag:
+                while self.get_time() <= time_limit and not self.finish_flag:
                     self.check_workload_status()
                     self.execute_workload()
-                    UPDATE_TIME()
+                    self.update_time()
                 if self.finish_flag:
                     self.record_recomp_set()
                     if not self.show_mem_usage():
@@ -617,10 +628,10 @@ class PipelineScheduler:
             self.results = self.temp_results
             # self.result2schedule()
             self.set_schedule()
-            while GET_TIME() <= time_limit and not self.finish_flag:
+            while self.get_time() <= time_limit and not self.finish_flag:
                 self.check_workload_status()
                 self.execute_workload()
-                UPDATE_TIME()
+                self.update_time()
             if self.finish_flag:
                 print("Success")
                 self.record_recomp_set()

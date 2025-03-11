@@ -141,10 +141,11 @@ class Stage:
                     continue
                 self.workloads[mid][WorkloadType.W] = pgw
 
-    def update_constraints(self, constraint: Workload):
+    def update_constraints(self, time, constraint: Workload):
         for mid in self.workloads:
             for wlt in self.workloads[mid]:
                 self.workloads[mid][wlt].update_constraints(
+                    time,
                     WorkloadConstraint(
                         device_id=constraint.did,
                         stage_id=constraint.sid, 
@@ -202,10 +203,10 @@ class Stage:
                 if self.sid == STAGE_NUM - 1:
                     self.memory_usage -= Activation.LOSS
         
-    def execute_workload(self, mid=None, workload_type=None)->Workload:
+    def execute_workload(self, time, mid=None, workload_type=None)->Workload:
         if mid is not None and workload_type is not None and workload_type in self.workloads[mid]:
             w = self.workloads[mid][workload_type]
-            if w.execute():
+            if w.execute(time=time):
                 return copy.deepcopy(w)
         else:
             if self.stage_type == StageType.EMBD and workload_type in (WorkloadType.B, WorkloadType.W):

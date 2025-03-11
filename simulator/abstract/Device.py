@@ -193,7 +193,7 @@ class Device:
             self.executing_workload_required_mem[mid] += Gradient.INPUT 
             self.executing_workload_required_mem[mid] += Gradient.PARAMETER
 
-    def get_executable_workload(self)->list[Workload]:
+    def get_executable_workload(self, time)->list[Workload]:
         executable_workoads = []
         workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
         # if self.current_mem_usage <= 0.75 * self.max_memory: cause too much memory pressure leading to low performance
@@ -239,10 +239,10 @@ class Device:
                     if stage_id > LAYER_NUM and LAYERWISE:
                         continue
                     workloads = self.stages[stage_id].workloads
-                    if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
+                    if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable(time=time):
                         workload = workloads[mid][workload_type]
                         # make sure warmup is finished as quickly as possible
-                        if OVERLAP_AWARE_SCHEDULE and self.exe_num_b > 0 and self.should_delay_for_overlap(workload=workload):
+                        if OVERLAP_AWARE_SCHEDULE and self.exe_num_b > 0 and self.should_delay_for_overlap(time=time, workload=workload):
                             # delayed_workload.append(workload)
                             pass
                         else:
@@ -255,7 +255,7 @@ class Device:
         
         return executable_workoads
 
-    def should_delay_for_overlap(self, workload:Workload):
+    def should_delay_for_overlap(self, time, workload:Workload):
         for did,executed_workloads in enumerate(self.workload_execute_record):
             if did == self.did or len(executed_workloads) == 0:
                 continue
@@ -264,13 +264,13 @@ class Device:
                 # print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
                 if not OVERLAP_DEGREE:
                     return True
-                if OVERLAP_DEGREE and pivot_workload.end_time + pivot_workload.duration // OVERLAP_DEGREE >= GET_TIME():
+                if OVERLAP_DEGREE and pivot_workload.end_time + pivot_workload.duration // OVERLAP_DEGREE >= time:
                     return True
             if pivot_workload.sid == workload.sid + 1 and pivot_workload.wtype == workload.wtype == WorkloadType.B:
                 # print(f"Delay workload ({workload.did},{workload.sid},{workload.mid},{workload.wtype}) due to ({pivot_workload.did},{pivot_workload.sid},{pivot_workload.mid},{pivot_workload.wtype})")
                 if not OVERLAP_DEGREE:
                     return True
-                if OVERLAP_DEGREE and pivot_workload.end_time + pivot_workload.duration // OVERLAP_DEGREE >= GET_TIME():
+                if OVERLAP_DEGREE and pivot_workload.end_time + pivot_workload.duration // OVERLAP_DEGREE >= time:
                     return True
         return False
 
@@ -359,9 +359,9 @@ class Device:
             count += 1 if w.wtype == wtype else 0
         return count
 
-    def update_constraints(self, constraint):
+    def update_constraints(self, time, constraint):
         for sid in self.stages:
-            self.stages[sid].update_constraints(constraint=constraint)
+            self.stages[sid].update_constraints(time, constraint=constraint)
     
     def update_mid_traverse_order(self,mid=None):
         if type(self.mid_traverse_order) is not list:
@@ -371,11 +371,12 @@ class Device:
             self.mid_traverse_order.remove(mid)
             self.mid_traverse_order.append(mid)
     
-    def execute_workload(self, run_schedule=False) -> None:
+    def execute_workload(self, time, run_schedule=False) -> None:
+        assert time >= 0, f"Time should be non-negative (but got {time})."
         if self.state == Device.IDLE:
             if SCHEDULE_METHOD == Schedule.UnifiedPP:
-                self.executable_workloads = self.get_executable_workload()
-                print_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{GET_TIME()},{len(self.executable_workloads)}\n")
+                self.executable_workloads = self.get_executable_workload(time=time)
+                print_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n")
                 for workload in self.executable_workloads:
                     workload_type = workload.wtype
                     sid = workload.sid
@@ -394,7 +395,7 @@ class Device:
                             if required_memory + self.current_mem_usage > self.max_memory - Gradient.PARAMETER:
                                 continue
 
-                    proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                    proc_workload = self.stages[sid].execute_workload(time, mid=mid,workload_type=workload_type)
                     if proc_workload:
                         self.last_workload_type = workload_type
                         if workload_type == WorkloadType.F:
@@ -443,7 +444,7 @@ class Device:
                             if workload_type == WorkloadType.F and required_memory + self.current_mem_usage > self.max_memory - Gradient.PARAMETER - Gradient.INPUT:
                                 continue
                             
-                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
                             if proc_workload:
                                 self.last_workload_type = workload_type
                                 if workload_type == WorkloadType.F:
@@ -471,15 +472,15 @@ class Device:
                 if self.did < PP_SIZE - 1:
                     if self.exe_num_f > (CHUNK_NUM - 1) * PP_SIZE + (PP_SIZE - self.did - 1) * 2 - 1 and self.exe_num_f < CHUNK_NUM * MICRO_BATCH_NUM:
                         if workload_type == WorkloadType.F and self.count_wtype_num(self.did, WorkloadType.B) < self.count_wtype_num(self.did + 1, WorkloadType.B) and self.workload_execute_record[self.did + 1][-1].wtype == WorkloadType.B:
-                            proc_workload = self.stages[workload_sid].execute_workload(mid=workload_mid,workload_type=workload_type)  
+                            proc_workload = self.stages[workload_sid].execute_workload(time=time, mid=workload_mid,workload_type=workload_type)  
                         elif workload_type in (WorkloadType.B, WorkloadType.W):
-                            proc_workload = self.stages[workload_sid].execute_workload(mid=workload_mid,workload_type=workload_type)  
+                            proc_workload = self.stages[workload_sid].execute_workload(time=time, mid=workload_mid,workload_type=workload_type)  
                         else:
                             return None
                     else:
-                        proc_workload = self.stages[workload_sid].execute_workload(mid=workload_mid,workload_type=workload_type)
+                        proc_workload = self.stages[workload_sid].execute_workload(time=time, mid=workload_mid,workload_type=workload_type)
                 else:
-                    proc_workload = self.stages[workload_sid].execute_workload(mid=workload_mid,workload_type=workload_type)
+                    proc_workload = self.stages[workload_sid].execute_workload(time=time, mid=workload_mid,workload_type=workload_type)
                 
                 if proc_workload:
                     self.proc_workload = proc_workload
@@ -506,7 +507,7 @@ class Device:
                 except Exception as e:
                     print((workload_type, workload_mid, workload_sid))
                     input()
-                proc_workload = self.stages[workload_sid].execute_workload(mid=workload_mid,workload_type=workload_type)
+                proc_workload = self.stages[workload_sid].execute_workload(time=time, mid=workload_mid,workload_type=workload_type)
                 if proc_workload:
                     self.proc_workload = proc_workload
                     self.update_memory_usage()
@@ -556,7 +557,7 @@ class Device:
                                 current_mem_usage=self.current_mem_usage,
                                 max_memory=self.max_memory,
                             )
-                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
                             if proc_workload:
                                 self.last_workload_type = workload_type
                                 if workload_type == WorkloadType.F:
@@ -581,7 +582,7 @@ class Device:
                         workload_type = WorkloadType.W
                     for mid in range(self.nmb):
                         for sid in self.stages:
-                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
                             if proc_workload:
                                 self.proc_workload = proc_workload
                                 self.update_memory_usage()
@@ -599,7 +600,7 @@ class Device:
                         workload_type = WorkloadType.W
                     for mid in range(self.nmb):
                         for sid in self.stages:
-                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
                             if proc_workload:
                                 self.last_workload_type = workload_type
                                 self.proc_workload = proc_workload
@@ -641,7 +642,7 @@ class Device:
                             max_memory=self.max_memory,
                         )
 
-                        proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                        proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
                         if proc_workload:
                             if workload_type == WorkloadType.F:
                                 self.warmup_num_f += 1
@@ -678,7 +679,7 @@ class Device:
                                 max_memory=self.max_memory,
                             )
 
-                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
                             if proc_workload:
                                 if workload_type == WorkloadType.F:
                                     self.warmup_num_f += 1
@@ -727,7 +728,7 @@ class Device:
                             max_memory=self.max_memory,
                         )
 
-                        proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                        proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
                         if proc_workload:
                             if workload_type == WorkloadType.F:
                                 self.warmup_num_f += 1
@@ -764,7 +765,7 @@ class Device:
                             #     max_memory=self.max_memory,
                             # )
 
-                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
                             if proc_workload:
                                 if workload_type == WorkloadType.F:
                                     self.warmup_num_f += 1
@@ -803,7 +804,7 @@ class Device:
                                 max_memory=self.max_memory,
                             )
 
-                            proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+                            proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
                             if proc_workload:
                                 self.last_workload_type = workload_type
                                 self.proc_workload = proc_workload
@@ -825,9 +826,9 @@ class Device:
         return workload_type
 
 
-    def _finish_proc_workload(self) -> bool: 
+    def _finish_proc_workload(self,time) -> bool: 
         if self.state == Device.BUSY:
-            if self.proc_workload and GET_TIME() >= self.proc_workload.end_time:
+            if self.proc_workload and time >= self.proc_workload.end_time:
                 return True
         return False
 
@@ -896,7 +897,7 @@ class Device:
     #                     max_memory=self.max_memory,
     #                 )
 
-    #                 proc_workload = self.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
+    #                 proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
     #                 if proc_workload:
     #                     self.last_workload_type = workload_type
     #                     if workload_type == WorkloadType.F:
