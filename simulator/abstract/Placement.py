@@ -57,14 +57,18 @@ class PipelinePlacement:
 
     def get_reduced_placements(self):
         max_chunk_num = (self.layer_num + self.dev_num - 1) // self.dev_num
-        gen = generate_binary_tuples(max_chunk_num)
+        gen = generate_binary_tuples(max_chunk_num - 1) # - 1 to reduce reverse but equal placements (example, (0,1) = (1.0))
         placements = []
         for g in gen:
             placement = [[] for _ in range(self.dev_num)]
             lid = 0
+
+            self.add_layer_to_device(placement, lid, self.dev_num, 1)
+            lid += self.dev_num
             for o in g:
                 self.add_layer_to_device(placement, lid, self.dev_num, o)
                 lid += self.dev_num
+            
             placements.append(copy.deepcopy(placement))
         return placements
 
@@ -397,7 +401,7 @@ if __name__ == "__main__":
     # print("\n每个chunk的最大时间:", chunk_max)
     # print("流水线整体最大时间:", total_max)
     pp_size = 8
-    layer_num = 80
+    layer_num = 64
     layer_computation_cost = [1 for _ in range(layer_num)]
     layer_computation_cost[-1] = 2
     pp_compute_power = [1 for _ in range(pp_size)]
@@ -417,7 +421,11 @@ if __name__ == "__main__":
     # pg = test_placement.get_reduced_possilble_placements()
     # for p in pg:
     #     print(p)
-    test_placement.get_layer_device_mapping()
+    ps = test_placement.get_reduced_placements()
+    # for p in test_placement.get_reduced_placements():
+    #     for d in p:
+    #         print(d)
+    #     print()
     # test_placement.get_placements()
     # pp4 layer8 也不行
     # test_placement.get_placements_dp()
