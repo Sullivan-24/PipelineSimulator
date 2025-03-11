@@ -67,7 +67,7 @@ class GSimulator:
 
         # baseline solution
         if self._base_solution:
-            self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
+            self.pipeline_scheduler = Pipeline.PipelineScheduler(placement=self._devices)
             self.pipeline_scheduler.run_pipeline_parallelism()
             print(self.pipeline_scheduler.results)
             # self.pipeline_scheduler.draw()

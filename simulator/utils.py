@@ -1,6 +1,8 @@
 """
 utils package
 """
+from typing import Literal
+import os
 from typing import Dict, Tuple
 from z3 import If
 from .z3_config import *
@@ -56,6 +58,23 @@ def resort_microbatch_index(num_microbatches: int, model_res: Dict[str, int]) ->
     }
 
     return res
+
+def save_to_file(filepath: str, content: str, mode: Literal['a', 'w'], delete_if_exist=False) -> None:
+    
+    if mode not in ('a', 'w'):
+        raise ValueError("Mode must be either 'a' (append) or 'w' (write).")
+    
+    directory = os.path.dirname(filepath)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        print("Create directory:{}".format(directory))
+
+    if delete_if_exist and os.path.exists(filepath):
+        os.remove(filepath)
+        print("Delete file:{}".format(filepath))
+
+    with open(file=filepath, mode=mode) as file:
+        file.write(content)
 
 def print_to_file(filename: str, content: str) -> None:
     if filename:

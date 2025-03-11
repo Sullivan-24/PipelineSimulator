@@ -73,7 +73,7 @@ class LayerwiseSimulator:
 
         # baseline solution
         if self._base_solution:
-            self.pipeline_scheduler = Pipeline.PipelineScheduler(dsa=self._devices)
+            self.pipeline_scheduler = Pipeline.PipelineScheduler(placement=self._devices)
             self.pipeline_scheduler.run_pipeline_parallelism()
             # NOTE should follow the order rule
             self.pipeline_scheduler.resort_w()

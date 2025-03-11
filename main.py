@@ -62,7 +62,7 @@ def clear_old_file(filepath:str):
         print("delete file:{}".format(filepath))
 
 def clear_old_files():
-    clear_old_file(RES_FILE_PATH)
+    clear_old_file(SCH_FILE_PATH)
     clear_old_file(PLA_FILE_PATH)
     clear_old_file(TEMP_RES_PATH)
     for did in range(DEVICE_NUM):
@@ -137,7 +137,7 @@ def main():
         if Schedule.Chimera == SCHEDULE_METHOD:
             simulator = ChimeraScheduler.ChimeraPipelineScheduler()
         else:
-            simulator = Pipeline.PipelineScheduler(run_schedule=RUN_SCHEDULE)
+            simulator = Pipeline.PipelineScheduler(pipeline_idx=0, run_schedule=RUN_SCHEDULE)
             
             if RUN_STANDARD_ZBV and not RUN_SCHEDULE and SCHEDULE_METHOD == Schedule.ZBV:
                 if check_standard_zbv_conditions():

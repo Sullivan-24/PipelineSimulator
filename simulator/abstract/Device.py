@@ -1,5 +1,5 @@
 from .Stage import *
-from ..utils import print_to_file
+from ..utils import save_to_file
 
 def get_required_memory_by_workload(workload:Workload):
         stage_id = workload.sid
@@ -376,7 +376,7 @@ class Device:
         if self.state == Device.IDLE:
             if SCHEDULE_METHOD == Schedule.UnifiedPP:
                 self.executable_workloads = self.get_executable_workload(time=time)
-                print_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n")
+                save_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n", 'a')
                 for workload in self.executable_workloads:
                     workload_type = workload.wtype
                     sid = workload.sid

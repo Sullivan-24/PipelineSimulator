@@ -4,7 +4,7 @@ painter package
 import os
 import tkinter as tk
 from tkinter import font
-from .utils import parse_microbatch_key, print_to_file
+from .utils import parse_microbatch_key, save_to_file
 from .abstract.mutils import *
 from .PainterToImage import save_canvas_as_image
 from .PainterColor import set_color
@@ -112,6 +112,7 @@ class SchedulingPainter:
             main_canvas.create_rectangle(x0, y0, x1, y1, outline="black")
 
         # 3. Draw execution block for each microbatch according to start and end time
+        schedule_res_content = ""
         for microbatch_key, offset in data.items():
             k, pid, mid = parse_microbatch_key(microbatch_key)
 
@@ -125,8 +126,8 @@ class SchedulingPainter:
             # y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
             y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
 
-            print_to_file(RES_FILE_PATH, "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
-            print_to_file(TEMP_RES_PATH, "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+            # save schedule representation in painter
+            schedule_res_content += "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width)
 
             tag = f"p_{pid}_m_{mid}_{k}"
             color = set_color(pid,workload_type=k,layer_num=self._pp_size)
@@ -163,6 +164,8 @@ class SchedulingPainter:
             # 求余考虑virtual stage的情况
             self._item2mid[block] = mid
         
+        save_to_file(SCH_FILE_PATH, schedule_res_content, 'w')
+        save_to_file(TEMP_RES_PATH, schedule_res_content, 'w')
         save_canvas_as_image(canvas=main_canvas, filename=f'{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}')
 
         # Register hook for highlighting execution block of this microbatch

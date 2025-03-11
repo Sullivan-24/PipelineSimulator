@@ -4,7 +4,7 @@ from .Workload import Workload
 from .mutils import *
 from ..painter import SchedulingPainter as SP
 from ..LayerwisePainter import LayerwiseSchedulingPainter as LSP
-from ..utils import print_to_file
+from ..utils import save_to_file
 from .Placement import PipelinePlacement
 import itertools
 import json
@@ -18,15 +18,14 @@ workload_type_mapping = {
 
 class PipelineScheduler:
 
-    def __init__(self, dsa = None, run_schedule=False) -> None:
+    def __init__(self, pipeline_idx, placement=None, run_schedule=False) -> None:
         
         self.time = 0
-
+        self.pipeline_idx = pipeline_idx # A flag for identifying each pipeline
         self.results = {}
         self.devices: list[Device] = []
-        self.dsa = [] if not dsa else dsa 
+        self.placement = [] if not placement else placement 
         self.microbatch_schedule_range = range(0,min(SCHEDULE_UNIT, MICRO_BATCH_NUM))
-        # self.microbatch_schedule_range = range(0,min(8, MICRO_BATCH_NUM))
         self.acc_finished_mb = 0
         self.finish_flag = False
         self.num_finished_microbatch = 0
@@ -66,7 +65,7 @@ class PipelineScheduler:
             self.set_schedule()
 
     def _sid2did(self, sid):
-        for did, sids in enumerate(self.dsa):
+        for did, sids in enumerate(self.placement):
             if sid in sids:
                 return did
             
@@ -153,7 +152,7 @@ class PipelineScheduler:
             dev_compute_power.append(comp_power)
             self.devices.append(device)
         self.set_recomp()
-        if not HOMO_DEVICE and not self.dsa:
+        if not HOMO_DEVICE and not self.placement:
             layer_computation_cost = [1 for _ in range(LAYER_NUM)]
             self.pipeline_placement_solver = PipelinePlacement(
                 layer_num=LAYER_NUM,
@@ -163,12 +162,12 @@ class PipelineScheduler:
                 dev_max_memory=[100000 for _ in range(DEVICE_NUM)],
                 dev_compute_power=dev_compute_power,
             )
-            self.dsa = self.pipeline_placement_solver.get_placements()
+            self.placement = self.pipeline_placement_solver.get_placements()
             if LAYERWISE:
                 assert False, 'Layerwise test not ready'
-        if self.dsa:
+        if self.placement:
             for did in range(DEVICE_NUM):
-                for pid in self.dsa[did]:
+                for pid in self.placement[did]:
                     self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
             if LAYERWISE:
                 self.devices[DEVICE_NUM - 1].add_stage(0, recomp=self.recomp_set[0])
@@ -252,13 +251,10 @@ class PipelineScheduler:
 
         for did in range(DEVICE_NUM):
             print(list(self.devices[did].stages.keys()))
-            if len(self.dsa) < DEVICE_NUM:
-                self.dsa.append(list(self.devices[did].stages.keys()))
+            if len(self.placement) < DEVICE_NUM:
+                self.placement.append(list(self.devices[did].stages.keys()))
 
-        if os.path.exists(PLA_FILE_PATH):
-            os.remove(PLA_FILE_PATH)
-            print("delete file:{}".format(PLA_FILE_PATH))
-        print_to_file(PLA_FILE_PATH,str(self.dsa))
+        save_to_file(PLA_FILE_PATH, str(self.placement), 'w')
 
     def set_recomp(self):
         if LAYERWISE:
@@ -373,7 +369,7 @@ class PipelineScheduler:
     def generate_interleaved_1f1b_schedule(self):
         workload_type_num = 2
         for did in range(DEVICE_NUM):
-            sids = list(self.dsa[did])
+            sids = list(self.placement[did])
             
             mids = [0 for _ in range(workload_type_num * CHUNK_NUM)]
             f_mid_count = 0
@@ -466,16 +462,16 @@ class PipelineScheduler:
                     else:
                         if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
                             self.finish_flag = True
-                # if not SPLIT_BACKPROP and device.proc_workload.wtype == WorkloadType.B:
-                #     if device.proc_workload.sid == 0:
-                #         self.num_finished_microbatch += 1
-                #         self.acc_finished_mb += 1
-                #     if LAYERWISE:
-                #         if self.acc_finished_mb == (1 + LAYER_NUM) * MICRO_BATCH_NUM:
-                #             self.finish_flag = True
-                #     else:
-                #         if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
-                #             self.finish_flag = True 
+                if not SPLIT_BACKPROP and device.proc_workload.wtype == WorkloadType.B:
+                    if device.proc_workload.duration > 0:
+                        self.num_finished_microbatch += 1
+                        self.acc_finished_mb += 1
+                    if LAYERWISE:
+                        if self.acc_finished_mb == (1 + LAYER_NUM) * MICRO_BATCH_NUM:
+                            self.finish_flag = True
+                    else:
+                        if self.acc_finished_mb == STAGE_NUM * MICRO_BATCH_NUM:
+                            self.finish_flag = True 
                 self.workload_execute_record[device.proc_workload.did].append(device.proc_workload)
                 self.update_workload_execution_record()
 
@@ -519,7 +515,7 @@ class PipelineScheduler:
     def reset_run_para(self):
         self.results = {}
         self.devices: list[Device] = []
-        self.dsa = []
+        self.placement = []
         self.acc_finished_mb = 0
         self.finish_flag = False
         self.num_finished_microbatch = 0
@@ -644,11 +640,11 @@ class PipelineScheduler:
         max_mem_usages = [0 for _ in range(len(self.devices))]
         for device in self.devices:
             aim_file_path = "schedule_results/memory/device{}.txt".format(device.did)
-            print_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did))
+            save_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did), mode='w')
             last_mem_record = 0
             for t, mem_record in device.mem_usage_record.items():
                 oom_flag = "" if mem_record <= device.max_memory else "OOM"
-                print_to_file(aim_file_path, "Time {}, mem = {}, {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2), oom_flag))
+                save_to_file(aim_file_path, "Time {}, mem = {}, {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2), oom_flag), 'a')
                 last_mem_record = mem_record
                 max_mem_usages[device.did] = max(max_mem_usages[device.did], mem_record)
         
@@ -719,22 +715,15 @@ class PipelineScheduler:
                 if lid == STAGE_NUM - 1:
                     workload_len += CE_W_TIME + HEAD_W_TIME
         return workload_len 
-
-
-    def write_fbw_to_file(self):
-        for key in self.results:
-            if key.startswith(("f_","b_","w_")):
-                print_to_file(f"sim_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}.txt", f"{key},{self.results[key]}\n")
-                
+         
     def draw(self) -> None:
         # 绘制结果的逻辑
         # self.resort_w()
-        # self.write_fbw_to_file()
         fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
         if LAYERWISE:
             painter_conf = {
                 "device_num": DEVICE_NUM,
-                "devices": self.dsa,
+                "devices": self.placement,
                 "num_layer": LAYER_NUM+3,
                 "stage_num": LAYER_NUM+3,
                 "pp_height": PP_HEIGHT,
@@ -754,7 +743,7 @@ class PipelineScheduler:
                     res[key] = self.results[key]
             painter_conf = {
                 "device_num": DEVICE_NUM,
-                "devices": self.dsa,
+                "devices": self.placement,
                 "stage_num": STAGE_NUM,
                 "pp_height": PP_HEIGHT,
                 "pp_align": PP_ALIGN,

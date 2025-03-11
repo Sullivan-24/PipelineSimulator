@@ -4,7 +4,7 @@ painter package
 import os
 import tkinter as tk
 from tkinter import font
-from .utils import parse_microbatch_key, print_to_file
+from .utils import parse_microbatch_key, save_to_file
 from .abstract.mutils import *
 from .PainterColor import set_color
 class LayerwiseSchedulingPainter:
@@ -138,6 +138,7 @@ class LayerwiseSchedulingPainter:
             main_canvas.create_rectangle(x0, y0, x1, y1, outline="black")
 
         # 3. Draw execution block for each microbatch according to start and end time
+        schedule_res_content = ""
         for microbatch_key, offset in data.items():
             if not microbatch_key.startswith(("f_","b_","w_",)):
                 continue
@@ -157,9 +158,9 @@ class LayerwiseSchedulingPainter:
             color = set_color(sid=pid, workload_type=k, layer_num=self._num_layer)
             if x0 == x1:
                 continue
-
-            print_to_file(RES_FILE_PATH, "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
-            print_to_file(TEMP_RES_PATH, "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width))
+            
+            # save schedule representation in painter
+            schedule_res_content += "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width)
 
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况
@@ -190,6 +191,9 @@ class LayerwiseSchedulingPainter:
             # 求余考虑virtual stage的情况
             self._item2mid[block] = mid
 
+        save_to_file(SCH_FILE_PATH, schedule_res_content, 'w')
+        save_to_file(TEMP_RES_PATH, schedule_res_content, 'w')
+        
         # Register hook for highlighting execution block of this microbatch
         def _trigger_hook(event):
             del event

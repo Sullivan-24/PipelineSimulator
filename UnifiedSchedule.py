@@ -53,7 +53,7 @@ class UnifiedScheduler:
 
         print("Searching schedules on different placements...")
         for placement in self.placements:
-            self.pipeline_scheduler = PipelineScheduler(dsa=placement)
+            self.pipeline_scheduler = PipelineScheduler(placement=placement)
             self.pipeline_scheduler.run_pipeline_parallelism()
             if self.pipeline_scheduler.finish_flag:
                 print("Simulating Finished Successfully.")
