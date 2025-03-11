@@ -5,16 +5,29 @@ import pickle
 
 def load_and_validate(filepath: str) -> list:
     """加载并验证临时文件"""
-    if not os.path.exists(filepath):
-        return []
-    
     try:
         with open(filepath, 'rb') as f:
             data = pickle.load(f)
-            return [(-t, res, pl) for t, res, pl in data.get('results', [])]
+            return [
+                (-t, uid, res, pl) 
+                for t, uid, res, pl in data.get('results', [])
+            ]
     except Exception as e:
         print(f"Error loading {filepath}: {str(e)}")
         return []
+    
+# def load_and_validate(filepath: str) -> list:
+#     """加载并验证临时文件"""
+#     if not os.path.exists(filepath):
+#         return []
+    
+#     try:
+#         with open(filepath, 'rb') as f:
+#             data = pickle.load(f)
+#             return [(-t, res, pl) for t, res, pl in data.get('results', [])]
+#     except Exception as e:
+#         print(f"Error loading {filepath}: {str(e)}")
+#         return []
 
 def main(output_file: str = "global_top10.txt"):
     # 加载所有节点结果
@@ -26,17 +39,27 @@ def main(output_file: str = "global_top10.txt"):
         print("No valid results found!")
         return
     
-    # 提取实际时间成本并排序
+    # # 提取实际时间成本并排序
+    # valid_results = []
+    # for neg_t, res, pl in all_results:
+    #     try:
+    #         valid_results.append((-neg_t, res, pl))
+    #     except:
+    #         continue
+    
+    # # 获取全局前10
+    # top10 = heapq.nsmallest(10, valid_results, key=lambda x: x[0])
+    # 提取实际时间成本并排序（忽略UID）
     valid_results = []
-    for neg_t, res, pl in all_results:
+    for t, uid, res, pl in all_results:
         try:
-            valid_results.append((-neg_t, res, pl))
+            valid_results.append( (t, res, pl) )  # 丢弃UID
         except:
             continue
     
-    # 获取全局前10
-    top10 = heapq.nsmallest(10, valid_results, key=lambda x: x[0])
-    
+    # 按时间成本排序
+    top10 = sorted(valid_results, key=lambda x: x[0])[:10]
+
     # 保存结果
     with open(output_file, 'w') as f:
         for idx, (t, res, pl) in enumerate(top10, 1):

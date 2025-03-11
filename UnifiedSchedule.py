@@ -34,7 +34,8 @@ class UnifiedScheduler:
 
         self.pid_counter = 0
         self.pid_lock = threading.Lock()
-        self.top_results: list[Tuple[float, dict, list]] = []
+        self.heap_counter = 0  # 新增堆元素唯一计数器
+        self.top_results: list[Tuple[float, int, dict, list]] = []  # 调整元素结构
         self.lock = threading.Lock()
 
     def generate_pid(self, node_id: int) -> int:
@@ -83,10 +84,14 @@ class UnifiedScheduler:
                     continue
                 
                 with self.lock:
+                    # 生成唯一堆序号避免字典比较
+                    self.heap_counter += 1
+                    item = (-time_cost, self.heap_counter, result, placement)
+                    
                     if len(self.top_results) < 10:
-                        heapq.heappush(self.top_results, (-time_cost, result, placement))
+                        heapq.heappush(self.top_results, item)
                     else:
-                        heapq.heappushpop(self.top_results, (-time_cost, result, placement))
+                        heapq.heappushpop(self.top_results, item)
 
     def save_temp_results(self, filename: str):
         """保存当前进程的临时结果"""
@@ -172,6 +177,9 @@ if __name__ == "__main__":
     with open(temp_file, 'wb') as f:
         pickle.dump({
             'node_id': args.node_id,
-            'results': [(-t, res, pl) for t, res, pl in us.top_results]
+            'results': [
+                (t, uid, res, pl) 
+                for t, uid, res, pl in us.top_results  # 包含全部信息
+            ]
         }, f)
     print(f"Node {args.node_id}: Results saved to {temp_file}")

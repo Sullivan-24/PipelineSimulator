@@ -5,4 +5,4 @@ simulator/abstract/__pycache__/
 searched_placement
 searched_schedule
 sbatch_output
-schedule_results
+global_top10.txt
