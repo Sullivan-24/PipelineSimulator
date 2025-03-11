@@ -1,6 +1,12 @@
+import os
+import heapq
+import argparse
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from simulator.abstract.Pipeline import *
 from simulator.abstract.Placement import PipelinePlacement
 from simulator.config import *
+
 class UnifiedScheduler:
     def __init__(self,layer_num=LAYER_NUM,
                 layer_computation_cost=None,
@@ -23,6 +29,46 @@ class UnifiedScheduler:
         self.best_schedule = None
         self.best_time_cost = 1000000
 
+        self.lock = threading.Lock()
+        self.top_results = []  # 使用堆维护当前进程的Top10结果 (时间成本, 结果, placement)
+
+
+    def process_placement(self, placement: list) -> tuple[float, dict, list]:
+        """处理单个placement并返回时间成本、结果和placement"""
+        scheduler = PipelineScheduler(placement=placement)
+        scheduler.run_pipeline_parallelism()
+        if not scheduler.finish_flag:
+            return float('inf'), {}, placement
+        
+        time_cost = max(
+            float(v) for k, v in scheduler.results.items()
+            if str(k).startswith(("f_", "b_", "w_"))
+        )
+        return time_cost, scheduler.results, placement
+
+    def parallel_generate_schedule(self, placements: list):
+        """处理指定的placements列表"""
+        with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            futures = [executor.submit(self.process_placement, p) for p in placements]
+            
+            for future in as_completed(futures):
+                time_cost, result, placement = future.result()
+                if time_cost == float('inf'):
+                    continue
+                
+                with self.lock:
+                    # 使用最小堆维护Top10（堆顶为当前第10小的值）
+                    if len(self.top_results) < 10:
+                        heapq.heappush(self.top_results, (-time_cost, result, placement))
+                    else:
+                        heapq.heappushpop(self.top_results, (-time_cost, result, placement))
+
+    def save_temp_results(self, filename: str):
+        """保存当前进程的临时结果"""
+        with open(filename, 'w') as f:
+            for t, res, pl in self.top_results:
+                f.write(f"{t}\t{res}\t{pl}\n")
+
     def save_to_file(self):
         with open("searched_schedule", 'w') as file:
             file.write(str(self.best_schedule))
@@ -39,11 +85,10 @@ class UnifiedScheduler:
             self.best_time_cost = time_cost
             self.best_schedule = schedule_result
             self.best_placement = placement
-            self.save_to_file()
             return True
         return False
 
-    def generate_schedule(self):
+    def serial_generate_schedule(self):
         if not self.placement_solver:
             self.generate_placement()
         if not self.placements:
@@ -75,5 +120,26 @@ class UnifiedScheduler:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--node-id", type=int, required=True, help="SLURM节点ID")
+    parser.add_argument("--total-nodes", type=int, required=True, help="总节点数")
+    args = parser.parse_args()
+
+    # 初始化调度器
     us = UnifiedScheduler()
-    us.generate_schedule()
+    us.generate_placement()
+    
+    # 获取所有placements并分片
+    all_placements = us.placement_solver.get_reduced_placements()
+    chunk_size = len(all_placements) // args.total_nodes
+    start = args.node_id * chunk_size
+    end = start + chunk_size if args.node_id != args.total_nodes - 1 else len(all_placements)
+    
+    # 执行计算
+    us.parallel_generate_schedule(all_placements[start:end])
+    
+    # 保存临时结果（二进制格式更高效）
+    temp_file = f"temp_node_{args.node_id}.bin"
+    with open(temp_file, 'wb') as f:
+        import pickle
+        pickle.dump(us.top_results, f)

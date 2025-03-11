@@ -6,6 +6,7 @@ import os
 from typing import Dict, Tuple
 from z3 import If
 from .z3_config import *
+from .config import SAVE_RES_TO_FILE
 # def parse_microbatch_key(key: str) -> Tuple[bool, int, int]:
 #     "parse microbatch key"
 #     is_forward = key.startswith("f")
@@ -61,6 +62,9 @@ def resort_microbatch_index(num_microbatches: int, model_res: Dict[str, int]) ->
 
 def save_to_file(filepath: str, content: str, mode: Literal['a', 'w'], delete_if_exist=False) -> None:
     
+    if not SAVE_RES_TO_FILE:
+        return
+
     if mode not in ('a', 'w'):
         raise ValueError("Mode must be either 'a' (append) or 'w' (write).")
     
