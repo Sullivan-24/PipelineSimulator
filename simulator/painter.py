@@ -6,7 +6,6 @@ import tkinter as tk
 from tkinter import font
 from .utils import parse_microbatch_key, save_to_file
 from .abstract.mutils import *
-from .PainterToImage import save_canvas_as_image
 from .PainterColor import set_color
 
 class SchedulingPainter:
@@ -166,7 +165,6 @@ class SchedulingPainter:
         
         save_to_file(SCH_FILE_PATH, schedule_res_content, 'w')
         save_to_file(TEMP_RES_PATH, schedule_res_content, 'w')
-        save_canvas_as_image(canvas=main_canvas, filename=f'{RUN_MODE}_{SCHEDULE_METHOD}_mb{MICRO_BATCH_NUM}_pp{DEVICE_NUM}_l{LAYER_NUM}')
 
         # Register hook for highlighting execution block of this microbatch
         def _trigger_hook(event):
