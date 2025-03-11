@@ -2,7 +2,10 @@ import os
 import heapq
 import argparse
 import threading
+import pickle
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Tuple
+
 from simulator.abstract.Pipeline import *
 from simulator.abstract.Placement import PipelinePlacement
 from simulator.config import *
@@ -29,27 +32,50 @@ class UnifiedScheduler:
         self.best_schedule = None
         self.best_time_cost = 1000000
 
+        self.pid_counter = 0
+        self.pid_lock = threading.Lock()
+        self.top_results: list[Tuple[float, dict, list]] = []
         self.lock = threading.Lock()
-        self.top_results = []  # 使用堆维护当前进程的Top10结果 (时间成本, 结果, placement)
 
-
-    def process_placement(self, placement: list) -> tuple[float, dict, list]:
-        """处理单个placement并返回时间成本、结果和placement"""
-        scheduler = PipelineScheduler(placement=placement)
-        scheduler.run_pipeline_parallelism()
-        if not scheduler.finish_flag:
+    def generate_pid(self, node_id: int) -> int:
+        """生成全局唯一PID (NodeID前缀 + 自增序号)"""
+        with self.pid_lock:
+            self.pid_counter += 1
+            return node_id * 10**9 + self.pid_counter
+            
+    def process_placement(self, placement: list, pid: int) -> Tuple[float, dict, list]:
+        """处理单个placement并返回结果"""
+        try:
+            scheduler = PipelineScheduler(
+                pipeline_idx=pid,
+                placement=placement
+            )
+            scheduler.run_pipeline_parallelism()
+            
+            if not scheduler.finish_flag:
+                return float('inf'), {}, placement
+            
+            time_cost = max(
+                float(v) for k, v in scheduler.results.items()
+                if str(k).startswith(("f_", "b_", "w_"))
+            )
+            return time_cost, scheduler.results, placement
+        except Exception as e:
+            print(f"Error processing PID {pid}: {str(e)}")
             return float('inf'), {}, placement
-        
-        time_cost = max(
-            float(v) for k, v in scheduler.results.items()
-            if str(k).startswith(("f_", "b_", "w_"))
-        )
-        return time_cost, scheduler.results, placement
 
-    def parallel_generate_schedule(self, placements: list):
-        """处理指定的placements列表"""
+    def generate_schedule(self, placements: list, node_id: int):
+        """并行处理placements"""
         with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
-            futures = [executor.submit(self.process_placement, p) for p in placements]
+            futures = []
+            for p in placements:
+                pid = self.generate_pid(node_id)
+                future = executor.submit(
+                    self.process_placement, 
+                    p, 
+                    pid
+                )
+                futures.append(future)
             
             for future in as_completed(futures):
                 time_cost, result, placement = future.result()
@@ -57,7 +83,6 @@ class UnifiedScheduler:
                     continue
                 
                 with self.lock:
-                    # 使用最小堆维护Top10（堆顶为当前第10小的值）
                     if len(self.top_results) < 10:
                         heapq.heappush(self.top_results, (-time_cost, result, placement))
                     else:
@@ -121,25 +146,32 @@ class UnifiedScheduler:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--node-id", type=int, required=True, help="SLURM节点ID")
-    parser.add_argument("--total-nodes", type=int, required=True, help="总节点数")
+    parser.add_argument("--node-id", type=int, required=True)
+    parser.add_argument("--total-nodes", type=int, required=True)
     args = parser.parse_args()
 
     # 初始化调度器
     us = UnifiedScheduler()
     us.generate_placement()
     
-    # 获取所有placements并分片
+    # 获取所有placements并进行跨步分片
     all_placements = us.placement_solver.get_reduced_placements()
-    chunk_size = len(all_placements) // args.total_nodes
-    start = args.node_id * chunk_size
-    end = start + chunk_size if args.node_id != args.total_nodes - 1 else len(all_placements)
+    chunk = all_placements[args.node_id::args.total_nodes]
+    
+    if not chunk:
+        print(f"Node {args.node_id}: No placements to process")
+        exit(0)
+        
+    print(f"Node {args.node_id}: Processing {len(chunk)} placements")
     
     # 执行计算
-    us.parallel_generate_schedule(all_placements[start:end])
+    us.generate_schedule(chunk, args.node_id)
     
-    # 保存临时结果（二进制格式更高效）
-    temp_file = f"temp_node_{args.node_id}.bin"
+    # 保存临时结果
+    temp_file = f"temp_node_{args.node_id}.pkl"
     with open(temp_file, 'wb') as f:
-        import pickle
-        pickle.dump(us.top_results, f)
+        pickle.dump({
+            'node_id': args.node_id,
+            'results': [(-t, res, pl) for t, res, pl in us.top_results]
+        }, f)
+    print(f"Node {args.node_id}: Results saved to {temp_file}")

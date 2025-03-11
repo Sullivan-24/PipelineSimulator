@@ -3,36 +3,54 @@ import heapq
 import glob
 import pickle
 
-def load_temp_files(pattern: str = "temp_node_*.bin"):
-    """加载所有临时结果文件"""
+def load_and_validate(filepath: str) -> list:
+    """加载并验证临时文件"""
+    if not os.path.exists(filepath):
+        return []
+    
+    try:
+        with open(filepath, 'rb') as f:
+            data = pickle.load(f)
+            return [(-t, res, pl) for t, res, pl in data.get('results', [])]
+    except Exception as e:
+        print(f"Error loading {filepath}: {str(e)}")
+        return []
+
+def main(output_file: str = "global_top10.txt"):
+    # 加载所有节点结果
     all_results = []
+    for fpath in glob.glob("temp_node_*.pkl"):
+        all_results.extend(load_and_validate(fpath))
     
-    for filename in glob.glob(pattern):
-        with open(filename, 'rb') as f:
-            node_results = pickle.load(f)
-            # 转换回正时间成本并扩展
-            for neg_t, res, pl in node_results:
-                all_results.append((-neg_t, res, pl))
+    if not all_results:
+        print("No valid results found!")
+        return
     
-    return all_results
-
-def save_final_top10(results: list, output_file: str = "global_top10.txt"):
-    """保存最终结果"""
-    top10 = heapq.nsmallest(10, results, key=lambda x: x[0])
+    # 提取实际时间成本并排序
+    valid_results = []
+    for neg_t, res, pl in all_results:
+        try:
+            valid_results.append((-neg_t, res, pl))
+        except:
+            continue
     
+    # 获取全局前10
+    top10 = heapq.nsmallest(10, valid_results, key=lambda x: x[0])
+    
+    # 保存结果
     with open(output_file, 'w') as f:
-        for t, res, pl in top10:
-            f.write(f"Time: {t}\nResult: {res}\nPlacement: {pl}\n\n")
-    print(f"Saved top10 results to {output_file}")
-
-if __name__ == "__main__":
-    # 聚合结果
-    combined = load_temp_files()
-    
-    # 保存最终结果
-    save_final_top10(combined)
+        for idx, (t, res, pl) in enumerate(top10, 1):
+            f.write(f"Rank {idx} | Time: {t:.4f}\n")
+            f.write(f"Placement: {pl}\n")
+            f.write(f"Results: {res}\n{'='*40}\n")
     
     # 清理临时文件
-    for f in glob.glob("temp_node_*.bin"):
-        os.remove(f)
-    print("Cleaned temporary files")
+    for fpath in glob.glob("temp_node_*.pkl"):
+        try:
+            os.remove(fpath)
+        except:
+            pass
+    print(f"Final results saved to {output_file}")
+
+if __name__ == "__main__":
+    main()
