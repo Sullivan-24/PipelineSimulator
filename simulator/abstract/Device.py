@@ -224,7 +224,7 @@ class Device:
                 for stage_id in self.stages:
                     if stage_id > LAYER_NUM and LAYERWISE:
                         workloads = self.stages[stage_id].workloads
-                        if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable():
+                        if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable(time=time):
                             head_ce_workloads.append(workloads[mid][workload_type])
         # ensure head to be executed as quickly as possible
         executable_workoads += head_ce_workloads
@@ -243,8 +243,8 @@ class Device:
                         workload = workloads[mid][workload_type]
                         # make sure warmup is finished as quickly as possible
                         if OVERLAP_AWARE_SCHEDULE and self.exe_num_b > 0 and self.should_delay_for_overlap(time=time, workload=workload):
-                            # delayed_workload.append(workload)
-                            pass
+                            if OVERLAP_DEGREE is None:
+                                delayed_workload.append(workload)
                         else:
                             executable_workoads.append(workloads[mid][workload_type])
         #decrease priority of the same mb

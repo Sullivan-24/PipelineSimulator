@@ -97,7 +97,7 @@ class SchedulingPainter:
         label_canvas.pack()
 
         # 1. Create main canvas
-        main_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=canvas_height)
+        main_canvas = tk.Canvas(self._tk_root, bg='#FFFFFF', width=canvas_width, height=canvas_height)
         main_canvas.pack()
 
         # 2. Add timeline for each pipeline
@@ -108,7 +108,7 @@ class SchedulingPainter:
             y0 = (self._pp_height + self._pp_align) * pid + 5
             x1 = canvas_width - self._pp_align
             y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
-            main_canvas.create_rectangle(x0, y0, x1, y1, outline="black")
+            main_canvas.create_rectangle(x0, y0, x1, y1, fill="#FFFFFF", outline="black")
 
         # 3. Draw execution block for each microbatch according to start and end time
         schedule_res_content = ""
@@ -143,6 +143,12 @@ class SchedulingPainter:
                     (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
                 )
                 self._item2block[text] = block
+            else:
+                if mid in (0, self._device_size + 1):
+                    text = main_canvas.create_text(
+                        (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
+                    )
+                    self._item2block[text] = block
             # text = main_canvas.create_text(
             #     (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
             # )

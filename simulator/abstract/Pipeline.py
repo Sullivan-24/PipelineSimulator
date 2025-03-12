@@ -25,6 +25,16 @@ class PipelineScheduler:
         self.results = {}
         self.devices: list[Device] = []
         self.placement = [] if not placement else placement 
+        self.placement = [
+            [10, 14, 22, 26, 34, 38, 46, 50, 58, 62, 70, 74, 79] ,
+            [0, 3, 11, 15, 23, 27, 35, 39, 47, 51, 59, 63, 71, 75] ,
+            [1, 4, 12, 16, 24, 28, 36, 40, 48, 52, 60, 64, 72, 76] ,
+            [2, 5, 13, 17, 25, 29, 37, 41, 49, 53, 61, 65, 73, 77] ,
+            [6, 18, 30, 42, 54, 66, 78] ,
+            [7, 19, 31, 43, 55, 67] ,
+            [8, 20, 32, 44, 56, 68] ,
+            [9, 21, 33, 45, 57, 69] ,
+        ]
         self.microbatch_schedule_range = range(0,min(SCHEDULE_UNIT, MICRO_BATCH_NUM))
         self.acc_finished_mb = 0
         self.finish_flag = False

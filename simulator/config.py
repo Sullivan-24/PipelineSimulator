@@ -10,8 +10,12 @@ RUN_MODE = RunMode.SIM_SOLVE
 
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
-SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
-SCHEDULE_METHOD = Schedule.UnifiedPP
+# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+# SCHEDULE_METHOD = Schedule.STANDARD_1F1B
+# CHUNK_NUM = 1
+# SCHEDULE_METHOD = Schedule.ZBV
+# CHUNK_NUM = 2
+# SCHEDULE_METHOD = Schedule.UnifiedPP
 STAGE_PLACEMENT = Placement.INTERLEAVED
 STAGE_PLACEMENT = Placement.WAVELIKE
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
@@ -20,28 +24,28 @@ if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
 # --------------------- Solver config ---------------------
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
 OVERLAP_AWARE_SCHEDULE = test_upp
-HOMO_DEVICE = True
+HOMO_DEVICE = False
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
 TIME_LIMIT = 11000
 
 # [1, 2, 100, None]
-OVERLAP_DEGREE = 2
+OVERLAP_DEGREE = None
 MEMORY_CONSTRAIN = 1
 
-EMB_TIME = 0
-HEAD_F_TIME = 4
-HEAD_B_TIME = 4
-HEAD_W_TIME = 4
-CE_F_TIME = 4
-CE_B_TIME = 4
+EMB_TIME = 1
+HEAD_F_TIME = 3
+HEAD_B_TIME = 3
+HEAD_W_TIME = 3
+CE_F_TIME = 3
+CE_B_TIME = 3
 CE_W_TIME = 0
 F_TIME = 4
 B_TIME = 4
 W_TIME = 4
 COMM_TIME = 0
 
-SPLIT_BACKPROP = test_upp
+SPLIT_BACKPROP = True
 LAYERWISE = False
 RECOMP = False
 AUTO_RECOMP_SEARCH = RECOMP
@@ -116,14 +120,14 @@ class Gradient:
 
 
 # --------------------- Painter Config ---------------------
-PIXEL_BASE = 2
+PIXEL_BASE = 3
 PP_HEIGHT = 35
 PP_ALIGN = 5
-SHOW_WORKLOAD_TEXT = True
+SHOW_WORKLOAD_TEXT = False
 # --------------------- Painter Config ---------------------
 
 # --------------------- Save File Config ---------------------
-SAVE_RES_TO_FILE = False
+SAVE_RES_TO_FILE = True
 SCH_FILE_PATH = f"schedule_results/schedules/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}.txt"
 PLA_FILE_PATH = f"schedule_results/placement.txt"
 TEMP_RES_PATH = f"schedule_results/result.txt"

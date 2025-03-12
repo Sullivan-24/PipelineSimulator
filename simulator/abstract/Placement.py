@@ -266,7 +266,7 @@ class PipelinePlacement:
         for device in devices:
             print(device)
         for dsa_in_pp in dsa:
-            print(dsa_in_pp)
+            print(dsa_in_pp, ",")
         return dsa
     
     def get_placements_dp(self):
@@ -401,7 +401,7 @@ if __name__ == "__main__":
     # print("\n每个chunk的最大时间:", chunk_max)
     # print("流水线整体最大时间:", total_max)
     pp_size = 8
-    layer_num = 64
+    layer_num = 80
     layer_computation_cost = [1 for _ in range(layer_num)]
     layer_computation_cost[-1] = 2
     pp_compute_power = [1 for _ in range(pp_size)]
@@ -421,11 +421,8 @@ if __name__ == "__main__":
     # pg = test_placement.get_reduced_possilble_placements()
     # for p in pg:
     #     print(p)
-    ps = test_placement.get_reduced_placements()
-    # for p in test_placement.get_reduced_placements():
-    #     for d in p:
-    #         print(d)
-    #     print()
+    # ps = test_placement.get_reduced_placements()
+    ps = test_placement.get_placements()
     # test_placement.get_placements()
     # pp4 layer8 也不行
     # test_placement.get_placements_dp()

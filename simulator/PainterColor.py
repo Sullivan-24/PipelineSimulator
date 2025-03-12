@@ -2,11 +2,11 @@ from .abstract.mutils import *
 def set_color(sid, workload_type, layer_num):
     color = None
     if workload_type == 'f':    #颜色设置，加上w的情况
-        color = "#00AFFF"
+        color = "#FFF2CC"
     elif workload_type == 'b':
-        color = "#00FFFF" 
+        color = "#DAE8FC" 
     else:
-        color = "#00FF6F"
+        color = "#D5E8D4"
 
     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE or LAYERWISE:
         if sid == 0:
