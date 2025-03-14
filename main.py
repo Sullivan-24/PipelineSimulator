@@ -63,7 +63,7 @@ def clear_old_file(filepath:str):
 
 def clear_old_files():
     clear_old_file(SCH_FILE_PATH)
-    clear_old_file(PLA_FILE_PATH)
+    clear_old_file(TEMP_PLA_PATH)
     clear_old_file(TEMP_RES_PATH)
     for did in range(DEVICE_NUM):
         workload_stat_filepath = f"schedule_results/workload_statistics/device{did}.txt"

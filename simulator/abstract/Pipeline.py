@@ -25,16 +25,16 @@ class PipelineScheduler:
         self.results = {}
         self.devices: list[Device] = []
         self.placement = [] if not placement else placement 
-        self.placement = [
-            [10, 14, 22, 26, 34, 38, 46, 50, 58, 62, 70, 74, 79] ,
-            [0, 3, 11, 15, 23, 27, 35, 39, 47, 51, 59, 63, 71, 75] ,
-            [1, 4, 12, 16, 24, 28, 36, 40, 48, 52, 60, 64, 72, 76] ,
-            [2, 5, 13, 17, 25, 29, 37, 41, 49, 53, 61, 65, 73, 77] ,
-            [6, 18, 30, 42, 54, 66, 78] ,
-            [7, 19, 31, 43, 55, 67] ,
-            [8, 20, 32, 44, 56, 68] ,
-            [9, 21, 33, 45, 57, 69] ,
-        ]
+        # self.placement = [
+        #     [10, 14, 22, 26, 34, 38, 46, 50, 58, 62, 70, 74, 79] ,
+        #     [0, 3, 11, 15, 23, 27, 35, 39, 47, 51, 59, 63, 71, 75] ,
+        #     [1, 4, 12, 16, 24, 28, 36, 40, 48, 52, 60, 64, 72, 76] ,
+        #     [2, 5, 13, 17, 25, 29, 37, 41, 49, 53, 61, 65, 73, 77] ,
+        #     [6, 18, 30, 42, 54, 66, 78] ,
+        #     [7, 19, 31, 43, 55, 67] ,
+        #     [8, 20, 32, 44, 56, 68] ,
+        #     [9, 21, 33, 45, 57, 69] ,
+        # ]
         self.microbatch_schedule_range = range(0,min(SCHEDULE_UNIT, MICRO_BATCH_NUM))
         self.acc_finished_mb = 0
         self.finish_flag = False
@@ -145,8 +145,8 @@ class PipelineScheduler:
         dev_compute_power = []
         for did in range(DEVICE_NUM):
             max_mem = GPU_MAX_MEM
-            comp_power = 1
-            if not HOMO_DEVICE:
+            comp_power = 2
+            if HETER_DEVICE:
                 if did >= DEVICE_NUM // 2:
                     max_mem = GPU_MAX_MEM / 2 
                     comp_power = comp_power / 2
@@ -162,40 +162,39 @@ class PipelineScheduler:
             dev_compute_power.append(comp_power)
             self.devices.append(device)
         self.set_recomp()
-        if not HOMO_DEVICE and not self.placement:
+        if HETER_DEVICE and not self.placement and SCHEDULE_METHOD is not Schedule.STANDARD_INTERLEAVED:
             layer_computation_cost = [1 for _ in range(LAYER_NUM)]
+            if LAYERWISE:
+                layer_computation_cost.append(HEAD_F_TIME / F_TIME)
+                layer_computation_cost.append(CE_F_TIME / F_TIME)
+            else:
+                layer_computation_cost[-1] += (HEAD_F_TIME + CE_F_TIME) / F_TIME
+            layer_num = LAYER_NUM if not LAYERWISE else LAYER_NUM + 2
             self.pipeline_placement_solver = PipelinePlacement(
-                layer_num=LAYER_NUM,
+                layer_num=layer_num,
                 layer_computation_cost=layer_computation_cost,
-                layer_para=[1 for _ in range(LAYER_NUM)],
+                layer_para=[1 for _ in range(layer_num)],
                 dev_num=DEVICE_NUM,
-                dev_max_memory=[100000 for _ in range(DEVICE_NUM)],
+                dev_max_memory=[100000 for _ in range(layer_num)],
                 dev_compute_power=dev_compute_power,
             )
             self.placement = self.pipeline_placement_solver.get_placements()
-            if LAYERWISE:
-                assert False, 'Layerwise test not ready'
+            # if LAYERWISE:
+            #     assert False, 'Layerwise test not ready'
         if self.placement:
+            offset = 0
+            if LAYERWISE:
+                offset = 1
             for did in range(DEVICE_NUM):
                 for pid in self.placement[did]:
-                    self.devices[did].add_stage(pid, recomp=self.recomp_set[pid])
+                    self.devices[did].add_stage(pid + offset, recomp=self.recomp_set[pid + offset])
             if LAYERWISE:
                 self.devices[DEVICE_NUM - 1].add_stage(0, recomp=self.recomp_set[0])
         elif LAYERWISE:
             if STAGE_PLACEMENT == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
-                if HOMO_DEVICE:
-                    for pid in range(LAYER_NUM):
-                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
-                else:
-                    for pid in range(DEVICE_NUM * 0):
-                        self.devices[pid % (DEVICE_NUM // 2)].add_stage(pid + 1, recomp=self.recomp_set[pid])
-                    for pid in range(DEVICE_NUM * 0, LAYER_NUM):
-                        self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
-                    # for pid in range(LAYER_NUM - DEVICE_NUM * 3):
-                    #     self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
-                    # for pid in range(LAYER_NUM - DEVICE_NUM * 3, LAYER_NUM):
-                    #     self.devices[pid % (DEVICE_NUM // 2)].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                for pid in range(LAYER_NUM):
+                    self.devices[pid % DEVICE_NUM].add_stage(pid + 1, recomp=self.recomp_set[pid])
             elif STAGE_PLACEMENT == Placement.RECURRENT:
                 print("Use Recurrent placement")
                 unit = range(DEVICE_NUM)
@@ -258,12 +257,12 @@ class PipelineScheduler:
             device.init_required_mem_for_each_microbatch()
             device.init_memory_monitor()
 
-
+        self.placement = []
         for did in range(DEVICE_NUM):
             print(list(self.devices[did].stages.keys()))
-            if len(self.placement) < DEVICE_NUM:
-                self.placement.append(list(self.devices[did].stages.keys()))
+            self.placement.append(list(self.devices[did].stages.keys()))
 
+        save_to_file(TEMP_PLA_PATH, str(self.placement), 'w')
         save_to_file(PLA_FILE_PATH, str(self.placement), 'w')
 
     def set_recomp(self):

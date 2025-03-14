@@ -10,43 +10,43 @@ RUN_MODE = RunMode.SIM_SOLVE
 
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
-# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # CHUNK_NUM = 1
 # SCHEDULE_METHOD = Schedule.ZBV
 # CHUNK_NUM = 2
-# SCHEDULE_METHOD = Schedule.UnifiedPP
+SCHEDULE_METHOD = Schedule.UnifiedPP
 STAGE_PLACEMENT = Placement.INTERLEAVED
-STAGE_PLACEMENT = Placement.WAVELIKE
+# STAGE_PLACEMENT = Placement.WAVELIKE
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
 
 # --------------------- Solver config ---------------------
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
 OVERLAP_AWARE_SCHEDULE = test_upp
-HOMO_DEVICE = False
+HETER_DEVICE = True
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
 TIME_LIMIT = 11000
 
 # [1, 2, 100, None]
-OVERLAP_DEGREE = None
-MEMORY_CONSTRAIN = 1
+OVERLAP_DEGREE = 2
+MEMORY_CONSTRAIN = 0.8
 
-EMB_TIME = 1
-HEAD_F_TIME = 3
-HEAD_B_TIME = 3
-HEAD_W_TIME = 3
-CE_F_TIME = 3
-CE_B_TIME = 3
+EMB_TIME = 0
+HEAD_F_TIME = 2
+HEAD_B_TIME = 2
+HEAD_W_TIME = 2
+CE_F_TIME = 2
+CE_B_TIME = 2
 CE_W_TIME = 0
 F_TIME = 4
 B_TIME = 4
 W_TIME = 4
 COMM_TIME = 0
 
-SPLIT_BACKPROP = True
-LAYERWISE = False
+SPLIT_BACKPROP = test_upp
+LAYERWISE = test_upp
 RECOMP = False
 AUTO_RECOMP_SEARCH = RECOMP
 RUN_SCHEDULE = False
@@ -91,7 +91,7 @@ MAX_ACTIVATION_TIMES_OF_STAGE_NUM = 3
 class Parameter:
     EMB: int = v * h
     HEAD: int = v * h
-    LAYER: int = 4 * h * h + 3 * h * i + 2 * h if MODEL_TYPE == "LLAMA" else 12 * h * h + 13 * h 
+    LAYER: int = 4 * h * h + 3 * h * i + 2 * h if MODEL_TYPE in ("LLAMA", "Qwen") else 12 * h * h + 13 * h 
 
 @dataclass
 class StateMemory:
@@ -120,7 +120,7 @@ class Gradient:
 
 
 # --------------------- Painter Config ---------------------
-PIXEL_BASE = 3
+PIXEL_BASE = 4
 PP_HEIGHT = 35
 PP_ALIGN = 5
 SHOW_WORKLOAD_TEXT = False
@@ -128,6 +128,7 @@ SHOW_WORKLOAD_TEXT = False
 
 # --------------------- Save File Config ---------------------
 SAVE_RES_TO_FILE = True
-SCH_FILE_PATH = f"schedule_results/schedules/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}.txt"
-PLA_FILE_PATH = f"schedule_results/placement.txt"
+SCH_FILE_PATH = f"schedule_results/schedules/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}.txt"
+PLA_FILE_PATH = f"schedule_results/placements/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}.txt"
+TEMP_PLA_PATH = f"schedule_results/placement.txt"
 TEMP_RES_PATH = f"schedule_results/result.txt"

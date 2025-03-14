@@ -1,59 +1,6 @@
-FP32 = 4 # 4 Bytes
-FP16 = 2 # 2 Bytes
-TIME_LIMIT = 10000
-G = 1024 * 1024 * 1024
-M = 1024 * 1024
-K = 1024
-B = G
-
-SHOW_WORKLOAD_TEXT = False
-PIXEL_BASE = 1
-PP_HEIGHT = 35
-PP_ALIGN = 5
-# Known parameter settings
-DEVICE_NUM = 4 * 4
-GPU_MAX_MEM = 80 * G / G
-WORLD_SIZE = DEVICE_NUM
-PP_SIZE = DEVICE_NUM
-TP_SIZE = WORLD_SIZE // PP_SIZE
-
-RECOMP = False
-RECOMP = True
-VOCAB_SIZE = 92544
-NUM_ATTENTION_HEAD = 32
-SEQ_LEN = 4 * K
-HIDDEN_SIZE = 4 * K
-MICRO_BATCH_SIZE = 1
-MICRO_BATCH_NUM = 4 * 2 * 4
-LAYER_NUM = 4 * 1 * 9
-LAYERWISE = True
-
-b = MICRO_BATCH_SIZE
-s = SEQ_LEN
-h = HIDDEN_SIZE
-a = NUM_ATTENTION_HEAD
-l = LAYER_NUM
-v = VOCAB_SIZE
-G = 1024 * 1024 * 1024
-from dataclasses import dataclass
-
-MIX_TRAINING = True
-DATA_TYPE: int = 2 if MIX_TRAINING else 4
-@dataclass
-class Activation:
-    INPUT: int = (2*b*s*h)/G
-    FULL: int = (34*b*s*h + 5*b*s*s*a)/G
-    LOSS: int = (2*2*b*s*v)/G
-
-LAYER_PARA_NUM = 12 * h * h + 13 * h
-HEAD_PARA_NUM = v * h
-LAYER_MEMORY = DATA_TYPE * LAYER_PARA_NUM / G
-HEAD_MEMORY = DATA_TYPE * HEAD_PARA_NUM / G
-@dataclass
-class Gradient:
-    INPUT: int = DATA_TYPE * LAYER_PARA_NUM / G
-    PARAMETER: int = DATA_TYPE * LAYER_PARA_NUM / G
-    HEAD: int = DATA_TYPE * HEAD_PARA_NUM / G
+import sys
+sys.path.append(".")
+from simulator.config import *
 import matplotlib.pyplot as plt
 import seaborn as sns
 
