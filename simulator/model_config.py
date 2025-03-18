@@ -29,21 +29,21 @@ TP_SIZE = 8
 ZERO_SIZE = 1
 # Qwen 72B I1F1B --------------
 
-# Llama2 70B I1F1B 400TGS --------------
+# Llama2 56B --------------
 MODEL_TYPE = "LLAMA"
 DEVICE_NUM = 4
 VOCAB_SIZE = 128256
 MLP_RATIO = 2.6875
-HIDDEN_SIZE = 4 * K
+HIDDEN_SIZE = 8 * K
 INTER_SIZE = HIDDEN_SIZE * MLP_RATIO
 SEQ_LEN = 4 * K
-LAYER_NUM = 8
+LAYER_NUM = 80
 NUM_ATTENTION_HEAD=64
 PP_SIZE = DEVICE_NUM
 TP_SIZE = 4
 ZERO_SIZE = 4
-MICRO_BATCH_NUM = PP_SIZE * 2
-# Llama 72B I1F1B --------------
+MICRO_BATCH_NUM = PP_SIZE * 4
+# Llama 56B --------------
 
 # # Qwen 72B --------------
 # MODEL_TYPE = "Qwen"

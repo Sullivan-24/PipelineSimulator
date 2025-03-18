@@ -1,5 +1,6 @@
 from .mutils import *
-    
+from .context import global_context as gpc
+
 class Workload:
     # 定义状态常量
     NOT_STARTED = 1
@@ -61,7 +62,7 @@ class Workload:
 
     def _generate_communication(self, time, constraint: WorkloadConstraint):
         if constraint.did != self.did:
-            self.ready_time = max(self.ready_time, time + COMM_TIME)
+            self.ready_time = max(self.ready_time, time + gpc["COMM_TIME"])
         else:
             self.ready_time = max(self.ready_time, time)
 
@@ -92,7 +93,7 @@ class Workload:
         
     def is_head_w(self):
         if self.wtype == WorkloadType.F:
-            if LAYERWISE and self.sid == LAYER_NUM + 1:
+            if  gpc["LAYERWISE"] and self.sid == gpc["LAYER_NUM"] + 1:
                 return True
         return False
 

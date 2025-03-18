@@ -1,9 +1,5 @@
 from ..config import *
 
-WORKLOAD_TYPE_NUM = 3
-if not SPLIT_BACKPROP:
-    B_TIME += W_TIME
-    WORKLOAD_TYPE_NUM = 2
 
 if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
     assert SCHEDULE_METHOD == Schedule.Layerwise, "SCHEDULE_METHOD should be Layerwise"
@@ -21,10 +17,7 @@ elif SCHEDULE_METHOD in (Schedule.STANDARD_ZBV, Schedule.ZBV, ):
 
 assert CHUNK_NUM <= (LAYER_NUM // DEVICE_NUM), f"Chunk num should be in [1,{LAYER_NUM//DEVICE_NUM}], but got {CHUNK_NUM}. "
 
-STAGE_NUM = int(DEVICE_NUM * CHUNK_NUM)
-assert STAGE_NUM <= LAYER_NUM, f"Stage ({STAGE_NUM}) should be less than Layer ({LAYER_NUM}). "
 
-MAX_ACTIVATION_COUNTS = int(STAGE_NUM * MAX_ACTIVATION_TIMES_OF_STAGE_NUM)
 STAGE_SEARCH_METHOD = StageSearchOrder.Random
 
 GLOBAL_TIME = 0

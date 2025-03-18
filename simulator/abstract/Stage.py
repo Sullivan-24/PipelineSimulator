@@ -13,39 +13,39 @@ def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:Workloa
     if layer_wise:
         assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}."
     if wtype == WorkloadType.F:
-        duration = F_TIME * layer_num
+        duration = gpc["F_TIME"] * layer_num
         if layer_wise:
             if sid == 0:
-                duration = EMB_TIME
-            elif sid == LAYER_NUM + 1: # Single Head Layer
-                duration = HEAD_F_TIME
-            elif sid == LAYER_NUM + 2:
-                duration = CE_F_TIME
+                duration = gpc["EMB_TIME"]
+            elif sid == gpc["LAYER_NUM"] + 1: # Single Head Layer
+                duration = gpc["HEAD_F_TIME"]
+            elif sid == gpc["LAYER_NUM"] + 2:
+                duration = gpc["CE_F_TIME"]
         else:
             if sid == 0:
-                duration += EMB_TIME
-            elif sid == STAGE_NUM - 1:
-                duration += HEAD_F_TIME + CE_F_TIME
+                duration += gpc["EMB_TIME"]
+            elif sid == gpc["STAGE_NUM"] - 1:
+                duration += gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]
     elif wtype == WorkloadType.B: # Consider recomputation
-        duration = (B_TIME + F_TIME * recomp) * layer_num
+        duration = (gpc["B_TIME"] + gpc["F_TIME"] * recomp) * layer_num
         if layer_wise:
-            if sid == LAYER_NUM + 1: # Single Head Layer
-                duration = HEAD_B_TIME + HEAD_F_TIME * recomp
-            elif sid == LAYER_NUM + 2:
-                duration = CE_B_TIME + CE_F_TIME * recomp
+            if sid == gpc["LAYER_NUM"] + 1: # Single Head Layer
+                duration = gpc["HEAD_B_TIME"] + gpc["HEAD_F_TIME"] * recomp
+            elif sid == gpc["LAYER_NUM"] + 2:
+                duration = gpc["CE_B_TIME"] + gpc["CE_F_TIME"] * recomp
         else:
-            if sid == STAGE_NUM - 1:
-                duration += HEAD_B_TIME + CE_B_TIME + (HEAD_F_TIME + CE_F_TIME) * recomp
-                if not SPLIT_BACKPROP:
-                    duration += HEAD_W_TIME
+            if sid == gpc["STAGE_NUM"] - 1:
+                duration += gpc["HEAD_B_TIME"] + gpc["CE_B_TIME"] + (gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]) * recomp
+                if not gpc["SPLIT_BACKPROP"]:
+                    duration += gpc["HEAD_W_TIME"]
     elif wtype == WorkloadType.W:
-        duration = W_TIME * layer_num
+        duration = gpc["W_TIME"] * layer_num
         if layer_wise:
-            if sid == LAYER_NUM + 1: # Cross-entropy Layer has no parameter to train
-                duration = HEAD_W_TIME
+            if sid == gpc["LAYER_NUM"] + 1: # Cross-entropy Layer has no parameter to train
+                duration = gpc["HEAD_W_TIME"]
         else:
-            if sid == STAGE_NUM - 1:
-                duration += HEAD_W_TIME
+            if sid == gpc["STAGE_NUM"] - 1:
+                duration += gpc["HEAD_W_TIME"]
     else:
         raise ValueError(f"Wrong workload type: {wtype}.")
     
@@ -57,14 +57,14 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, layer_num: int = LAYER_NUM // STAGE_NUM, layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
+    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, layer_num: int = gpc["LAYER_NUM"] // gpc["STAGE_NUM"], layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
         self.did: int = device_id
         self.sid: int = stage_id
         self.nmb: int = microbatch_num
-        self.para_num: int = para_num / G
-        self.model_memory_usage = self.para_num * FP16 / TP_SIZE
-        self.grad_memory_usage = self.para_num * FP16 / TP_SIZE
-        self.opt_memory_usage = self.para_num * 3 * FP32 / TP_SIZE / ZERO_SIZE
+        self.para_num: int = para_num / gpc["G"]
+        self.model_memory_usage = self.para_num * gpc["FP16"] / gpc["TP_SIZE"]
+        self.grad_memory_usage = self.para_num * gpc["FP16"] / gpc["TP_SIZE"]
+        self.opt_memory_usage = self.para_num * 3 * gpc["FP32"] / gpc["TP_SIZE"] / gpc["ZERO_SIZE"]
         self.memory_usage: int = self.model_memory_usage + self.grad_memory_usage + self.opt_memory_usage
         self.workloads: dict[int, dict[WorkloadType, Workload]] = {}  
         self.stage_type: StageType = stage_type
@@ -75,7 +75,7 @@ class Stage:
         if layerwise: 
             assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}"
         if layer_density is None:
-            self.layer_density = [1 for _ in range(LAYER_NUM)]
+            self.layer_density = [1 for _ in range(gpc["LAYER_NUM"])]
         else:
             self.layer_density = layer_density
         self._add_workload()
@@ -97,7 +97,7 @@ class Stage:
                     comp_power=self.comp_power,
                 ),
                 recomp=self.recomp,
-                total_stages=LAYER_NUM+3 if self.layerwise else STAGE_NUM,
+                total_stages=gpc["LAYER_NUM"]+3 if self.layerwise else gpc["STAGE_NUM"],
             )
             self.workloads[mid][WorkloadType.F] = fpw
             if self.sid == 0 and self.layerwise: # Embedding layer only has F
@@ -117,10 +117,10 @@ class Stage:
                     comp_power=self.comp_power,
                 ), 
                 recomp=self.recomp,
-                total_stages=LAYER_NUM+3 if self.layerwise else STAGE_NUM,   
+                total_stages=gpc["LAYER_NUM"]+3 if self.layerwise else gpc["STAGE_NUM"],   
             )
             self.workloads[mid][WorkloadType.B] = igw
-            if SPLIT_BACKPROP:
+            if gpc["SPLIT_BACKPROP"]:
                 pgw = Workload(
                     device_id=self.did,
                     stage_id=self.sid,
@@ -135,7 +135,7 @@ class Stage:
                         comp_power=self.comp_power,
                     ),
                     recomp=self.recomp,
-                    total_stages=LAYER_NUM+3 if self.layerwise else STAGE_NUM,
+                    total_stages=gpc["LAYER_NUM"]+3 if self.layerwise else gpc["STAGE_NUM"],
                 )
                 if self.stage_type == StageType.CE: # Cross-entropy layer has no W for parameter training
                     continue
@@ -175,7 +175,7 @@ class Stage:
                 elif self.stage_type == StageType.CE:
                     self.memory_usage += 0
                 else:
-                    if SPLIT_BACKPROP:
+                    if gpc["SPLIT_BACKPROP"]:
                         self.memory_usage += Gradient.INPUT
                         if self.recomp:
                             self.memory_usage += (Activation.FULL - Activation.INPUT)
@@ -184,23 +184,23 @@ class Stage:
             elif workload.wtype == WorkloadType.W:
                 if self.stage_type in (StageType.HEAD, StageType.CE):
                     return
-                if SPLIT_BACKPROP:
+                if gpc["SPLIT_BACKPROP"]:
                     self.memory_usage -= Gradient.INPUT + Activation.FULL
         else:
-            layers_per_stage = LAYER_NUM // STAGE_NUM
+            layers_per_stage = gpc["LAYER_NUM"] // gpc["STAGE_NUM"]
             if workload.wtype == WorkloadType.F:
                 self.memory_usage += (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
-                if self.sid == STAGE_NUM - 1:
+                if self.sid == gpc["STAGE_NUM"] - 1:
                     self.memory_usage += Activation.LOSS
             elif workload.wtype == WorkloadType.W:
                 self.memory_usage -= (Activation.FULL + Gradient.INPUT) * layers_per_stage
-                if self.sid == STAGE_NUM - 1:
+                if self.sid == gpc["STAGE_NUM"] - 1:
                     self.memory_usage -= Activation.LOSS
-            elif SPLIT_BACKPROP and workload.wtype == WorkloadType.B:
+            elif gpc["SPLIT_BACKPROP"] and workload.wtype == WorkloadType.B:
                 self.memory_usage += ((Activation.FULL - Activation.INPUT) * self.recomp + Gradient.INPUT) * layers_per_stage
-            elif SPLIT_BACKPROP == False and workload.wtype == WorkloadType.B:
+            elif gpc["SPLIT_BACKPROP"] == False and workload.wtype == WorkloadType.B:
                 self.memory_usage -= (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
-                if self.sid == STAGE_NUM - 1:
+                if self.sid == gpc["STAGE_NUM"] - 1:
                     self.memory_usage -= Activation.LOSS
         
     def execute_workload(self, time, mid=None, workload_type=None)->Workload:

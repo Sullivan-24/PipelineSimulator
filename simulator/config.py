@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from .abstract.variables import *
-from .model_config import *
+from simulator.abstract.variables import *
+from simulator.model_config import *
 # --------------------- Solver config ---------------------
 BASE_SOLUTION = True
 RUN_MODE = RunMode.LAYERWISE_GUROBI_SOLVE
@@ -24,14 +24,14 @@ if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
 # --------------------- Solver config ---------------------
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
 OVERLAP_AWARE_SCHEDULE = test_upp
-HETER_DEVICE = True
+HETER_DEVICE = False
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
 TIME_LIMIT = 11000
 
 # [1, 2, 100, None]
-OVERLAP_DEGREE = 2
-MEMORY_CONSTRAIN = 0.8
+OVERLAP_DEGREE = None
+MEMORY_CONSTRAIN = 0.80
 
 EMB_TIME = 0
 HEAD_F_TIME = 2
@@ -45,8 +45,8 @@ B_TIME = 4
 W_TIME = 4
 COMM_TIME = 0
 
-SPLIT_BACKPROP = test_upp
-LAYERWISE = test_upp
+SPLIT_BACKPROP = True
+LAYERWISE = False
 RECOMP = False
 AUTO_RECOMP_SEARCH = RECOMP
 RUN_SCHEDULE = False
@@ -128,7 +128,17 @@ SHOW_WORKLOAD_TEXT = False
 
 # --------------------- Save File Config ---------------------
 SAVE_RES_TO_FILE = True
-SCH_FILE_PATH = f"schedule_results/schedules/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}.txt"
-PLA_FILE_PATH = f"schedule_results/placements/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}.txt"
+SCH_FILE_PATH = f"schedule_results/schedules/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
+PLA_FILE_PATH = f"schedule_results/placements/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
 TEMP_PLA_PATH = f"schedule_results/placement.txt"
 TEMP_RES_PATH = f"schedule_results/result.txt"
+
+STAGE_NUM = int(DEVICE_NUM * CHUNK_NUM)
+assert STAGE_NUM <= LAYER_NUM, f"Stage ({STAGE_NUM}) should be less than Layer ({LAYER_NUM}). "
+
+WORKLOAD_TYPE_NUM = 3
+if not SPLIT_BACKPROP:
+    B_TIME += W_TIME
+    WORKLOAD_TYPE_NUM = 2
+
+MAX_ACTIVATION_COUNTS = int(STAGE_NUM * MAX_ACTIVATION_TIMES_OF_STAGE_NUM)
