@@ -42,7 +42,7 @@ NUM_ATTENTION_HEAD=64
 PP_SIZE = DEVICE_NUM
 TP_SIZE = 4
 ZERO_SIZE = 4
-MICRO_BATCH_NUM = PP_SIZE * 4
+MICRO_BATCH_NUM = PP_SIZE * 2
 # Llama 56B --------------
 
 # # Qwen 72B --------------

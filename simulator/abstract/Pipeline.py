@@ -240,8 +240,11 @@ class PipelineScheduler:
                     self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid])
             elif gpc["STAGE_PLACEMENT"] == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
-                for pid in range(gpc["STAGE_NUM"]):
+                offset = gpc["DEVICE_NUM"] if gpc["REVERSE_LAST_STAGES"] else 0
+                for pid in range(gpc["STAGE_NUM"] - offset):
                     self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid])
+                for pid in range(gpc["STAGE_NUM"] - offset, gpc["STAGE_NUM"]):
+                    self.devices[gpc["DEVICE_NUM"] - (pid % gpc["DEVICE_NUM"]) - 1].add_stage(pid, recomp=self.recomp_set[pid])
             else:
                 assert gpc["STAGE_NUM"] <= gpc["LAYER_NUM"], f"STAGE should be less than LAYER ({gpc["STAGE_NUM"]} >= {gpc["LAYER_NUM"]})"                
                 offset = gpc["DEVICE_NUM"] if gpc["REVERSE_LAST_STAGES"] else 0
