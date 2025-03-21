@@ -143,6 +143,7 @@ class PipelineScheduler:
 
     def _init_stage(self):
         dev_compute_power = []
+        layer_num = gpc["LAYER_NUM"] // gpc["STAGE_NUM"]
         for did in range(gpc["DEVICE_NUM"]):
             max_mem = gpc["GPU_MAX_MEM"]
             comp_power = 2
@@ -187,14 +188,14 @@ class PipelineScheduler:
                 offset = 1
             for did in range(gpc["DEVICE_NUM"]):
                 for pid in self.placement[did]:
-                    self.devices[did].add_stage(pid + offset, recomp=self.recomp_set[pid + offset])
+                    self.devices[did].add_stage(pid + offset, layer_num = layer_num, recomp=self.recomp_set[pid + offset])
             if gpc["LAYERWISE"]:
-                self.devices[gpc["DEVICE_NUM"] - 1].add_stage(0, recomp=self.recomp_set[0])
+                self.devices[gpc["DEVICE_NUM"] - 1].add_stage(0, layer_num = layer_num, recomp=self.recomp_set[0])
         elif gpc["LAYERWISE"]:
             if gpc["STAGE_PLACEMENT"] == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
                 for pid in range(gpc["LAYER_NUM"]):
-                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, recomp=self.recomp_set[pid])
+                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, layer_num = layer_num, recomp=self.recomp_set[pid])
             elif gpc["STAGE_PLACEMENT"] == Placement.RECURRENT:
                 print("Use Recurrent placement")
                 unit = range(gpc["DEVICE_NUM"])
@@ -205,56 +206,56 @@ class PipelineScheduler:
                     unit = reversed(unit)
 
                 for pid in range(gpc["LAYER_NUM"] - 1):
-                    self.devices[orders[pid]].add_stage(pid + 1, recomp=self.recomp_set[pid])
-                self.devices[-1].add_stage(gpc["LAYER_NUM"], recomp=self.recomp_set[pid])
+                    self.devices[orders[pid]].add_stage(pid + 1, layer_num = layer_num, recomp=self.recomp_set[pid])
+                self.devices[-1].add_stage(gpc["LAYER_NUM"], layer_num = layer_num, recomp=self.recomp_set[pid])
             elif gpc["STAGE_PLACEMENT"] == Placement.CROSS:
                 print("Use V+I placement")
                 for pid in range(gpc["LAYER_NUM"]):
                     if (pid // (gpc["DEVICE_NUM"])) == gpc["LAYER_NUM"] // (gpc["DEVICE_NUM"]) - 1:
-                        self.devices[gpc["DEVICE_NUM"] - 1 - pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                        self.devices[gpc["DEVICE_NUM"] - 1 - pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, layer_num = layer_num, recomp=self.recomp_set[pid + 1])
                     else:
-                        self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                        self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, layer_num = layer_num, recomp=self.recomp_set[pid + 1])
             else:   
                 print("Use Wavelike placement")
                 offset = gpc["DEVICE_NUM"] if gpc["REVERSE_LAST_STAGES"] else 0
                 print(f"Reverse last {offset} stages.")
                 for pid in range(gpc["LAYER_NUM"] - offset):
                     if (pid // gpc["DEVICE_NUM"]) % 2 == 0:
-                        self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                        self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, layer_num = layer_num, recomp=self.recomp_set[pid + 1])
                     else:
-                        self.devices[gpc["DEVICE_NUM"] - 1 - pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                        self.devices[gpc["DEVICE_NUM"] - 1 - pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, layer_num = layer_num, recomp=self.recomp_set[pid + 1])
                 for pid in range(gpc["LAYER_NUM"] - offset, gpc["LAYER_NUM"]):
-                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, recomp=self.recomp_set[pid + 1])
+                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid + 1, layer_num = layer_num, recomp=self.recomp_set[pid + 1])
 
             if gpc["STAGE_PLACEMENT"] != Placement.RECURRENT:
-                self.devices[-1].add_stage(0)
-                self.devices[0].add_stage(gpc["LAYER_NUM"]+1)
-                self.devices[1].add_stage(gpc["LAYER_NUM"]+2)
+                self.devices[-1].add_stage(0, layer_num = layer_num)
+                self.devices[0].add_stage(gpc["LAYER_NUM"]+1, layer_num = layer_num)
+                self.devices[1].add_stage(gpc["LAYER_NUM"]+2, layer_num = layer_num)
             else:
-                self.devices[-1].add_stage(0)
-                self.devices[0].add_stage(gpc["LAYER_NUM"]+1)
-                self.devices[1].add_stage(gpc["LAYER_NUM"]+2)
+                self.devices[-1].add_stage(0, layer_num = layer_num)
+                self.devices[0].add_stage(gpc["LAYER_NUM"]+1, layer_num = layer_num)
+                self.devices[1].add_stage(gpc["LAYER_NUM"]+2, layer_num = layer_num)
         else:
-            if gpc["SCHEDULE_METHOD"] in (Schedule.INTERLEAVED, Schedule.STANDARD_INTERLEAVED):
+            if gpc["SCHEDULE_METHOD"] in (Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED):
                 for pid in range(gpc["STAGE_NUM"]):
-                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid])
+                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
             elif gpc["STAGE_PLACEMENT"] == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
                 offset = gpc["DEVICE_NUM"] if gpc["REVERSE_LAST_STAGES"] else 0
                 for pid in range(gpc["STAGE_NUM"] - offset):
-                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid])
+                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
                 for pid in range(gpc["STAGE_NUM"] - offset, gpc["STAGE_NUM"]):
-                    self.devices[gpc["DEVICE_NUM"] - (pid % gpc["DEVICE_NUM"]) - 1].add_stage(pid, recomp=self.recomp_set[pid])
+                    self.devices[gpc["DEVICE_NUM"] - (pid % gpc["DEVICE_NUM"]) - 1].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
             else:
                 assert gpc["STAGE_NUM"] <= gpc["LAYER_NUM"], f"STAGE should be less than LAYER ({gpc["STAGE_NUM"]} >= {gpc["LAYER_NUM"]})"                
                 offset = gpc["DEVICE_NUM"] if gpc["REVERSE_LAST_STAGES"] else 0
                 for pid in range(gpc["STAGE_NUM"] - offset):
                     if (pid // gpc["DEVICE_NUM"]) % 2 == 0:
-                        self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid])
+                        self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
                     else:
-                        self.devices[gpc["DEVICE_NUM"] - 1 - pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid])
+                        self.devices[gpc["DEVICE_NUM"] - 1 - pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
                 for pid in range(gpc["STAGE_NUM"] - offset, gpc["STAGE_NUM"]):
-                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid])
+                    self.devices[pid % gpc["DEVICE_NUM"]].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
         # Launch MemoryMonitors
         for device in self.devices:
             device.init_required_mem_for_each_microbatch()
@@ -649,7 +650,7 @@ class PipelineScheduler:
                 self.result2file()
             else:
                 print("Wrong answer!")
-
+        return self.last_workload.end_time
 
     def show_mem_usage(self, device_id=(0,1, gpc["DEVICE_NUM"]-1), show_all=False):
         max_mem_usages = [0 for _ in range(len(self.devices))]

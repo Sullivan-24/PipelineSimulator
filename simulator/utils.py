@@ -69,7 +69,7 @@ def save_to_file(filepath: str, content: str, mode: Literal['a', 'w'], delete_if
         raise ValueError("Mode must be either 'a' (append) or 'w' (write).")
     
     directory = os.path.dirname(filepath)
-    if not os.path.exists(directory):
+    if not os.path.exists(directory) and directory:
         os.makedirs(directory)
         print("Create directory:{}".format(directory))
 

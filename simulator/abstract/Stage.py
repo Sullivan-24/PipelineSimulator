@@ -57,7 +57,7 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, layer_num: int = gpc["LAYER_NUM"] // gpc["STAGE_NUM"], layerwise:bool = False, microbatch_num:int = MICRO_BATCH_NUM, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
+    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, microbatch_num:int, layer_num: int, layerwise:bool = False, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
         self.did: int = device_id
         self.sid: int = stage_id
         self.nmb: int = microbatch_num

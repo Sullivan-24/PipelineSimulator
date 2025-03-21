@@ -303,12 +303,10 @@ class Device:
                         for wlt in self.stages[sid].workloads[mid]:
                             print(self.stages[sid].workloads[mid][wlt])
 
-    def add_stage(self, stage_id: int, 
+    def add_stage(self, stage_id: int, layer_num:int,
                   recomp:bool = False, 
-                  layerwise:bool = gpc["LAYERWISE"], 
-                  layer_num = gpc["LAYER_NUM"] // gpc["STAGE_NUM"], 
+                  layerwise:bool = gpc["LAYERWISE"],
                   basic_memory = 0) -> None:
-        
         stage_type = StageType.LAYERS
         para_num = 0
         if layerwise:
@@ -341,6 +339,7 @@ class Device:
                 stage_id=stage_id,
                 para_num=para_num,
                 stage_type=stage_type,
+                microbatch_num=self.nmb,
                 recomp=recomp,
                 layerwise=layerwise,
                 layer_num=layer_num,
@@ -450,7 +449,7 @@ class Device:
                         raise Exception("Error workload type.")
                     self.next_workload_idx += 1
                     return proc_workload
-            elif run_schedule or gpc["SCHEDULE_METHOD"] in (Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB):
+            elif run_schedule or gpc["SCHEDULE_METHOD"] in (Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB, Schedule.STANDARD_ZBH1):
                 if self.next_workload_idx == len(self.stages) * self.nmb * gpc["WORKLOAD_TYPE_NUM"]:
                     return None
                 if self.next_workload_idx == len(self.static_schedule):
@@ -467,88 +466,6 @@ class Device:
                     self.state = Device.BUSY
                     self.next_workload_idx += 1
                     return proc_workload
-            elif gpc["SCHEDULE_METHOD"] == Schedule.STANDARD_ZBH1:
-                if self.last_workload_type == WorkloadType.F:
-                    workload_type = WorkloadType.B
-                elif self.last_workload_type == WorkloadType.B:
-                    workload_type = WorkloadType.W
-                elif self.last_workload_type == WorkloadType.W:
-                    workload_type = WorkloadType.F
-                else:
-                    workload_type = WorkloadType.F
-
-                if self.warmup_num_f < gpc["DEVICE_NUM"] - self.did:
-                    workload_type = WorkloadType.F
-
-                if self.warmup_num_f == gpc["MICRO_BATCH_NUM"]:
-                    workload_type = WorkloadType.B
-                if self.warmup_num_b == gpc["MICRO_BATCH_NUM"]:
-                    workload_type = WorkloadType.W
-                for mid in range(gpc["MICRO_BATCH_NUM"]):
-                    for sid in self.stages:
-                        required_memory = get_required_memory(
-                            stage_id=sid, 
-                            layer_num=gpc["LAYER_NUM"]//gpc["STAGE_NUM"],
-                            workload_type=workload_type,
-                            workload_type_num=gpc["WORKLOAD_TYPE_NUM"], 
-                            layer_wise=True,
-                            recomp=self.stages[sid].recomp,
-                        )
-
-                        workload_type = self._reset_workload_type(
-                            workload_type=workload_type,
-                            required_memory=required_memory,
-                            current_mem_usage=self.current_mem_usage,
-                            max_memory=self.max_memory,
-                        )
-
-                        proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
-                        if proc_workload:
-                            if workload_type == WorkloadType.F:
-                                self.warmup_num_f += 1
-                            elif workload_type == WorkloadType.B:
-                                self.warmup_num_b += 1
-                            elif workload_type == WorkloadType.W:
-                                self.warmup_num_w += 1
-                            self.last_workload_type = workload_type
-                            self.proc_workload = proc_workload
-                            self.update_memory_usage()
-                            self.state = Device.BUSY
-                            return proc_workload
-                
-                now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-                for workload_type in now_workload_priority_order:
-                    for mid in range(gpc["MICRO_BATCH_NUM"]):
-                        for sid in self.stages:
-                            required_memory = get_required_memory(
-                                stage_id=sid, 
-                                layer_num=gpc["LAYER_NUM"]//gpc["STAGE_NUM"],
-                                workload_type=workload_type,
-                                workload_type_num=gpc["WORKLOAD_TYPE_NUM"], 
-                                layer_wise=True,
-                                recomp=self.stages[sid].recomp,
-                            )
-
-                            workload_type = self._reset_workload_type(
-                                workload_type=workload_type,
-                                required_memory=required_memory,
-                                current_mem_usage=self.current_mem_usage,
-                                max_memory=self.max_memory,
-                            )
-
-                            proc_workload = self.stages[sid].execute_workload(time=time, mid=mid,workload_type=workload_type)
-                            if proc_workload:
-                                if workload_type == WorkloadType.F:
-                                    self.warmup_num_f += 1
-                                elif workload_type == WorkloadType.B:
-                                    self.warmup_num_b += 1
-                                elif workload_type == WorkloadType.W:
-                                    self.warmup_num_w += 1
-                                self.last_workload_type = workload_type
-                                self.proc_workload = proc_workload
-                                self.update_memory_usage()
-                                self.state = Device.BUSY
-                                return proc_workload       
             elif gpc["SCHEDULE_METHOD"] in (Schedule.STANDARD_ZBV, Schedule.ZBV):
                 if self.last_workload_type == WorkloadType.F:
                     workload_type = WorkloadType.B
