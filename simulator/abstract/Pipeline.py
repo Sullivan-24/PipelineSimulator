@@ -662,7 +662,7 @@ class PipelineScheduler:
                 oom_flag = "" if mem_record <= device.max_memory else "OOM"
                 save_to_file(aim_file_path, "Time {}, mem = {}, {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2), oom_flag), 'a')
                 last_mem_record = mem_record
-                max_mem_usages[device.did] = max(max_mem_usages[device.did], mem_record)
+                max_mem_usages[device.did] = round(max(max_mem_usages[device.did], mem_record), 3)
         
         oom = False
         for did, device in enumerate(self.devices):

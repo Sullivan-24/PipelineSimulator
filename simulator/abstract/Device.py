@@ -208,8 +208,8 @@ class Device:
             elif self.last_workload_type == WorkloadType.W:
                 workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
 
-        # deal with long tail
-        if self.exe_num_f == gpc["CHUNK_NUM"] * gpc["MICRO_BATCH_NUM"]:
+        # deal with long tail, advance more B when memory is sufficient
+        if self.exe_num_f >= (gpc["CHUNK_NUM"] - 1) * gpc["MICRO_BATCH_NUM"]:
             workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W]
 
         
@@ -239,7 +239,9 @@ class Device:
                         workload = workloads[mid][workload_type]
                         # make sure warmup is finished as quickly as possible
                         # if OVERLAP_AWARE_SCHEDULE and self.overlap_flag and self.should_delay_for_overlap(time=time, workload=workload):
-                        if gpc["OVERLAP_AWARE_SCHEDULE"] and self.exe_num_b > 0 and self.should_delay_for_overlap(time=time, workload=workload):
+                        bottle_neck_did = 0 if gpc["STAGE_PLACEMENT"] == Placement.WAVELIKE else gpc["DEVICE_NUM"] - 1
+                        # bottle_neck_did = - 1
+                        if self.did != bottle_neck_did and gpc["OVERLAP_AWARE_SCHEDULE"] and self.exe_num_b > 0 and self.should_delay_for_overlap(time=time, workload=workload):
                             if gpc["OVERLAP_DEGREE"] is None:
                                 delayed_workload.append(workload)
                         else:

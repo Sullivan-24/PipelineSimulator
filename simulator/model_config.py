@@ -46,21 +46,21 @@ MICRO_BATCH_NUM = PP_SIZE * 4
 # Llama 56B --------------
 
 
-# Llama2 13B --------------
+# Llama2 14B --------------
 MODEL_TYPE = "LLAMA"
 DEVICE_NUM = 8
 VOCAB_SIZE = 128256
 MLP_RATIO = 2.6875
-HIDDEN_SIZE = 3.5 * K
+HIDDEN_SIZE = 8 * K
 INTER_SIZE = HIDDEN_SIZE * MLP_RATIO
 SEQ_LEN = 4 * K
-LAYER_NUM = 32
+LAYER_NUM = 64
 NUM_ATTENTION_HEAD=32
 PP_SIZE = DEVICE_NUM
-TP_SIZE = 2
+TP_SIZE = 8
 ZERO_SIZE = 1
 MICRO_BATCH_NUM = PP_SIZE * 4
-# Llama 13B --------------
+# Llama 14B --------------
 
 
 # gpt 175B --------------
