@@ -15,9 +15,9 @@ SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # CHUNK_NUM = 1
 # SCHEDULE_METHOD = Schedule.ZBV
 # CHUNK_NUM = 2
-SCHEDULE_METHOD = Schedule.UnifiedPP
+# SCHEDULE_METHOD = Schedule.UnifiedPP
 STAGE_PLACEMENT = Placement.INTERLEAVED
-STAGE_PLACEMENT = Placement.WAVELIKE
+# STAGE_PLACEMENT = Placement.WAVELIKE
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
 
@@ -45,7 +45,7 @@ B_TIME = 4
 W_TIME = 4
 COMM_TIME = 0
 
-SPLIT_BACKPROP = True
+SPLIT_BACKPROP = test_upp
 LAYERWISE = False
 RECOMP = False
 AUTO_RECOMP_SEARCH = RECOMP
@@ -110,7 +110,7 @@ class StateMemory:
     # Optimizer M + V, gradients * 1, model * 1
     OPTIMIZER: int = FP32 * 4 * (Parameter.LAYER * l + Parameter.EMB + Parameter.HEAD) / G / (TP_SIZE * PP_SIZE) / ZERO_SIZE
 
-ACT_OPT_COE = 0.63 # adjust by profiling results
+ACT_OPT_COE = 0.2075 # adjust by profiling results
 @dataclass
 class Activation:
     INPUT: int = (2*b*s*h) / G / TP_SIZE

@@ -209,6 +209,7 @@ class Device:
                 workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
 
         # deal with long tail, advance more B when memory is sufficient
+        # if self.exe_num_f >= (gpc["CHUNK_NUM"] - 0) * gpc["MICRO_BATCH_NUM"]:
         if self.exe_num_f >= (gpc["CHUNK_NUM"] - 1) * gpc["MICRO_BATCH_NUM"]:
             workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W]
 
