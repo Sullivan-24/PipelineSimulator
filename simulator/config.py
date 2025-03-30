@@ -12,10 +12,12 @@ SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
 SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_1F1B
-# CHUNK_NUM = 1
+# CHUNK_NUM = 20
+# CHUNK_NUM = 3
 # SCHEDULE_METHOD = Schedule.ZBV
-# CHUNK_NUM = 2
-# SCHEDULE_METHOD = Schedule.UnifiedPP
+# SCHEDULE_METHOD = Schedule.STANDARD_ZBH1
+# CHUNK_NUM = 1
+SCHEDULE_METHOD = Schedule.UnifiedPP
 STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
@@ -27,13 +29,14 @@ OVERLAP_AWARE_SCHEDULE = test_upp
 HETER_DEVICE = False
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
-TIME_LIMIT = 3000
+TIME_LIMIT = 10000
 
 # [1, 2, 100, None]
 OVERLAP_DEGREE = None
-MEMORY_CONSTRAIN = 0.80
+MEMORY_CONSTRAIN = 0.8
+MEMORY_REDUCATION = 0
 
-EMB_TIME = 0
+EMB_F_TIME = 0
 HEAD_F_TIME = 2
 HEAD_B_TIME = 2
 HEAD_W_TIME = 2
@@ -45,14 +48,45 @@ B_TIME = 4
 W_TIME = 4
 COMM_TIME = 0
 
+# No backward splitting
+EMB_F_TIME = 0
+EMB_B_TIME = 4
+EMB_W_TIME = 0
+HEAD_F_TIME = 34
+HEAD_B_TIME = 32
+HEAD_W_TIME = 0
+CE_F_TIME = 0
+CE_B_TIME = 0
+CE_W_TIME = 0
+F_TIME = 12
+B_TIME = 24
+W_TIME = 0
+COMM_TIME = 0
+
 SPLIT_BACKPROP = test_upp
+
+if SPLIT_BACKPROP:
+    EMB_F_TIME = 0
+    EMB_B_TIME = 2
+    EMB_W_TIME = 2
+    HEAD_F_TIME = 34
+    HEAD_B_TIME = 16
+    HEAD_W_TIME = 16
+    CE_F_TIME = 0
+    CE_B_TIME = 0
+    CE_W_TIME = 0
+    F_TIME = 12
+    B_TIME = 14
+    W_TIME = 10
+    COMM_TIME = 0
+
 LAYERWISE = False
 RECOMP = False
 AUTO_RECOMP_SEARCH = RECOMP
 RUN_SCHEDULE = False
 RUN_STANDARD_ZBV = False
 if not RUN_SCHEDULE and RUN_STANDARD_ZBV:
-    EMB_TIME = 0
+    EMB_F_TIME = 0
     HEAD_F_TIME = 0
     HEAD_B_TIME = 0
     HEAD_W_TIME = 0
@@ -62,6 +96,7 @@ if not RUN_SCHEDULE and RUN_STANDARD_ZBV:
 
 SCHEDULE_UNIT = MICRO_BATCH_NUM // 1
 REVERSE_LAST_STAGES = False
+REVERSE_FIRST_STAGES = False
 # Run standard ZBV ---------------------
 # SCHEDULE_METHOD = Schedule.ZBV
 # RUN_SCHEDULE = False
@@ -86,7 +121,7 @@ l = LAYER_NUM
 v = VOCAB_SIZE
 i = INTER_SIZE
 
-LAYER_PARA_NUM = 12 * h * h + 13 * h
+LAYER_PARA_NUM = 4 * h * h + 3 * h * i + 2 * h if MODEL_TYPE in ("LLAMA", "Qwen") else 12 * h * h + 13 * h 
 HEAD_PARA_NUM = v * h
 PARAMETER_NUM = LAYER_PARA_NUM * LAYER_NUM + HEAD_PARA_NUM
 
@@ -98,9 +133,9 @@ MAX_ACTIVATION_TIMES_OF_STAGE_NUM = 1
 
 @dataclass
 class Parameter:
-    EMB: int = v * h
-    HEAD: int = v * h
-    LAYER: int = 4 * h * h + 3 * h * i + 2 * h if MODEL_TYPE in ("LLAMA", "Qwen") else 12 * h * h + 13 * h 
+    EMB: int = b * v * h
+    HEAD: int = b * v * h
+    LAYER: int = LAYER_PARA_NUM
 
 @dataclass
 class StateMemory:
@@ -110,16 +145,24 @@ class StateMemory:
     # Optimizer M + V, gradients * 1, model * 1
     OPTIMIZER: int = FP32 * 4 * (Parameter.LAYER * l + Parameter.EMB + Parameter.HEAD) / G / (TP_SIZE * PP_SIZE) / ZERO_SIZE
 
-ACT_OPT_COE = 0.2075 # adjust by profiling results
+ACT_OPT_COE = 0.18298 # adjust by profiling results
+ACT_B_RATIO = 0.5669
+ACT_W_RATIO = 1 - ACT_B_RATIO
+ACT_HEAD_B = 2/3
+ACT_HEAD_W = 1 - ACT_HEAD_B
 @dataclass
 class Activation:
     INPUT: int = (2*b*s*h) / G / TP_SIZE
     FULL: int = (34*b*s*h + 5*b*s*s*a) * ACT_OPT_COE / G / TP_SIZE
     LOSS: int = (2*FP32*b*s*v) / G / TP_SIZE
-    
+    HEAD: int = (3*FP16*b*s*h) / G / TP_SIZE
+    EMB: int = (FP16*b*s*h) / G / TP_SIZE
+
+GRAD_COE = 0.225
+# 1.5->0.6
 @dataclass
 class Gradient:
-    INPUT: int = DATA_TYPE * Parameter.LAYER / G / TP_SIZE
+    INPUT: int = DATA_TYPE * Parameter.LAYER / G / TP_SIZE * GRAD_COE
     PARAMETER: int = DATA_TYPE * Parameter.LAYER / G / TP_SIZE
     HEAD_INPUT: int = DATA_TYPE * Parameter.HEAD / G / TP_SIZE
     HEAD_PARA: int = DATA_TYPE * Parameter.HEAD / G / TP_SIZE
@@ -129,7 +172,7 @@ class Gradient:
 
 
 # --------------------- Painter Config ---------------------
-PIXEL_BASE = 4
+PIXEL_BASE = 2
 PP_HEIGHT = 35
 PP_ALIGN = 5
 SHOW_WORKLOAD_TEXT = False

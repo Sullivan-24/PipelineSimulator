@@ -16,20 +16,22 @@ def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:Workloa
         duration = gpc["F_TIME"] * layer_num
         if layer_wise:
             if sid == 0:
-                duration = gpc["EMB_TIME"]
+                duration = gpc["EMB_F_TIME"]
             elif sid == gpc["LAYER_NUM"] + 1: # Single Head Layer
                 duration = gpc["HEAD_F_TIME"]
             elif sid == gpc["LAYER_NUM"] + 2:
                 duration = gpc["CE_F_TIME"]
         else:
             if sid == 0:
-                duration += gpc["EMB_TIME"]
+                duration += gpc["EMB_F_TIME"]
             elif sid == gpc["STAGE_NUM"] - 1:
                 duration += gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]
     elif wtype == WorkloadType.B: # Consider recomputation
         duration = (gpc["B_TIME"] + gpc["F_TIME"] * recomp) * layer_num
         if layer_wise:
-            if sid == gpc["LAYER_NUM"] + 1: # Single Head Layer
+            if sid == 0:
+                duration = gpc["EMB_B_TIME"]
+            elif sid == gpc["LAYER_NUM"] + 1: # Single Head Layer
                 duration = gpc["HEAD_B_TIME"] + gpc["HEAD_F_TIME"] * recomp
             elif sid == gpc["LAYER_NUM"] + 2:
                 duration = gpc["CE_B_TIME"] + gpc["CE_F_TIME"] * recomp
@@ -38,6 +40,10 @@ def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:Workloa
                 duration += gpc["HEAD_B_TIME"] + gpc["CE_B_TIME"] + (gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]) * recomp
                 if not gpc["SPLIT_BACKPROP"]:
                     duration += gpc["HEAD_W_TIME"]
+            elif sid == 0:
+                duration += gpc["EMB_B_TIME"]
+                if not gpc["SPLIT_BACKPROP"]:
+                    duration += gpc["EMB_W_TIME"]
     elif wtype == WorkloadType.W:
         duration = gpc["W_TIME"] * layer_num
         if layer_wise:
@@ -46,6 +52,8 @@ def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:Workloa
         else:
             if sid == gpc["STAGE_NUM"] - 1:
                 duration += gpc["HEAD_W_TIME"]
+            elif sid == 0:
+                duration += gpc["EMB_W_TIME"]
     else:
         raise ValueError(f"Wrong workload type: {wtype}.")
     
@@ -63,9 +71,12 @@ class Stage:
         self.nmb: int = microbatch_num
         self.para_num: int = para_num / gpc["G"]
         self.model_memory_usage = self.para_num * gpc["FP16"] / gpc["TP_SIZE"]
-        self.grad_memory_usage = self.para_num * gpc["FP16"] / gpc["TP_SIZE"]
+        self.grad_memory_usage = 0
+        self.emb_memory_gradient_usage = 0
         self.opt_memory_usage = self.para_num * 3 * gpc["FP32"] / gpc["TP_SIZE"] / gpc["ZERO_SIZE"]
+        self.memory_generated_by_mb : int = [0] * self.nmb
         self.memory_usage: int = self.model_memory_usage + self.grad_memory_usage + self.opt_memory_usage
+        self.peak_memory_usage: int = self.model_memory_usage + self.grad_memory_usage + self.opt_memory_usage
         self.workloads: dict[int, dict[WorkloadType, Workload]] = {}  
         self.stage_type: StageType = stage_type
         self.recomp = recomp
@@ -154,7 +165,138 @@ class Stage:
                     )
                 ) 
 
-    def update_memory_usage(self, workload:Workload):
+    def update_memory_usage(self, workload:Workload, sim = False):
+        begin_memory = self.memory_usage
+        begin_peak_memory = self.peak_memory_usage
+        begin_emb_memory_gradient_usage = self.emb_memory_gradient_usage
+        begin_grad_memory_usage = self.grad_memory_usage
+        
+        layers_per_stage = self.layer_num
+
+        peak_memory = self.memory_usage
+        if gpc["SPLIT_BACKPROP"]:
+            if workload.wtype == WorkloadType.F:
+                self.memory_usage += (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
+                if self.sid == 0: # Including emb layer
+                    self.memory_usage += Activation.EMB
+                peak_memory = self.memory_usage
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage += Activation.HEAD
+                    self.memory_usage += Activation.LOSS / 2
+                    peak_memory = self.memory_usage + Activation.LOSS / 2 # Need copy a FP32 logits
+
+            elif workload.wtype == WorkloadType.B:
+                if self.recomp:
+                    self.memory_usage += (Activation.FULL - Activation.INPUT) * layers_per_stage
+                self.memory_usage += Gradient.INPUT * layers_per_stage # Input gradient of layers
+                peak_memory = self.memory_usage
+                if self.sid == 0 and self.emb_memory_gradient_usage == 0: # Including emb layer
+                    self.emb_memory_gradient_usage = Gradient.HEAD_INPUT
+                    self.memory_usage += self.emb_memory_gradient_usage
+                    peak_memory = max(peak_memory, self.memory_usage)
+                if self.sid == 0:
+                    self.memory_usage -= Activation.EMB
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage -= Activation.HEAD * ACT_HEAD_B
+                    self.memory_usage -= Activation.LOSS / 2
+                    self.memory_usage += Activation.LOSS / 4 # Input gradient of head
+                self.memory_usage -= Activation.FULL * ACT_B_RATIO * layers_per_stage
+                if self.sid == 0:
+                    peak_memory = max(self.memory_usage + self.emb_memory_gradient_usage, peak_memory)
+
+            elif workload.wtype == WorkloadType.W:
+                if self.grad_memory_usage == 0:
+                    self.grad_memory_usage = self.para_num * gpc["FP16"] / gpc["TP_SIZE"] # Para gradients
+                    if self.sid == 0: # Gradient is already stored
+                        assert self.emb_memory_gradient_usage > 0, "W should after B."
+                        self.grad_memory_usage -= self.emb_memory_gradient_usage
+                    self.memory_usage += self.grad_memory_usage # Input gradient of layers
+                    peak_memory = self.memory_usage
+                else:
+                    if self.sid != 0: # emb will be stored to the end
+                        peak_memory += self.grad_memory_usage
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage -= Activation.LOSS / 4 # Input gradient of head
+                self.memory_usage -= (Activation.FULL * ACT_W_RATIO) * layers_per_stage
+                self.memory_usage -= Gradient.INPUT * layers_per_stage
+        else:
+            if workload.wtype == WorkloadType.F:
+                self.memory_usage += (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage += Activation.LOSS
+                peak_memory = self.memory_usage
+            elif workload.wtype == WorkloadType.B:
+                if self.recomp:
+                    self.memory_usage += (Activation.FULL - Activation.INPUT) * layers_per_stage
+                self.memory_usage -= Activation.FULL * layers_per_stage
+                if self.grad_memory_usage == 0:
+                    self.grad_memory_usage = self.para_num * gpc["FP16"] / gpc["TP_SIZE"] # Para gradients
+                    self.memory_usage += self.grad_memory_usage
+                    peak_memory = self.memory_usage
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage -= Activation.HEAD * ACT_HEAD_W
+                    self.memory_usage -= Activation.LOSS
+        self.peak_memory_usage = peak_memory
+        if sim:
+            peak_memory_delta = self.peak_memory_usage - begin_memory
+            memory_delta = self.memory_usage - begin_memory
+            self.memory_usage = begin_memory
+            self.peak_memory_usage = begin_peak_memory
+            self.emb_memory_gradient_usage = begin_emb_memory_gradient_usage
+            self.grad_memory_usage = begin_grad_memory_usage
+            return peak_memory_delta, memory_delta
+
+    def update_memory_usage_old2(self, workload:Workload):
+        layers_per_stage = self.layer_num
+        peak_memory = self.memory_usage
+        if gpc["SPLIT_BACKPROP"]:
+            if workload.wtype == WorkloadType.F:
+                self.memory_usage += (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
+                peak_memory = self.memory_usage
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage += Activation.LOSS / 2
+                    peak_memory = self.memory_usage + Activation.LOSS / 2
+            elif workload.wtype == WorkloadType.B:
+                if self.recomp:
+                    self.memory_usage += (Activation.FULL - Activation.INPUT) * layers_per_stage
+                self.memory_usage += Gradient.INPUT * layers_per_stage # Input gradient of layers
+                peak_memory = self.memory_usage
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage -= Activation.LOSS
+                    self.memory_usage += Activation.LOSS / 4 # Input gradient of head
+                if self.sid == 0 and self.emb_memory_gradient_usage == 0: # Including emb layer
+                    self.emb_memory_gradient_usage = Activation.LOSS / 2
+                    self.memory_usage += self.emb_memory_gradient_usage
+                    peak_memory = max(peak_memory, self.memory_usage)
+                self.memory_usage -= Activation.FULL * ACT_B_RATIO * layers_per_stage
+            elif workload.wtype == WorkloadType.W:
+                if self.grad_memory_usage == 0:
+                    self.grad_memory_usage = self.para_num * gpc["FP16"] / gpc["TP_SIZE"] # Para gradients
+                    self.memory_usage += self.grad_memory_usage # Input gradient of layers
+                    peak_memory = self.memory_usage
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage -= Activation.LOSS / 4 # Input gradient of head
+                self.memory_usage -= (Activation.FULL * ACT_W_RATIO) * layers_per_stage
+                self.memory_usage -= Gradient.INPUT * layers_per_stage
+        else:
+            if workload.wtype == WorkloadType.F:
+                self.memory_usage += (Activation.FULL * (1 - self.recomp) + Activation.INPUT * self.recomp) * layers_per_stage
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage += Activation.LOSS
+                peak_memory = self.memory_usage
+            elif workload.wtype == WorkloadType.B:
+                if self.recomp:
+                    self.memory_usage += (Activation.FULL - Activation.INPUT) * layers_per_stage
+                self.memory_usage -= Activation.FULL * layers_per_stage
+                if self.grad_memory_usage == 0:
+                    self.grad_memory_usage = self.para_num * gpc["FP16"] / gpc["TP_SIZE"] # Para gradients
+                    self.memory_usage += self.grad_memory_usage
+                    peak_memory = self.memory_usage
+                if self.sid == gpc["STAGE_NUM"] - 1:
+                    self.memory_usage -= Activation.LOSS
+        self.peak_memory_usage = peak_memory
+
+    def update_memory_usage_old1(self, workload:Workload):
         if self.layerwise:
             if self.stage_type == StageType.EMBD:
                 return

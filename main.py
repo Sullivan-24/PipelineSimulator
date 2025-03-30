@@ -14,7 +14,7 @@ from simulator.abstract.mutils import *
 
 def set_workload_length(config):
     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
-        config["f_time"] = [EMB_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
+        config["f_time"] = [EMB_F_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
         config["b_time"] = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
         config["w_time"] = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
         config["layer_num"] = config["layer_num"] + 3
@@ -24,7 +24,7 @@ def set_workload_length(config):
         config["w_time"] = [W_TIME for _ in range(LAYER_NUM)]
         
         fwd_time = config["f_time"]
-        fwd_time[0] += EMB_TIME
+        fwd_time[0] += EMB_F_TIME
         fwd_time[-1] += CE_F_TIME + HEAD_F_TIME
         config["f_time"] = fwd_time
 
@@ -37,7 +37,7 @@ def set_workload_length(config):
         config["w_time"] = gwd_time
 
 def check_standard_zbv_conditions():
-    if EMB_TIME!=0:
+    if EMB_F_TIME!=0:
         print("Required to ignore EMB layers.")
         return False
     if HEAD_B_TIME!=0 or HEAD_F_TIME!=0 or HEAD_W_TIME!=0:

@@ -80,7 +80,7 @@ class LayerwiseSimulator:
             # self.pipeline_scheduler.draw()
         self.model_result = None
         additional_time = HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME
-        print("Theoretical minimal time:{}.".format(EMB_TIME + COMM_TIME + MICRO_BATCH_NUM * (len(self._devices[0]) - 1) * (F_TIME + B_TIME + W_TIME) + MICRO_BATCH_NUM * additional_time))
+        print("Theoretical minimal time:{}.".format(EMB_F_TIME + COMM_TIME + MICRO_BATCH_NUM * (len(self._devices[0]) - 1) * (F_TIME + B_TIME + W_TIME) + MICRO_BATCH_NUM * additional_time))
 
     def result2file(self, filepath=None):
         if filepath is None:
@@ -90,7 +90,7 @@ class LayerwiseSimulator:
 
     def estimate_time_cost(self):
         fbw_time = (MICRO_BATCH_NUM + DEVICE_NUM) * (F_TIME + B_TIME + W_TIME)
-        emb_time = EMB_TIME
+        emb_time = EMB_F_TIME
         head_time = MICRO_BATCH_NUM * (HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME)
         ce_time = MICRO_BATCH_NUM * (CE_F_TIME + CE_B_TIME + CE_W_TIME)
         comm_time = COMM_TIME

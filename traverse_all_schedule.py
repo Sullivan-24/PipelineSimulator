@@ -3,7 +3,7 @@ from simulator.abstract.Pipeline import *
 from simulator.abstract.mutils import *
 
 def check_standard_zbv_conditions():
-    if gpc["EMB_TIME"]!=0:
+    if gpc["EMB_F_TIME"]!=0:
         print("Required to ignore EMB layers.")
         return False
     if gpc["HEAD_B_TIME"]!=0 or gpc["HEAD_F_TIME"]!=0 or gpc["HEAD_W_TIME"]!=0:
@@ -58,7 +58,7 @@ def set_env_for_zbv(step):
     if step == 1:
         gpc["RUN_SCHEDULE"] = False
         gpc["RUN_STANDARD_ZBV"] = True
-        gpc["EMB_TIME"] = 0
+        gpc["EMB_F_TIME"] = 0
         gpc["HEAD_F_TIME"] = 0
         gpc["HEAD_B_TIME"] = 0
         gpc["HEAD_W_TIME"] = 0
@@ -68,7 +68,7 @@ def set_env_for_zbv(step):
     elif step == 2:
         gpc["RUN_SCHEDULE"] = True
         gpc["RUN_STANDARD_ZBV"] = False
-        gpc["EMB_TIME"] = 0
+        gpc["EMB_F_TIME"] = 0
         gpc["HEAD_F_TIME"] = 2
         gpc["HEAD_B_TIME"] = 2
         gpc["HEAD_W_TIME"] = 2
@@ -157,4 +157,6 @@ def main():
     save_to_file(f"traverse_res_{Schedule.ZBV.name}.txt", content ,'w')
 if __name__ == "__main__":
     # main()
+    # print(Activation.FULL * ACT_B_RATIO)
+    # print(Gradient.INPUT)
     run_schedule(draw=True)

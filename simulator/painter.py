@@ -88,11 +88,12 @@ class SchedulingPainter:
             ),
         )
 
-        label_canvas.create_text(
-            canvas_width - self._pp_align - 120, y_label, text="BlockCoords:"
+        coords_label_1 = label_canvas.create_text(
+            canvas_width * 0.25, y_label, text="BlockCoords:(start,end)"
         )
+
         coords_label = label_canvas.create_text(
-            canvas_width - self._pp_align - 40, y_label, text="(start,end)"
+            canvas_width - self._pp_align - 120, y_label, text="BlockCoords:(start,end)"
         )
         label_canvas.pack()
 
@@ -149,19 +150,6 @@ class SchedulingPainter:
                         (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
                     )
                     self._item2block[text] = block
-            # text = main_canvas.create_text(
-            #     (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
-            # )
-            # if pid + 1 >= self._num_microbatches:
-            #     bold_font = font.Font(size= pid // (self._pp_size // self._device_size), weight=tk.font.BOLD)
-            #     text = main_canvas.create_text(
-            #         (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
-            #     )
-            # else:
-            #     text = main_canvas.create_text(
-            #         (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid}"
-            #     )
-            # print(f"block {tag}: {x0}, {y0}, {x1}, {y1}", flush=True)
 
             self._highlight_state[block] = False
             self._item2color[block] = color
@@ -188,7 +176,10 @@ class SchedulingPainter:
             current_start = int(item_coords[0] - self._pp_align) // self._pixel_base
             current_end = int(item_coords[2] - self._pp_align) // self._pixel_base
             label_canvas.itemconfig(
-                coords_label, text=f"({current_start},{current_end})"
+                coords_label, text=f"BlockCoords:({current_start},{current_end})"
+            )
+            label_canvas.itemconfig(
+                coords_label_1, text=f"BlockCoords:({current_start},{current_end})"
             )
 
             tags = [

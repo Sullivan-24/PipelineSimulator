@@ -263,9 +263,9 @@ class PipelineScheduler:
                         self.devices[self.device_num - 1 - pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
                 for pid in range(self.stage_num - offset, self.stage_num):
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
+
         # Launch MemoryMonitors
         for device in self.devices:
-            device.init_required_mem_for_each_microbatch()
             device.init_memory_monitor()
 
         self.placement = []
@@ -660,24 +660,25 @@ class PipelineScheduler:
         return self.last_workload.end_time
 
     def show_mem_usage(self, device_id=(0,), show_all=False):
-        max_mem_usages = [0 for _ in range(len(self.devices))]
+        peak_mem_usages = [0 for _ in range(len(self.devices))]
         for device in self.devices:
             aim_file_path = "schedule_results/memory/device{}.txt".format(device.did)
             save_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did), mode='w')
             last_mem_record = 0
             for t, mem_record in device.mem_usage_record.items():
+                peak_mem = device.peak_mem_usage_record[t]
                 oom_flag = "" if mem_record <= device.max_memory else "OOM"
-                save_to_file(aim_file_path, "Time {}, mem = {}, {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2), oom_flag), 'a')
+                save_to_file(aim_file_path, "Time {}, mem = {}, {}, peak = {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2), round(peak_mem, 2), oom_flag), 'a')
                 last_mem_record = mem_record
-                max_mem_usages[device.did] = round(max(max_mem_usages[device.did], mem_record), 3)
+                peak_mem_usages[device.did] = round(max(peak_mem_usages[device.did], peak_mem), 3)
         
         oom = False
         for did, device in enumerate(self.devices):
-            if device.max_memory < max_mem_usages[did]:
-                print(f"Out of Memory in Device {device.did}. ({max_mem_usages[did]} > {device.max_memory})")
+            if device.max_memory < peak_mem_usages[did]:
+                print(f"Out of Memory in Device {device.did}. ({peak_mem_usages[did]} > {device.max_memory})")
                 oom = True
 
-        print(max_mem_usages)
+        print(peak_mem_usages)
         return not oom
     
     def get_workloadload_duration(self):
@@ -707,14 +708,14 @@ class PipelineScheduler:
             workload_len = gpc["F_TIME"] * layers
             if self.layer_wise:
                 if lid == 0:
-                    workload_len = gpc["EMB_TIME"]
+                    workload_len = gpc["EMB_F_TIME"]
                 elif lid == self.layer_num - 1:
                     workload_len = gpc["CE_F_TIME"]
                 elif lid == self.layer_num - 2:
                     workload_len = gpc["HEAD_F_TIME"]
             else:
                 if lid == 0:
-                    workload_len += gpc["EMB_TIME"]
+                    workload_len += gpc["EMB_F_TIME"]
                 elif lid == self.stage_num - 1:
                     workload_len += gpc["CE_F_TIME"] + gpc["HEAD_F_TIME"]
         elif workload_type == "b":
