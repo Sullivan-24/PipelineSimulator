@@ -246,6 +246,14 @@ class PipelineScheduler:
             if self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED):
                 for pid in range(self.stage_num):
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
+            elif gpc["STAGE_PLACEMENT"] == Placement.SEARCHED:
+                print("Use Searched placement")
+                for pid in range(self.device_num):
+                    self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
+                for pid in range(self.device_num, self.device_num * 2):
+                    self.devices[self.device_num - (pid % self.device_num) - 1].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
+                for pid in range(self.device_num * 2, self.stage_num):
+                    self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
             elif gpc["STAGE_PLACEMENT"] == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
                 offset = self.device_num if gpc["REVERSE_LAST_STAGES"] else 0

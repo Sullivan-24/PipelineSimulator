@@ -185,8 +185,6 @@ class Device:
         self.did = device_id
         self.warmup_end_flag = False
         self.begin_warmup_num = (gpc["CHUNK_NUM"] - 1) * gpc["PP_SIZE"] + 1 + gpc["PP_SIZE"] - 1 - self.did
-        if not gpc["OVERLAP_AWARE_SCHEDULE"]:
-            self.begin_warmup_num = (gpc["CHUNK_NUM"] - 1) * gpc["PP_SIZE"] + 1
         self.steady_start_flag = False
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
@@ -295,9 +293,14 @@ class Device:
         else:
             workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W]
 
-
-        if self.exe_num_f >= (gpc["CHUNK_NUM"] - 2) * (gpc["MICRO_BATCH_NUM"]):
+        if self.exe_num_f >= (gpc["CHUNK_NUM"]) * (gpc["MICRO_BATCH_NUM"] - 0):
             workload_type_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
+
+        # if self.exe_num_f >= (gpc["CHUNK_NUM"]) * (gpc["MICRO_BATCH_NUM"] - 16):
+        #     if self.last_workload_type != WorkloadType.F:
+        #         workload_type_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
+        #     else:
+        #         workload_type_order = [WorkloadType.W, WorkloadType.B, WorkloadType.F]
 
         # raise priority of head and ce
         if gpc["LAYERWISE"]:
@@ -319,7 +322,8 @@ class Device:
             for mid in range(self.nmb):
                 for workload_type in [WorkloadType.W, WorkloadType.B]:
                     for stage_id in self.stages:
-                        if stage_id == gpc["STAGE_NUM"] - 1:
+                        # if stage_id == gpc["STAGE_NUM"] - 1:
+                        if stage_id == gpc["STAGE_NUM"] - 1 or stage_id == 0:
                             workloads = self.stages[stage_id].workloads
                             if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable(time=time):
                                 head_ce_workloads.append(workloads[mid][workload_type])                          
@@ -328,7 +332,7 @@ class Device:
 
         delayed_workload = []
         canceled_workload = []
-        for workload_type in workload_type_order:    
+        for workload_type in workload_type_order:
             for mid in range(self.nmb):
                 for stage_id in self.stages:
                     if stage_id > gpc["LAYER_NUM"] and gpc["LAYERWISE"]:
@@ -360,11 +364,11 @@ class Device:
             pivot_workload = executed_workloads[-1]
             if pivot_workload.mid == workload.mid: # Only micro-batches with same the mid have dependency
                 if pivot_workload.sid == workload.sid - 1 and pivot_workload.wtype == workload.wtype == WorkloadType.F:
-                    if pivot_workload.end_time < self.workload_execute_record[self.did][-1].start_time:
+                    if pivot_workload.end_time <= self.workload_execute_record[self.did][-1].start_time:
                         continue
                     return True
                 if pivot_workload.sid == workload.sid + 1 and pivot_workload.wtype == workload.wtype == WorkloadType.B:
-                    if pivot_workload.end_time < self.workload_execute_record[self.did][-1].start_time:
+                    if pivot_workload.end_time <= self.workload_execute_record[self.did][-1].start_time:
                         continue
                     return True
         return False
@@ -529,7 +533,7 @@ class Device:
                             if not self.warmup_end_flag:
                                 continue
                             else:
-                                if not self.steady_start_flag and workload.wtype != WorkloadType.F and gpc["OVERLAP_AWARE_SCHEDULE"]:
+                                if not self.steady_start_flag and workload.wtype != WorkloadType.F:
                                     continue
                                 else:
                                     if not self.is_bottleneck_device():
@@ -540,7 +544,7 @@ class Device:
                     # if not self.memory_monitor.is_executable_workload(workload=workload, current_mem=self.current_mem_usage):
                     #     continue
                     if self.steady_start_flag:
-                        if not self.memory_monitor.is_safe(workload=workload, current_mem=self.current_mem_usage):
+                        if not self.memory_monitor.is_safe(workload=workload, current_mem=self.current_mem_usage+MEMORY_REDUCATION):
                             continue
                     
                     proc_workload = self.stages[sid].execute_workload(time, mid=mid,workload_type=workload_type)
@@ -639,7 +643,7 @@ class Device:
 
                 for mid in range(gpc["MICRO_BATCH_NUM"]):
                     for sid in self.stages:
-                        required_memory = get_required_memory(
+                        required_memory = get_required_memory_old(
                             stage_id=sid, 
                             layer_num=gpc["LAYER_NUM"]//gpc["STAGE_NUM"],
                             workload_type=workload_type,

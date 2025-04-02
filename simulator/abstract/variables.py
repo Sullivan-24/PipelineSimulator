@@ -15,6 +15,7 @@ class Placement(Enum):
     NAIVE = 4
     RECURRENT = 5
     CROSS = 6
+    SEARCHED = 7
 
 class Schedule(Enum):
     GREEDY_v1 = 1

@@ -90,37 +90,44 @@ def sim_acc():
 
         # 组织可比较的配置
         configs_to_compare = {
-            "56B Llama": [
+            "14B LLaMA": [
                 # ("pp4 tp4 dp2 mb16", "pp4 tp4 dp2 mb16"),
                 # ("pp4 tp8 dp1 mb16", "pp4 tp8 dp1 mb16"),
-                ("pp8 tp4 dp1 mb32", "pp8 tp4 dp1 mb32"),
+                # ("pp4 tp2 dp1 mb16", "pp4 tp2 dp1 mb16"),
+                ("pp8 tp1 dp1 mb32", "pp8 tp1 dp1 mb32"),
             ],
-            "70B Llama": [
-                # ("pp4 tp4 dp4 mb16", "pp4 tp4 dp4 mb16"),
-                # ("pp4 tp8 dp2 mb16", "pp4 tp8 dp2 mb16"),
-                ("pp8 tp4 dp2 mb32", "pp8 tp4 dp2 mb32"),
-            ]
+            # "42B LLaMA": [
+            #     ("pp4 tp4 dp2 mb16", "pp4 tp4 dp2 mb16"),
+            #     ("pp8 tp4 dp1 mb32", "pp8 tp4 dp1 mb32"),
+            # ],
+            # "70B LLaMA": [
+            #     ("pp4 tp8 dp1 mb16", "pp4 tp8 dp1 mb16"),
+            #     # ("pp4 tp8 dp2 mb16", "pp4 tp8 dp2 mb16"),
+            #     ("pp8 tp4 dp1 mb32", "pp8 tp4 dp1 mb32"),
+            # ],
         }
 
         # 创建画布
-        fig, axs = plt.subplots(2, 1, figsize=(8, 3), sharey=True)
+        fig, axs = plt.subplots(1, 1, figsize=(9, 3), sharey=True)
         fig.subplots_adjust(wspace=0.3, hspace=0.4)
-        order = ["UnifiedPP", "Interleaved-L", "Interleaved", "ZBV", "ZBH", "1F1B"]
+        order = ["UnifiedPP", "Interleaved", "ZBV", "ZBH", "1F1B"]
         # 为每个配置绘制图表
         for model_idx, (model, configs) in enumerate(configs_to_compare.items()):
             for cfg_idx, (data_cfg, sim_cfg) in enumerate(configs):
                 ax = axs[model_idx]
                 
                 # 获取原始数据
-                data_homo = data[model][data_cfg]["homo"]
-                sim_homo = sim[model][sim_cfg]["homo"]
-                    
+                data_homo = data_h800[model][data_cfg]["homo"]
+                sim_homo = sim_h800[model][sim_cfg]["homo"]
+                sim_homo = {k: 1/v for k, v in sim_homo.items()}
+
                 # 计算归一化值
-                data_base = data_homo["UnifiedPP"]
-                sim_base = sim_homo["UnifiedPP"]
+                data_base = data_homo["1F1B"]
+                sim_base = sim_homo["1F1B"]
+                
                 
                 data_norm = {k: v/data_base for k, v in data_homo.items()}
-                sim_norm = {k: sim_base/v for k, v in sim_homo.items()}
+                sim_norm = {k: v/sim_base for k, v in sim_homo.items()}
                 
                 # 按顺序准备数据
                 x = np.arange(len(order))
@@ -132,20 +139,22 @@ def sim_acc():
                 bars = ax.bar(x, data_values, label='Measured', color=color)
 
                 for i, bar in enumerate(bars):
-                        if i == 0: continue
-                        height = bar.get_height()
-                        diff = round(data_values[i] - sim_values[i], 3)
-                        diff_text = f"+{diff}" if diff > 0 else f"-{abs(diff)}"
-                        ax.text(
-                            bar.get_x() + bar.get_width() / 2,
-                            height * 1.00,
-                            diff_text,
-                            ha='center',
-                            va='bottom',
-                            fontsize=10
-                        )
+                    height = bar.get_height()
+                    diff_ratio = (data_values[i] - sim_values[i])
+                    if data_values[i] != 0:
+                        diff_ratio /= data_values[i]
+                    diff = diff_ratio
+                    diff_text = f"+{diff*100:.2f}%" if diff > 0 else f"-{abs(diff)*100:.2f}%"
+                    ax.text(
+                        bar.get_x() + bar.get_width() / 2,
+                        height * 1.00,
+                        diff_text,
+                        ha='center',
+                        va='bottom',
+                        fontsize=10
+                    )
 
-                ax.plot(x, sim_values, '--', lw=1, label='Simulated', color='#d7191c')
+                ax.plot(x, sim_values, '--', lw=1, marker='o', markersize=3, label='Simulated', color='#d7191c')
                 
                 # 装饰图表
                 ax.set_xticks(x)
@@ -154,7 +163,7 @@ def sim_acc():
                 ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
                 # ax.set_xticklabels([labels[o] for o in order], rotation=45, ha='right')
                 ax.grid(True, alpha=0.3)
-                ax.set_ylim(0.725, 1.075)
+                ax.set_ylim(0.75, 1.25)
                 
                 if model_idx == 1 and cfg_idx == 2:
                     ax.legend(ncol=2, loc='lower right')
@@ -162,19 +171,19 @@ def sim_acc():
                 from matplotlib.lines import Line2D  # 导入 Line2D
 
                 # 原始矩形图例
-                legend_labels = [plt.Rectangle((0,0),1,1, color=colors[method]) for method in labels]
+                legend_labels = [plt.Rectangle((0,0),1,1, color=colors[method]) for method in order]
 
                 # 创建红色折线图例句柄（自定义线型/颜色/宽度）
                 red_line = Line2D([0], [0], color='red', lw=1, linestyle='--')  # 实线样式
                 legend_labels = [red_line] + legend_labels
                 # 合并标签（原始标签 + 新标签）
-                all_labels =  ["Simulator"] + list(labels.keys()) # 替换成你的实际名称
+                all_labels =  ["Simulator"] + order # 替换成你的实际名称
 
                 fig.legend(
                     legend_labels,
                     all_labels,  # 使用合并后的标签
                     loc="upper center",
-                    bbox_to_anchor=(0.5, 1.0275),
+                    bbox_to_anchor=(0.5, 1.03),
                     ncol=7,
                     frameon=False,
                     fontsize=9
