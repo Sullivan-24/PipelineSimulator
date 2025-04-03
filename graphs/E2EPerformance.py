@@ -24,7 +24,7 @@ def drawhomo2row3col():
             configs = model_configs[model]
             for col_idx, config in enumerate(configs):
                 ax = axes[row_idx, col_idx]
-                config_data = data[model][config]["homo"]
+                config_data = comp_data[model][config]["homo"]
                 methods = list(config_data.keys())
                 values = list(config_data.values())
                 colors_list = [colors[method] for method in methods]
@@ -99,7 +99,7 @@ def drawhomo1row6col():
         # 遍历6个配置绘制子图
         for col_idx, (model, config) in enumerate(all_configs):
             ax = axes[col_idx]
-            config_data = data[model][config]["homo"]
+            config_data = comp_data[model][config]["homo"]
             methods = list(config_data.keys())
             values = list(config_data.values())
             colors_list = [colors[method] for method in methods]
@@ -175,7 +175,7 @@ def drawheter1row6col():
         # 遍历6个配置绘制子图
         for col_idx, (model, config) in enumerate(all_configs):
             ax = axes[col_idx]
-            config_data = data[model][config]["heter"]
+            config_data = comp_data[model][config]["heter"]
             methods = list(config_data.keys())
             values = list(config_data.values())
             colors_list = [colors[method] for method in methods]

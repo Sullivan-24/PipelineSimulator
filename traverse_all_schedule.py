@@ -1,4 +1,5 @@
 import os
+import time
 from simulator.abstract.Pipeline import *
 from simulator.abstract.mutils import *
 
@@ -156,7 +157,8 @@ def main():
         content += str(r)+"\n"
     save_to_file(f"traverse_res_{Schedule.ZBV.name}.txt", content ,'w')
 if __name__ == "__main__":
-    # main()
-    # print(Activation.FULL * ACT_B_RATIO)
-    # print(Gradient.INPUT)
+    print(Gradient.INPUT * 4)
+    # start_time = time.time()
     run_schedule(draw=True)
+    # end_time = time.time()
+    # print(f"Schedule generation time:{end_time-start_time}")
