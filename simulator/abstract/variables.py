@@ -73,6 +73,4 @@ class WorkloadConstraint:
         return hash((self.mid, self.sid, self.workload_type))
     
     def __repr__(self):
-        return (f"{self.__class__.__name__}(device_id={self.did}, "
-            f"microbatch_id={self.mid}, stage_id={self.sid}, "
-            f"workload_type={self.workload_type})")
+        return (f"did={self.did}, mid={self.mid}, sid={self.sid}, wtype={self.workload_type.name})")
