@@ -113,4 +113,4 @@ class Workload:
         return (f"did={self.did}, mid={self.mid}, sid={self.sid}, wtype={self.wtype.name}, "
             f"duration={self.duration}, start_time={self.start_time}, end_time={self.end_time}, state={self.state}, "
             f"ready_time={self.ready_time}, total_stages={self.total_stages}, "
-            f"constraints={self.constraints}")
+            f"constraints={self.constraints}\n")

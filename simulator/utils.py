@@ -16,6 +16,12 @@ from .config import SAVE_RES_TO_FILE
 
 def parse_microbatch_key(key: str) -> Tuple[bool, int, int]:
     "parse microbatch key"
+    k, mid, pid, did = key.split("_")
+
+    return k, int(pid), int(mid), int(did)
+
+def parse_microbatch_key_old(key: str) -> Tuple[bool, int, int]:
+    "parse microbatch key"
     k, mid, pid = key.split("_")
 
     return k, int(pid), int(mid)

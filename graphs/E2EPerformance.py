@@ -307,7 +307,8 @@ def drawhomo1row6col():
     plt.savefig("/Users/hanayukino/e2e performance h800.pdf", format='pdf', dpi=200, bbox_inches="tight")
     plt.show()
 
-def drawhomo2row5col():
+def drawhomo2row5col(arch="homo"):
+    text_size = 9
     def sinplot():
         # 设置全局字体和样式
         plt.rcParams.update({
@@ -315,11 +316,11 @@ def drawhomo2row5col():
             'axes.titlesize': 8,
             'axes.labelsize': 7,
             'xtick.labelsize': 6,
-            'ytick.labelsize': 6
+            'ytick.labelsize': 7.5
         })
 
         # 创建2行5列的子图布局
-        fig, axes = plt.subplots(nrows=2, ncols=5, figsize=(10, 4))  # 调整画布尺寸
+        fig, axes = plt.subplots(nrows=2, ncols=5, figsize=(10, 3))  # 调整画布尺寸
         plt.subplots_adjust(wspace=0.3, hspace=0.4)  # 同时调整水平和垂直间距
 
         # 定义所有配置（共10个）
@@ -337,113 +338,81 @@ def drawhomo2row5col():
         ]
 
         bar_width = 0.6  # 柱宽
-        temp_labels = list(labels.keys())
-        temp_labels = temp_labels[0:1]+temp_labels[2:]
+        temp_labels = list(reversed(list(labels.keys())))
+        max_statistics = [0,0,0,0,0]
         statistics = [0,0,0,0,0,0]
         counts = [0,0,0,0,0,0]
         for i, (model, config) in enumerate(all_configs):
             row = i // 5  # 计算行索引
             col = i % 5   # 计算列索引
             ax = axes[row, col]
-            config_data = data_h800[model][config]["homo"]
-            methods = list(config_data.keys())
-            methods = methods[0:1]+methods[2:]
-            values = list(config_data.values())
-            values = values[0:1]+values[2:]
+            config_data = data_h800[model][config][arch]
+            methods = list(reversed(list(config_data.keys())))
+            values = list(reversed(list(config_data.values())))
+            print(values)
+            if arch == "heter":
+                values = [1/v if v else v for v in values]
+            speedups = [round(v/values[0],2) for v in values]
+            print(speedups)
             colors_list = [colors[method] for method in methods]
-
+            hatch_list = [hatches[method] for method in methods]
             # 绘制柱状图
             init_values = values
             values = [v if v!="OOM" else 0 for v in values]
-            bars = ax.bar(methods, values, bar_width, color=colors_list, edgecolor='grey')
+            bars = ax.bar(methods, values, bar_width, hatch=hatch_list, color=colors_list, edgecolor='black', label=methods)
             
-            standard = values[-1]
-            upp = values[0]
+            standard = values[0]
+            upp = values[-1]
             min_v = max(values)
             max_v = max(values)
             for i, v in enumerate(values):
                 if v == 0: continue
                 min_v = min(v, min_v)
                 statistics[i] += upp / v
+                max_statistics[i] = max(max_statistics[i] , upp / v)
                 counts[i] += 1
+            min_v = values[0]
 
-            bottom_ratio = 0.9
+            bottom_ratio = 0.98
             for bar in bars:
                 height = bar.get_height()
                 ax.text(
                     bar.get_x() + bar.get_width() / 2,
-                    height * 1.0 if height !=0 else min_v*bottom_ratio,
-                    f"x{height/standard:.2f}" if height != 0 else "OOM",
+                    height * 1.0 if height >=min_v else min_v*bottom_ratio,
+                    f"{height/standard:.2f}X" if height != 0 else "OOM",
                     ha='center',
                     va='bottom',
-                    fontsize=7  # 缩小字体
+                    rotation=0,
+                    fontsize=text_size  # 缩小字体
                 )
-
-            # if not ((row == 1 and col == 2) or (row == 0 and col == 0) or (row == 0 and col == 2) or (row == 0 and col == 5)):
-            #     for bar in bars:
-            #         height = bar.get_height()
-            #         ax.text(
-            #             bar.get_x() + bar.get_width() / 2,
-            #             height * 1.0 if height !=0 else min_v*0.98,
-            #             f"{max_v/height:.3f}" if height != 0 else "OOM",
-            #             ha='center',
-            #             va='bottom',
-            #             fontsize=7  # 缩小字体
-            #         )
-
-            # 设置子图标签
-            ax.set_xlabel(f"{model}\n{config}", fontsize=10, labelpad=5)  # 换行显示模型和配置
+            ax.set_xlabel(f"{model[:3]} {config[:-5].upper()}", fontsize=10, labelpad=5)  # 换行显示模型和配置
             if col == 0:
-                ax.set_ylabel("Tokens/GPU/second", fontsize=11)
-            
-            # if row == 1 and col == 2:
-            #     for bar in bars:
-            #         height = bar.get_height()
-            #         ax.text(
-            #             bar.get_x() + bar.get_width() / 2,
-            #             height * 1.0,
-            #             f"{max_v/height:.3f}" if height != 0 else "OOM",
-            #             ha='center',
-            #             va='bottom',
-            #             fontsize=7  # 缩小字体
-            #         )
-            #     ax.set_ylim(0, max(values) * 1.0)  # 统一Y轴范围
-            # elif (row == 0 and col == 0) or (row == 0 and col == 2) or (row == 0 and col == 5):
-            #     for bar in bars:
-            #         height = bar.get_height()
-            #         ax.text(
-            #             bar.get_x() + bar.get_width() / 2,
-            #             height * 1.0,
-            #             f"{max_v/height:.3f}" if height != 0 else "OOM",
-            #             ha='center',
-            #             va='bottom',
-            #             fontsize=7  # 缩小字体
-            #         )
-            #     ax.set_ylim(0, max(values) * 1.0)  # 统一Y轴范围
-            # else:
-            ax.set_ylim(min_v*bottom_ratio, max(values) * 1.02)  # 统一Y轴范围
+                ax.set_ylabel("TGS", fontsize=11)
+            ax.set_ylim(min_v*bottom_ratio, max(values) * 1.01)  # 统一Y轴范围
             ax.grid(axis='y', linestyle='--', alpha=0.6)
+            if arch == "heter":
+                ax.tick_params(axis='y', which='both', left=False, labelleft=False)
             ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)  # 隐藏X轴刻度
 
-        # 添加全局图例（调整位置到图像下方）
-        legend_labels = [plt.Rectangle((0,0),1,1, color=colors[method]) for method in temp_labels]
+            handles, ls = ax.get_legend_handles_labels()
+
+        # legend_labels = [plt.Rectangle((0,0),1,1, hatch=hatches[method], color=colors[method], alpha=1) for method in temp_labels]
         fig.legend(
-            legend_labels,
-            temp_labels,
+            handles,
+            ls,
             loc="upper center",
-            bbox_to_anchor=(0.5, 1.0),  # 下移图例
+            bbox_to_anchor=(0.5, 1.025),  # 下移图例
             ncol=len(temp_labels),
             frameon=False,
-            fontsize=8
+            fontsize=12
         )
-        for i in range(len(statistics)):
-            if counts[i] == 0: continue
-            print(statistics[i]/counts[i], end=" ")
+        for i in range(len(max_statistics)):
+            print(round(max_statistics[i], 2), end=" ")
         print()
 
         for i in range(len(statistics)):
             if counts[i] == 0: continue
-            print(round(statistics[i]/counts[i],3), end=" ")
+            print(round(statistics[i]/counts[i],2), end=" ")
         print()
         # 调整布局
         plt.tight_layout()
@@ -452,10 +421,10 @@ def drawhomo2row5col():
     # 生成图形
     sinplot()
     sns.despine()
-    plt.savefig("/Users/hanayukino/e2e_performance_h800_2x5.pdf", 
+    plt.savefig(f"/Users/hanayukino/e2e_performance_h800_2x5_{arch}.pdf", 
               format='pdf', 
               dpi=300,
               bbox_inches="tight")
     plt.show()
 
-drawhomo2row5col()
+drawhomo2row5col(arch="homo")

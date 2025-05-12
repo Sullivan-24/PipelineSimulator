@@ -6,7 +6,6 @@ from simulator.DSASimulator import DSASimulator
 from simulator.LayerwiseSimulator import LayerwiseSimulator
 from simulator.ChimeraSimulator import ChimeraSimulator
 from simulator.GSimulator import GSimulator
-from simulator.CompCommSimulator import CompCommSimulator
 from simulator.SPSimulator import SPSimulator
 from simulator.abstract import Pipeline
 from simulator.abstract import ChimeraScheduler

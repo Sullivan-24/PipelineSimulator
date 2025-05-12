@@ -12,28 +12,31 @@ SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
 SCHEDULE_METHOD = Schedule.UnifiedPP
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+# CHUNK_NUM = 2
 # SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH1
 # SCHEDULE_METHOD = Schedule.ZBV
-# CHUNK_NUM = 2
 STAGE_PLACEMENT = Placement.INTERLEAVED
-STAGE_PLACEMENT = Placement.SEARCHED
+# STAGE_PLACEMENT = Placement.SEARCHED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
-
+if SCHEDULE_METHOD == Schedule.STANDARD_1F1B:
+    CHUNK_NUM = 1
+# 495 * 153 motivation graph size
 # --------------------- Solver config ---------------------
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
-OVERLAP_AWARE_SCHEDULE = True
 HETER_DEVICE = False
+OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = True
-TIME_LIMIT = 10000
-
+TIME_LIMIT = 20000
+HEAD_DP = False if test_upp else False
 # [1, 2, 100, None]
 OVERLAP_DEGREE = None
-MEMORY_CONSTRAIN = 0.99
+MEMORY_CONSTRAIN = 0.9
 MEMORY_REDUCATION = 0.0
+TERMINAL_FLAG = False
 
 EMB_F_TIME = 0
 HEAD_F_TIME = 2
@@ -62,7 +65,7 @@ B_TIME = 24
 W_TIME = 0
 COMM_TIME = 0
 
-SPLIT_BACKPROP = test_upp
+SPLIT_BACKPROP = True
 if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.ZBV):
     SPLIT_BACKPROP = True
     if SCHEDULE_METHOD == Schedule.ZBV:
@@ -86,12 +89,12 @@ if SPLIT_BACKPROP:
     COMM_TIME = 0
 
 LAYERWISE = False
-RECOMP = False
-AUTO_RECOMP_SEARCH = RECOMP
+RECOMP = True
+AUTO_RECOMP_SEARCH = False
 RUN_SCHEDULE = False
 RUN_STANDARD_ZBV = False
 if not RUN_SCHEDULE and RUN_STANDARD_ZBV:
-    print("WARN, overlook non-transformer layers")
+    print("Overlooking non-transformer layers")
     EMB_F_TIME = 0
     EMB_B_TIME = 0
     EMB_W_TIME = 0
@@ -186,7 +189,7 @@ class Gradient:
 PIXEL_BASE = 2
 PP_HEIGHT = 35
 PP_ALIGN = 5
-SHOW_WORKLOAD_TEXT = False
+SHOW_WORKLOAD_TEXT = True
 # --------------------- Painter Config ---------------------
 
 # --------------------- Save File Config ---------------------

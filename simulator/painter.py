@@ -59,7 +59,7 @@ class SchedulingPainter:
         data = {key: val * self._pixel_base for key, val in data.items()}
 
         max_key = max(data, key=data.get)
-        _, max_key_pid, _ = parse_microbatch_key(max_key)
+        _, max_key_pid, _, _ = parse_microbatch_key(max_key)
 
         canvas_width = data[max_key] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
         # canvas_height = (self._pp_height + self._pp_align) * self._pp_size
@@ -91,6 +91,12 @@ class SchedulingPainter:
         coords_label_1 = label_canvas.create_text(
             canvas_width * 0.25, y_label, text="BlockCoords:(start,end)"
         )
+        coords_label_2 = label_canvas.create_text(
+            canvas_width * 0.5, y_label, text="BlockCoords:(start,end)"
+        )
+        coords_label_3 = label_canvas.create_text(
+            canvas_width * 0.75, y_label, text="BlockCoords:(start,end)"
+        )
 
         coords_label = label_canvas.create_text(
             canvas_width - self._pp_align - 120, y_label, text="BlockCoords:(start,end)"
@@ -114,10 +120,10 @@ class SchedulingPainter:
         # 3. Draw execution block for each microbatch according to start and end time
         schedule_res_content = ""
         for microbatch_key, offset in data.items():
-            k, pid, mid = parse_microbatch_key(microbatch_key)
+            k, pid, mid, did = parse_microbatch_key(microbatch_key)
 
             x0 = self._pp_align + offset
-            did = self._pid2did(pid=pid) # 获取对应的device id，把每个stage画在对应的device上
+            # did = self._pid2did(pid=pid) # 获取对应的device id，把每个stage画在对应的device上
             # y0 = (self._pp_height + self._pp_align) * pid + 5
             y0 = (self._pp_height + self._pp_align) * did + 5
             #修改画图中每个block的宽度
@@ -127,7 +133,10 @@ class SchedulingPainter:
             y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
 
             # save schedule representation in painter
-            schedule_res_content += "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width)
+            if HEAD_DP:
+                schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,did,offset,offset+block_width)
+            else:
+                schedule_res_content += "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width)
 
             tag = f"p_{pid}_m_{mid}_{k}"
             color = set_color(pid,workload_type=k,layer_num=self._pp_size)
@@ -180,6 +189,12 @@ class SchedulingPainter:
             )
             label_canvas.itemconfig(
                 coords_label_1, text=f"BlockCoords:({current_start},{current_end})"
+            )
+            label_canvas.itemconfig(
+                coords_label_2, text=f"BlockCoords:({current_start},{current_end})"
+            )
+            label_canvas.itemconfig(
+                coords_label_3, text=f"BlockCoords:({current_start},{current_end})"
             )
 
             tags = [

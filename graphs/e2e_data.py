@@ -1,19 +1,39 @@
 labels = {
-    "UnifiedPP": "UnifiedPP",
-    "Interleaved-L": "Interleaved-L",
+    "OctoPipe": "OctoPipe",
     "Interleaved": "Interleaved",
     "ZBV": "ZBV",
     "ZBH": "ZBH",
-    "1F1B": "1F1B",
+    "Dapple": "Dapple",
+}
+
+hatches = {
+    "OctoPipe": "\\",
+    "Interleaved": "+",
+    "ZBV": "x",
+    "ZBH": "/",
+    "Dapple": "",
+    "Alpa": "+",
+    "Metis": "//",
+}
+
+heter_labels = {
+    "OctoPipe": "OctoPipe",
+    "Alpa": "Alpa",
+    "Metis": "Metis",
+    "Dapple": "Dapple",
 }
 
 colors = {
-    "UnifiedPP": "#F8CECC",
-    "Interleaved-L": "#DAE8FC",
+    "OctoPipe": "#F8CECC",
     "Interleaved": "#99CCFF",
-    "ZBV": "#D5E8D4",
-    "ZBH": "#FFE6CC",
-    "1F1B": "#FFF2CC",
+    "ZBV": "#FFE6CC",
+    "ZBH": "#D5E8D4",
+    "Dapple": "#FFF2CC",
+    "Dapple": "#FFF2CC",
+    # "Metis": "#E1D5E7",
+    "Metis": "#99CCFF",
+    # "Alpa": "#B0E3E6",
+    "Alpa": "#D5E8D4",
 }
 
 layer_overhead = {
@@ -44,7 +64,7 @@ layer_overhead = {
 }
 
 preprocessing = {
-    "70B LLaMA": {
+    "70B": {
         # "pp2":{
         #     "single":13.459882974624634/5,
         #     "multi":13.459882974624634/5,
@@ -74,7 +94,7 @@ preprocessing = {
             "multi": 1045.2018249034882,
         },
     },
-    "42B LLaMA": {
+    "42B": {
         # "pp2":{
         #     "single":5.076202869415283/5,
         #     "multi":5.076202869415283/5,
@@ -100,7 +120,7 @@ preprocessing = {
             "multi":133.84632897377014,
         }
     },
-    "14B LLaMA": {
+    "14B": {
         # "pp2":{
         #     "single":0.756459712982177/5,
         #     "multi":0.756459712982177/5,
@@ -124,104 +144,94 @@ comp_data = {
     "56B LLaMA": {
          "pp4 tp4 dp2 mb16":{
             "homo":{
-                "UnifiedPP": 535,
-                "Interleaved-L": 541,
+                "OctoPipe": 535,
                 "Interleaved": 512,
                 "ZBV": 526,
                 "ZBH": 506,
-                "1F1B": 478,
+                "Dapple": 478,
             },
             "heter":{
-                "UnifiedPP": 275,
-                "Interleaved-L": 158,
+                "OctoPipe": 275,
                 "Interleaved": 158,
                 "ZBV": 255,
                 "ZBH": 225,
-                "1F1B": 238,
+                "Dapple": 238,
             },
         },
         "pp4 tp8 dp1 mb16":{
             "heter":{
-                "UnifiedPP": 184,
-                "Interleaved-L": 79,
+                "OctoPipe": 184,
                 "Interleaved": 79,
                 "ZBV": 128,
                 "ZBH": 114,
-                "1F1B": 118,
+                "Dapple": 118,
             },
             "homo":{
-                "UnifiedPP": 450,
-                "Interleaved-L": 450,
+                "OctoPipe": 450,
                 "Interleaved": 433,
                 "ZBV": 420,
                 "ZBH": 410,
-                "1F1B": 400,
+                "Dapple": 400,
             },
         },
         "pp8 tp4 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 490,
-                "Interleaved-L": 500,
+                "OctoPipe": 490,
                 "Interleaved": 475,
                 "ZBV": 495,
                 "ZBH": 475,
-                "1F1B": 435,
+                "Dapple": 435,
             },
             "heter":{
-                "UnifiedPP": 168,
-                "Interleaved-L": 82,
+                "OctoPipe": 168,
                 "Interleaved": 81,
                 "ZBV": 134,
                 "ZBH": 115,
-                "1F1B": 120,
+                "Dapple": 120,
             },
         },
     },
     "70B LLaMA": {
         "pp4 tp4 dp4 mb16":{
             "homo":{
-                "UnifiedPP": 415,
-                "Interleaved-L": 415,
+                "OctoPipe": 415,
                 "Interleaved": 399,
                 "ZBV": 400,
                 "ZBH": 390,
-                "1F1B": 370,
+                "Dapple": 370,
             },
             "heter":{
             },
         },
         "pp4 tp8 dp2 mb16":{
             "homo":{
-                "UnifiedPP": 334,
-                "Interleaved-L": 331,
+                "OctoPipe": 334,
                 "Interleaved": 318,
                 "ZBV": 307,
                 "ZBH": 305,
-                "1F1B": 295,
+                "Dapple": 295,
             },
             "heter":{
             },
         },
         "pp8 tp4 dp2 mb32":{
             "homo":{
-                "UnifiedPP": 414,
-                "Interleaved-L": 410,
+                "OctoPipe": 414,
                 "Interleaved": 390,
                 "ZBV": 404,
                 "ZBH": 386,
-                "1F1B": 356,
+                "Dapple": 356,
             },
             "heter":{
             },
         },
         # "pp8 tp8 dp1 mb32":{
         #     "homo":{
-        #         "UnifiedPP": 348,
-        #         "Interleaved-L": 347,
+        #         "OctoPipe": 348,
         #         "Interleaved": 328,
         #         "ZBV": 330,
         #         "ZBH": 316,
-        #         "1F1B": 300,
+        #         "Dapple": 300,
         #     },
         #     "heter":{
         #     },
@@ -229,148 +239,215 @@ comp_data = {
     },
 }
 
+data_h800_heter = {
+    "70B LLaMA": {
+        "pp8 tp4 dp1 mb32":{
+            "OctoPipe": 390,
+            "Alpa": 0,
+            "Metis": 0,
+            "Dapple": 324,
+        },
+        "pp4 tp8 dp1 mb16":{
+            "OctoPipe": 390,
+            "Alpa": 338,
+            "Metis": 340,
+            "Dapple": 259,
+        },
+    },
+    "42B LLaMA": {
+        "pp8 tp4 dp1 mb32":{
+            "OctoPipe": 518,
+            "Alpa": 472,
+            "Metis": 446,
+            "Dapple": 363,
+        },
+        "pp4 tp8 dp1 mb16":{
+            "OctoPipe": 655,
+            "Alpa": 625,
+            "Metis": 505,
+            "Dapple": 445,
+        },
+    },
+    "14B LLaMA": {
+        "pp8 tp1 dp1 mb32":{
+            "OctoPipe": 2965,
+            "Alpa": 2156,
+            "Metis": 0,
+            "Dapple": 1655,
+        },
+        "pp4 tp2 dp1 mb16":{
+            "OctoPipe": 2965,
+            "Alpa": 2120,
+            "Metis": 2037,
+            "Dapple": 1752,
+        },
+    },
+}
+
 data_h800 = {
     "70B LLaMA": {
          "pp4 tp4 dp2 mb16":{
             "homo":{
-                "UnifiedPP": 761,
-                "Interleaved-L": 660,
+                "OctoPipe": 761,
                 "Interleaved": 200,
                 "ZBV": 0,
                 "ZBH": 0,
-                "1F1B": 670,
+                "Dapple": 670,
             },
             "heter":{
-                "UnifiedPP": 0,
-                "Interleaved-L": 0,
-                "Interleaved": 0,
-                "ZBV": 0,
-                "ZBH": 0,
-                "1F1B": 0,
+                "OctoPipe": 8563,
+                "Interleaved": 0, #13298,
+                "ZBV": 0, #13072,
+                "ZBH": 0, #13072,
+                "Dapple": 14018,
             },
         },
         "pp4 tp8 dp1 mb16":{
             "homo":{
-                "UnifiedPP": 599,
-                "Interleaved-L": 608,
+                "OctoPipe": 599,
                 "Interleaved": 565,
                 "ZBV": 534,
                 "ZBH": 553,
-                "1F1B": 540,
+                "Dapple": 540,
             },
             "heter":{
-                "UnifiedPP": 0,
-                "Interleaved-L": 0,
-                "Interleaved": 0,
-                "ZBV": 0,
-                "ZBH": 0,
-                "1F1B": 0,
+                "OctoPipe": 8473,
+                "Interleaved": 13298,
+                "ZBV": 12072,
+                "ZBH": 13172,
+                "Dapple": 13018,
             },
         },
         "pp8 tp4 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 790,
-                "Interleaved-L": 801,
+                "OctoPipe": 810,
                 "Interleaved": 400,
                 "ZBV": 775,
                 "ZBH": 750,
-                "1F1B": 720,
+                "Dapple": 720,
             },
             "heter":{
-                "UnifiedPP": 0,
-                "Interleaved-L": 0,
-                "Interleaved": 0,
-                "ZBV": 0,
-                "ZBH": 0,
-                "1F1B": 0,
+                "OctoPipe": 8964,
+                "Interleaved": 0, #14534,
+                "ZBV": 12632,
+                "ZBH": 14232,
+                "Dapple": 15134,
             },
         },
     },
     "42B LLaMA": {
         "pp8 tp4 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 1260,
-                "Interleaved-L": 1245,
+                "OctoPipe": 1260,
                 "Interleaved": 1207,
                 "ZBV": 1040,
                 "ZBH": 1180,
-                "1F1B": 1128,
+                "Dapple": 1128,
             },
             "heter":{
+                "OctoPipe": 5528,
+                "Interleaved": 9566,
+                "ZBV": 9384,
+                "ZBH": 9584,
+                "Dapple": 10106,
             },
         },
         "pp4 tp4 dp2 mb16":{
             "homo":{
-                "UnifiedPP": 1335,
-                "Interleaved-L": 1363,
+                "OctoPipe": 1375,
                 "Interleaved": 1325,
                 "ZBV": 1275,
                 "ZBH": 1270,
-                "1F1B": 1226,
+                "Dapple": 1226,
             },
             "heter":{
+                "OctoPipe": 5222,
+                "Interleaved": 8462,
+                "ZBV": 8440,
+                "ZBH": 8240,
+                "Dapple": 10506,
             },
         },
         "pp4 tp8 dp1 mb16":{
             "homo":{
-                "UnifiedPP": 955,
-                "Interleaved-L": 970,
+                "OctoPipe": 955,
                 "Interleaved": 920,
                 "ZBV": 855,
                 "ZBH": 890,
-                "1F1B": 843,
+                "Dapple": 843,
             },
             "heter":{
+                "OctoPipe": 5222,
+                "Interleaved": 8202,
+                "ZBV": 8340,
+                "ZBH": 8240,
+                "Dapple": 10306,
             },
         },
         "pp4 tp4 dp1 mb16":{
             "homo":{
-                "UnifiedPP": 1309,
-                "Interleaved-L": 1311,
-                "Interleaved": 1277,
+                "OctoPipe": 1309,
+                "Interleaved": 1257,
                 "ZBV": 1271,
                 "ZBH": 1240,
-                "1F1B": 1195,
+                "Dapple": 1195,
             },
             "heter":{
+                "OctoPipe": 5525,
+                "Interleaved": 8502,
+                "ZBV": 8640,
+                "ZBH": 8240,
+                "Dapple": 10806,
             },
         },
         "pp8 tp2 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 1395,
-                "Interleaved-L": 0,
+                "OctoPipe": 1395,
                 "Interleaved": 0,
                 "ZBV": 0,
                 "ZBH": 0,
-                "1F1B": 1334,
+                "Dapple": 1334,
             },
             "heter":{
+                "OctoPipe": 5528,
+                "Interleaved": 0,
+                "ZBV": 0,
+                "ZBH": 0,
+                "Dapple": 10156,
             },
         },
     },
     "14B LLaMA": {
         "pp4 tp2 dp1 mb16":{
             "homo":{
-                "UnifiedPP": 3776,
-                "Interleaved-L": 3693,
-                "Interleaved": 3693,
-                "ZBV": 3615,
-                "ZBH": 3684,
-                "1F1B": 3475,
+                "OctoPipe": 3776,
+                "Interleaved": 3593,
+                "ZBV": 3515,
+                "ZBH": 3584,
+                "Dapple": 3375,
             },
             "heter":{
+                "OctoPipe": 2175,
+                "Interleaved": 3506,
+                "ZBV": 3456,
+                "ZBH": 3456,
+                "Dapple": 3650,
             },
         },
         "pp8 tp1 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 3455,
-                "Interleaved-L": 3262,
+                "OctoPipe": 3455,
                 "Interleaved": 3262,
                 "ZBV": 0,
                 "ZBH": 3288,
-                "1F1B": 3130,
+                "Dapple": 3130,
             },
             "heter":{
+                "OctoPipe": 2535,
+                "Interleaved": 0, #4598,
+                "ZBV": 0, #4536,
+                "ZBH": 0, #4536,
+                "Dapple": 4778,
             },
         },
     },
@@ -385,7 +462,7 @@ ablation_study_data = {
                 "+ Memory monitor": 741,
                 "+ Adaptive workload schedule": 742,
                 "+ Adaptive model placement": 718,
-                "1F1B": 670,
+                "Dapple": 670,
             },
             "heter":{
             },
@@ -398,7 +475,7 @@ ablation_study_data = {
                 "+ Memory monitor": 922,
                 "+ Adaptive workload schedule": 921,
                 "+ Adaptive model placement": 841,
-                "1F1B": 745,
+                "Dapple": 745,
             },
             "heter":{
             },
@@ -411,7 +488,7 @@ ablation_study_data = {
                 "+ Memory monitor": 3356,
                 "+ Adaptive workload schedule": 0,
                 "+ Adaptive model placement": 3301,
-                "1F1B": 3124,
+                "Dapple": 3124,
             },
             "heter":{
             },
@@ -423,12 +500,11 @@ sim = {
     "56B LLaMA": {
          "pp4 tp4 dp2 mb16":{
             "homo":{
-                "UnifiedPP": 1624,
-                "Interleaved-L": 1634,
+                "OctoPipe": 1624,
                 "Interleaved": 1760,
                 "ZBV": 1663,
                 "ZBH": 1712,
-                "1F1B": 1904,
+                "Dapple": 1904,
             },
             "heter":{
             },
@@ -437,58 +513,53 @@ sim = {
             "heter":{
             },
             "homo":{
-                "UnifiedPP": 1624,
-                "Interleaved-L": 1634,
+                "OctoPipe": 1624,
                 "Interleaved": 1760,
                 "ZBV": 1663,
                 "ZBH": 1712,
-                "1F1B": 1904,
+                "Dapple": 1904,
             },
         },
         "pp8 tp4 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 1744,
-                "Interleaved-L": 1738,
+                "OctoPipe": 1744,
                 "Interleaved": 1864,
                 "ZBV": 1751,
                 "ZBH": 1808,
-                "1F1B": 2032,
+                "Dapple": 2032,
             },
         },
     },
     "70B LLaMA": {
         "pp4 tp4 dp4 mb16":{
             "homo":{
-                "UnifiedPP": 2039,
-                "Interleaved-L": 2018,
+                "OctoPipe": 2039,
                 "Interleaved": 2180,
                 "ZBV": 2059,
                 "ZBH": 2120,
-                "1F1B": 2360,
+                "Dapple": 2360,
             },
             "heter":{
             },
         },
         "pp4 tp8 dp2 mb16":{
             "homo":{
-                "UnifiedPP": 2039,
-                "Interleaved-L": 2018,
+                "OctoPipe": 2039,
                 "Interleaved": 2180,
                 "ZBV": 2059,
                 "ZBH": 2120,
-                "1F1B": 2360,
+                "Dapple": 2360,
             },
             "heter":{
             },
         },
         "pp8 tp4 dp2 mb32":{
             "homo":{
-                "UnifiedPP": 2122,
-                "Interleaved-L": 2122,
+                "OctoPipe": 2122,
                 "Interleaved": 2290,
                 "ZBV": 2149,
                 "ZBH": 2220,
-                "1F1B": 2500,
+                "Dapple": 2500,
             },
             "heter":{
             },
@@ -497,24 +568,22 @@ sim = {
     "14B LLaMA": {
         "pp8 tp1 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 2332,
-                "Interleaved-L": 2386,
+                "OctoPipe": 2332,
                 "Interleaved": 2386,
                 "ZBV": 2283,
                 "ZBH": 2292,
-                "1F1B": 2462,
+                "Dapple": 2462,
             },
             "heter":{
             },
         },
         "pp4 tp2 dp1 mb16":{
             "homo":{
-                "UnifiedPP": 1698,
-                "Interleaved-L": 1796,
+                "OctoPipe": 1698,
                 "Interleaved": 1796,
                 "ZBV": 1726,
                 "ZBH": 1746,
-                "1F1B": 1898,
+                "Dapple": 1898,
             },
             "heter":{
             },
@@ -526,36 +595,33 @@ sim_h800 = {
     "70B LLaMA": {
         "pp4 tp4 dp2 mb16":{
             "homo":{
-                "UnifiedPP": 6383,
-                "Interleaved-L": 6350,
+                "OctoPipe": 6383,
                 "Interleaved": 6836,
                 "ZBV": 6454,
                 "ZBH": 6738,
-                "1F1B": 7370,
+                "Dapple": 7370,
             },
             "heter":{
             },
         },
         "pp4 tp8 dp1 mb16":{
             "homo":{
-                "UnifiedPP": 5802,
-                "Interleaved-L": 5814,
+                "OctoPipe": 5802,
                 "Interleaved": 6300,
                 "ZBV": 6454,
                 "ZBH": 6120,
-                "1F1B": 6840,
+                "Dapple": 6840,
             },
             "heter":{
             },
         },
         "pp8 tp4 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 2122,
-                "Interleaved-L": 8056,
+                "OctoPipe": 2122,
                 "Interleaved": 8332,
                 "ZBV": 7031,
                 "ZBH": 7314,
-                "1F1B": 8078,
+                "Dapple": 8078,
             },
             "heter":{
             },
@@ -564,48 +630,44 @@ sim_h800 = {
     "42B LLaMA": {
         "pp4 tp4 dp1 mb16":{
             "homo":{
-                "UnifiedPP": 4002,
-                "Interleaved-L": 4046,
+                "OctoPipe": 4002,
                 "Interleaved": 4316,
                 "ZBV": 4090,
                 "ZBH": 4242,
-                "1F1B": 4634,
+                "Dapple": 4634,
             },
             "heter":{
             },
         },
         "pp4 tp4 dp2 mb16":{
             "homo":{
-                "UnifiedPP": 4002,
-                "Interleaved-L": 4046,
+                "OctoPipe": 4002,
                 "Interleaved": 4316,
                 "ZBV": 4090,
                 "ZBH": 4242,
-                "1F1B": 4634,
+                "Dapple": 4634,
             },
             "heter":{
             },
         },
         "pp4 tp8 dp1 mb16":{
             "homo":{
-                "UnifiedPP": 4002,
-                "Interleaved-L": 4046,
+                "OctoPipe": 4002,
                 "Interleaved": 4316,
                 "ZBV": 4090,
                 "ZBH": 4242,
-                "1F1B": 4634,
+                "Dapple": 4634,
             },
             "heter":{
             },
         },
         "pp8 tp4 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 4554,
-                "Interleaved-L": 5176,
+                "OctoPipe": 4554,
                 "Interleaved": 4620,
                 "ZBV": 4657,
                 "ZBH": 4786,
-                "1F1B": 5270,
+                "Dapple": 5270,
             },
             "heter":{
             },
@@ -614,24 +676,22 @@ sim_h800 = {
     "14B LLaMA": {
         "pp8 tp1 dp1 mb32":{
             "homo":{
-                "UnifiedPP": 2332,
-                "Interleaved-L": 2386,
+                "OctoPipe": 2252,
                 "Interleaved": 2386,
                 "ZBV": 2283,
                 "ZBH": 2292,
-                "1F1B": 2462,
+                "Dapple": 2462,
             },
             "heter":{
             },
         },
         "pp4 tp2 dp1 mb16":{
             "homo":{
-                "UnifiedPP": 1698,
-                "Interleaved-L": 1796,
+                "OctoPipe": 1698,
                 "Interleaved": 1796,
                 "ZBV": 1726,
                 "ZBH": 1746,
-                "1F1B": 1898,
+                "Dapple": 1898,
             },
             "heter":{
             },
@@ -643,12 +703,11 @@ mem_pro_h800 = {
     "14B LLaMA": {
         "pp8 tp1 dp1 mb32":{
             "homo":{
-                "UnifiedPP": [66.4321, 49.3999, 49.1665, 48.0542, 46.8794, 45.813, 44.7632, 68.9313 - 5], #TODO runtime wrong order
-                "Interleaved-L": [66.103, 47.5874, 45.2378, 42.8882, 40.5386, 38.189, 35.8394, 52.5878],
+                "OctoPipe": [66.4321, 49.3999, 49.1665, 48.0542, 46.8794, 45.813, 44.7632, 68.9313 - 5], #TODO runtime wrong order
                 "Interleaved": [66.103, 47.5874, 45.2378, 42.8882, 40.5386, 38.189, 35.8394, 52.5878],
-                "ZBV": ["OOM","OOM","OOM","OOM","OOM","OOM","OOM","OOM"],
+                # "ZBV": ["OOM","OOM","OOM","OOM","OOM","OOM","OOM","OOM"],
                 "ZBH": [56.7446, 41.4009, 41.1216, 40.8423, 40.563, 40.2837, 40.0044, 66.2174],
-                "1F1B": [56.7446, 38.8638, 36.5767, 34.2896, 32.0025, 29.7153, 27.7252, 47.2957],
+                "Dapple": [56.7446, 38.8638, 36.5767, 34.2896, 32.0025, 29.7153, 27.7252, 47.2957],
             },
             "heter":{
             },
@@ -659,15 +718,19 @@ mem_sim_h800 = {
     "14B LLaMA": {
         "pp8 tp1 dp1 mb32":{
             "homo":{
-                "UnifiedPP": [67.042, 49.749, 49.459, 48.35, 47.24, 46.421, 45.311, 62.975],
-                "Interleaved-L": [65.296, 47.421, 45.202, 42.984, 40.765, 38.547, 36.328, 53.18],
+                "OctoPipe": [67.042, 49.749, 49.459, 48.35, 47.24, 46.421, 45.311, 62.975],
                 "Interleaved": [65.296, 47.421, 45.202, 42.984, 40.765, 38.547, 36.328, 53.18],
-                "ZBV": [79.841, 44.093, 44.093, 44.093, 45.202, 45.202, 46.311, 46.311],
+                # "ZBV": [79.841, 44.093, 44.093, 44.093, 45.202, 45.202, 46.311, 46.311],
                 "ZBH": [59.346, 43.732, 43.153, 42.573, 41.994, 41.415, 40.836, 67.698],
-                "1F1B": [57.531, 39.656, 37.437, 35.219, 33.0, 30.781, 28.563, 45.852],
+                "Dapple": [57.531, 39.656, 37.437, 35.219, 33.0, 30.781, 28.563, 45.852],
             },
             "heter":{
             },
         },
     },
+}
+vary_seq = {
+    "OctoPipe": [1752, 2345, 2582, 2630, 2596],
+    "ZBH": [1772, 2304, 2489, 2530, 2490],
+    "Dapple": [1730, 2250, 2450, 2445, 2430],
 }

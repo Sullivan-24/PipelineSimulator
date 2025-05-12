@@ -157,7 +157,6 @@ def main():
         content += str(r)+"\n"
     save_to_file(f"traverse_res_{Schedule.ZBV.name}.txt", content ,'w')
 if __name__ == "__main__":
-    print(Gradient.INPUT * 4)
     # start_time = time.time()
     run_schedule(draw=True)
     # end_time = time.time()

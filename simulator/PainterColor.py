@@ -1,3 +1,4 @@
+from .abstract.context import global_context as gpc
 from .abstract.mutils import *
 def set_color(sid, workload_type, layer_num, layer_wise = LAYERWISE):
     color = None
@@ -5,8 +6,12 @@ def set_color(sid, workload_type, layer_num, layer_wise = LAYERWISE):
         color = "#FFF2CC"
     elif workload_type == 'b':
         color = "#DAE8FC" 
-    else:
+    elif workload_type == 'w':
         color = "#D5E8D4"
+    
+    if gpc["HEAD_DP"]:
+        if sid == gpc["STAGE_NUM"]:
+            color = "#E1D5E7" # 紫色: #E1D5E7
 
     if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE or layer_wise:
         if sid == 0:

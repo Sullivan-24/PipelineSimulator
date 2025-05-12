@@ -27,27 +27,106 @@ class PipelineScheduler:
         self.layer_num = gpc["LAYER_NUM"]
         self.devices: list[Device] = []
         self.placement = [] if not placement else placement 
-        # self.placement = [
-        #     [10, 14, 22, 26, 34, 38, 46, 50, 58, 62, 70, 74, 79] ,
-        #     [0, 3, 11, 15, 23, 27, 35, 39, 47, 51, 59, 63, 71, 75] ,
-        #     [1, 4, 12, 16, 24, 28, 36, 40, 48, 52, 60, 64, 72, 76] ,
-        #     [2, 5, 13, 17, 25, 29, 37, 41, 49, 53, 61, 65, 73, 77] ,
-        #     [6, 18, 30, 42, 54, 66, 78] ,
-        #     [7, 19, 31, 43, 55, 67] ,
-        #     [8, 20, 32, 44, 56, 68] ,
-        #     [9, 21, 33, 45, 57, 69] ,
+        # self.placement = [ # head
+        #     [0, 4, 6, 10, 11, 14],
+        #     [1, 5, 7, 15],
+        #     [2, 8, 12],
+        #     [3, 9, 13],
         # ]
+        # self.placement = [ # no head
+        #     [0, 4, 6, 10, 12],
+        #     [1, 5, 7, 11, 13],
+        #     [2, 8, 14],
+        #     [3, 9, 15],
+        # ]
+        # self.placement = [
+        #     [0, 4, 12] ,
+        #     [1, 5, 13] ,
+        #     [2, 6, 14] ,
+        #     [3, 7, 15] ,
+        #     [8] ,
+        #     [9] ,
+        #     [10] ,
+        #     [11] ,
+        # ]
+        # self.placement = [
+        #     [0, 4, 6, 8, 15] ,
+        #     [1, 5, 7, 9, 14] ,
+        #     [2, 12, 10] ,
+        #     [3, 13, 11] ,
+        # ]
+        # self.placement = [
+        #     [0, 1, 2, 3, 4,5,6] ,
+        #     [7, 8, 9, 10] ,
+        #     [11, 12, 13] ,
+        #     [14, 15] ,
+        # ]
+        # self.placement = [ # 5375
+        #     [0, 8, 12, 20, 28, 47],
+        #     [1, 9, 13, 21, 29, 32, 35, 42, 45],
+        #     [2, 10, 14, 22, 30, 33, 36, 43, 46],
+        #     [3, 11, 15, 23, 31, 34, 37, 44],
+        #     [4, 16, 24, 38],
+        #     [5, 17, 25, 39],
+        #     [6, 18, 26, 40],
+        #     [7, 19, 27, 41],
+        # ]
+        # self.placement = [ # 5576
+        #     [0, 8, 16, 24, 32, 47],
+        #     [1, 9, 17, 25, 33, 36, 39, 42, 45],
+        #     [2, 10, 18, 26, 34, 37, 40, 43, 46],
+        #     [3, 11, 19, 27, 35, 38, 41, 44],
+        #     [4, 12, 20, 28],
+        #     [5, 13, 21, 29],
+        #     [6, 14, 22, 30],
+        #     [7, 15, 23, 31],
+        # ]
+        # self.placement = [ # 5022
+        #     [0, 4, 6, 10, 12, 16, 18, 22, 24, 28, 30, 34, 36, 40, 47] ,
+        #     [1, 5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 35, 37, 41, 44, 45, 46] ,
+        #     [2, 8, 14, 20, 26, 32, 38, 42] ,
+        #     [3, 9, 15, 21, 27, 33, 39, 43] ,
+        # ]
+        # self.placement = [ # 8473 mem 0.775 
+        #     [8, 10, 14, 16, 20, 22, 26, 28, 32, 34, 38, 40, 44, 46, 50, 52, 56, 58, 62, 64, 68, 70, 74, 76, 79] ,
+        #     [0, 1, 4, 5, 9, 11, 15, 17, 21, 23, 27, 29, 33, 35, 39, 41, 45, 47, 51, 53, 57, 59, 63, 65, 69, 71, 75, 77] ,
+        #     [2, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 78] ,
+        #     [3, 7, 13, 19, 25, 31, 37, 43, 49, 55, 61, 67, 73] ,
+        # ]
+        # self.placement = [
+        #     [0, 2, 6, 8, 12, 14, 18, 20, 24, 26, 30, 32, 36, 38, 42, 44, 48, 50, 54, 56, 60, 62, 66, 68, 72, 74, 78] ,
+        #     [1, 3, 7, 9, 13, 15, 19, 21, 25, 27, 31, 33, 37, 39, 43, 45, 49, 51, 55, 57, 61, 63, 67, 69, 73, 75, 79] ,
+        #     [4, 10, 16, 22, 28, 34, 40, 46, 52, 58, 64, 70, 76] ,
+        #     [5, 11, 17, 23, 29, 35, 41, 47, 53, 59, 65, 71, 77] ,
+        # ]
+        # self.placement = [
+        #     [0, 4, 12, 16, 24, 47] ,
+        #     [1, 5, 13, 17, 25, 28, 36, 40] ,
+        #     [2, 6, 14, 18, 26, 29, 37, 41, 42] ,
+        #     [3, 7, 15, 19, 27, 30, 31, 38, 39] ,
+        #     [8, 20, 32, 43] ,
+        #     [9, 21, 33, 44] ,
+        #     [10, 22, 34, 45] ,
+        #     [11, 23, 35, 46] ,
+        # ]
+        # print(len(self.placement[0]))
+        # print(len(self.placement[1]))
+        # print(len(self.placement[2]))
+        # print(len(self.placement[3]))
+        # input()
         self.nmb = gpc["MICRO_BATCH_NUM"]
         self.stage_num = gpc["STAGE_NUM"]
         self.schedule_method = gpc["SCHEDULE_METHOD"]
         self.layer_wise = gpc["LAYERWISE"]
-        print(self.layer_wise)
+        self.head_dp = gpc["HEAD_DP"]
         self.microbatch_schedule_range = range(0,min(gpc["SCHEDULE_UNIT"], self.nmb))
         self.acc_finished_mb = 0
         self.finish_flag = False
         self.num_finished_microbatch = 0
         self.run_schedule = run_schedule
         self.manual_recomp_set = []
+        self.manual_recomp_set = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0]
+        
         self.fail_indexes = set()
         # pp4 tp4 zero4 I1F1B recomp set
         # self.manual_recomp_set = [0 for _ in range(self.layer_num)]
@@ -90,7 +169,7 @@ class PipelineScheduler:
         for key in self.results.keys():
             if not key.startswith(("f_","b_","w_",)):
                 continue
-            k, mid, sid = key.split("_")
+            k, mid, sid = key.split("_")[:3]
             sid = int(sid)
             mid = int(mid)
             did = self._sid2did(sid=sid)
@@ -156,7 +235,7 @@ class PipelineScheduler:
             comp_power = 2
             if gpc["HETER_DEVICE"]:
                 if did >= self.device_num // 2:
-                    max_mem = gpc["GPU_MAX_MEM"] / 2 
+                    max_mem = gpc["GPU_MAX_MEM"] / 2
                     comp_power = comp_power / 2
             device = Device(
                         device_id = did, 
@@ -170,23 +249,25 @@ class PipelineScheduler:
             dev_compute_power.append(comp_power)
             self.devices.append(device)
         self.set_recomp()
-        if gpc["HETER_DEVICE"] and not self.placement and self.schedule_method is not Schedule.STANDARD_INTERLEAVED:
+        if gpc["HETER_DEVICE"] and not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH1):
             layer_computation_cost = [1 for _ in range(self.layer_num)]
             if self.layer_wise:
                 layer_computation_cost.append(gpc["HEAD_F_TIME"] / gpc["F_TIME"])
                 layer_computation_cost.append(gpc["CE_F_TIME"] / gpc["F_TIME"])
             else:
-                layer_computation_cost[-1] += (gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]) / gpc["F_TIME"]
-            layer_num = self.layer_num if not self.layer_wise else self.layer_num + 2
+                layer_computation_cost[-1] += (gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]) / gpc["F_TIME"] * 0
+            total_layer = self.layer_num if not self.layer_wise else self.layer_num + 2
             self.pipeline_placement_solver = PipelinePlacement(
-                layer_num=layer_num,
+                layer_num=total_layer,
                 layer_computation_cost=layer_computation_cost,
-                layer_para=[1 for _ in range(layer_num)],
+                layer_para=[1 for _ in range(total_layer)],
                 dev_num=self.device_num,
-                dev_max_memory=[100000 for _ in range(layer_num)],
+                dev_max_memory=[100000 for _ in range(total_layer)],
                 dev_compute_power=dev_compute_power,
             )
-            self.placement = self.pipeline_placement_solver.get_placements()
+            if not self.placement:
+                self.placement = self.pipeline_placement_solver.get_placements()
+            # input(11111)
             # if self.layer_wise:
             #     assert False, 'Layerwise test not ready'
         if self.placement:
@@ -248,6 +329,11 @@ class PipelineScheduler:
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
             elif gpc["STAGE_PLACEMENT"] == Placement.SEARCHED:
                 print("Use Searched placement")
+                # for pid in range(self.stage_num - self.device_num):
+                #     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
+                # for pid in range(self.stage_num - self.device_num, self.stage_num):
+                #     self.devices[self.device_num - (pid % self.device_num) - 1].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
+                
                 for pid in range(self.device_num):
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
                 for pid in range(self.device_num, self.device_num * 2):
@@ -271,6 +357,10 @@ class PipelineScheduler:
                         self.devices[self.device_num - 1 - pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
                 for pid in range(self.stage_num - offset, self.stage_num):
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
+
+        if self.head_dp:
+            for device in self.devices:
+                device.add_stage(self.stage_num, False, False, 0)
 
         # Launch MemoryMonitors
         for device in self.devices:
@@ -464,6 +554,28 @@ class PipelineScheduler:
             wlt = workload.wtype.value.lower()
             mid = workload.mid
             sid = workload.sid
+            did = workload.did
+            k = '{}_{}_{}_{}'.format(wlt,mid,sid,did)
+            self.results[k] = workload.start_time
+            if self.last_workload is None or workload.start_time + workload.duration > self.last_workload.start_time + self.last_workload.duration:
+                self.last_workload = workload
+            if workload.wtype is not WorkloadType.F:
+                for device in self.devices:
+                    device.overlap_flag = True
+            if gpc["HEAD_DP"]:
+                if sid == gpc["STAGE_NUM"]:
+                    for d in self.devices:
+                        if d.did == did: continue
+                        for s in d.stages.keys():
+                            if s == sid:
+                                if mid in d.stages[s].workloads.keys():
+                                    d.stages[s].workloads.pop(mid)
+    
+    def record_workload_old(self, workload: Workload):
+        if workload:
+            wlt = workload.wtype.value.lower()
+            mid = workload.mid
+            sid = workload.sid
             k = '{}_{}_{}'.format(wlt,mid,sid)
             self.results[k] = workload.start_time
             if self.last_workload is None or workload.start_time + workload.duration > self.last_workload.start_time + self.last_workload.duration:
@@ -489,6 +601,9 @@ class PipelineScheduler:
                     self.acc_finished_mb += 1
                     if self.layer_wise:
                         if self.acc_finished_mb == (1 + self.layer_num) * self.nmb:
+                            self.finish_flag = True
+                    elif gpc["HEAD_DP"]:
+                        if self.acc_finished_mb == (1 + self.stage_num) * self.nmb:
                             self.finish_flag = True
                     else:
                         if self.acc_finished_mb == self.stage_num * self.nmb:
@@ -520,6 +635,8 @@ class PipelineScheduler:
         for device in self.devices:
             processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
             self.record_workload(processing_workload)
+            if processing_workload:
+                pass
             
     def reduce_recomp_degree(self):
         
@@ -596,15 +713,27 @@ class PipelineScheduler:
     def get_time(self):
         return self.time
 
+    def check_device_states(self):
+        for device in self.devices:
+            if device.state == Device.IDLE:
+                if device.exe_num_w != device.nmb * len(device.stages):
+                    device.idle_time += 1
+
+    def print_device_utilization(self):
+        for device in self.devices:
+            print(f"Device {device.did} idle time :{device.idle_time}, idle ratio:{round(device.idle_time / self.get_time(), 4)}")
+
     def run_pipeline_parallelism(self, time_limit = gpc["TIME_LIMIT"]):
         # self.run_schedule = False
         self.reset_time()
-        while self.get_time() <= time_limit and not self.finish_flag:
+        while self.get_time() <= time_limit and not self.finish_flag and not gpc["TERMINAL_FLAG"]:
             self.check_workload_status(time=self.time)
             self.execute_workload(time=self.time)
+            self.check_device_states()
             self.update_time()
         if self.finish_flag:
             print("Success")
+            self.print_device_utilization()
             self.record_recomp_set()
             if not self.show_mem_usage():
                 print("Fail due to OOM")
@@ -631,8 +760,8 @@ class PipelineScheduler:
                 print(self.recomp_set)
                 
                 while self.get_time() <= time_limit and not self.finish_flag:
-                    self.check_workload_status()
-                    self.execute_workload()
+                    self.check_workload_status(time=self.time)
+                    self.execute_workload(time=self.time)
                     self.update_time()
                 if self.finish_flag:
                     self.record_recomp_set()
@@ -656,8 +785,8 @@ class PipelineScheduler:
             # self.result2schedule()
             self.set_schedule()
             while self.get_time() <= time_limit and not self.finish_flag:
-                self.check_workload_status()
-                self.execute_workload()
+                self.check_workload_status(time=self.time)
+                self.execute_workload(time=self.time)
                 self.update_time()
             if self.finish_flag:
                 print("Success")
@@ -674,9 +803,9 @@ class PipelineScheduler:
             save_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did), mode='w')
             last_mem_record = 0
             for t, mem_record in device.mem_usage_record.items():
-                peak_mem = device.peak_mem_usage_record[t]
+                (peak_mem, wtype, sid, mid) = device.peak_mem_usage_record[t]
                 oom_flag = "" if mem_record <= device.max_memory else "OOM"
-                save_to_file(aim_file_path, "Time {}, mem = {}, {}, peak = {}, {}.\n".format(t, round(mem_record,2), round((mem_record - last_mem_record), 2), round(peak_mem, 2), oom_flag), 'a')
+                save_to_file(aim_file_path, "Time {} {}, mem = {}, {}, peak = {}, {}.\n".format(t, (wtype, sid, mid), round(mem_record,2), round((mem_record - last_mem_record), 2), round(peak_mem, 2), oom_flag), 'a')
                 last_mem_record = mem_record
                 peak_mem_usages[device.did] = round(max(peak_mem_usages[device.did], peak_mem), 3)
         
@@ -696,6 +825,7 @@ class PipelineScheduler:
         for device in self.devices:
             for sid in device.stages:
                 for mid in range(self.nmb):
+                    if mid not in device.stages[sid].workloads: continue
                     fwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.F].duration
                     if WorkloadType.B in device.stages[sid].workloads[mid]:
                         iwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.B].duration
@@ -776,7 +906,7 @@ class PipelineScheduler:
             painter_conf = {
                 "device_num": self.device_num,
                 "devices": self.placement,
-                "stage_num": self.stage_num,
+                "stage_num": self.stage_num if not gpc["HEAD_DP"] else self.stage_num + 1,
                 "pp_height": gpc["PP_HEIGHT"],
                 "pp_align": gpc["PP_ALIGN"],
                 "pixel_base": gpc["PIXEL_BASE"],
