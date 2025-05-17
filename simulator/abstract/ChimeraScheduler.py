@@ -149,7 +149,7 @@ class ChimeraPipelineScheduler:
                         required_memory = get_required_memory(
                             stage_id=sid, 
                             layer_num=1,
-                            workload_type=workload_type,
+                            wtype=workload_type,
                             workload_type_num=WORKLOAD_TYPE_NUM, 
                             layer_wise=True,
                             recomp=device.stages[sid].recomp,

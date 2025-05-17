@@ -8,6 +8,8 @@ def set_color(sid, workload_type, layer_num, layer_wise = LAYERWISE):
         color = "#DAE8FC" 
     elif workload_type == 'w':
         color = "#D5E8D4"
+    elif workload_type == 'r':
+        color = "#F8CECC"
     
     if gpc["HEAD_DP"]:
         if sid == gpc["STAGE_NUM"]:

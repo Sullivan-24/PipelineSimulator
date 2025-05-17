@@ -7,6 +7,7 @@ class WorkloadType(Enum):
     F = "F"
     B = "B"
     W = "W"
+    R = "R"
 
 class Placement(Enum):
     WAVELIKE = 1

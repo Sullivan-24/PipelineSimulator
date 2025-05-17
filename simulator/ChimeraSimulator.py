@@ -113,7 +113,7 @@ class ChimeraSimulator:
                         required_memory = get_required_memory(
                             stage_id=lid,
                             layer_num=1,
-                            workload_type=workload_type_mapping['w' if SPLIT_BACKPROP else 'b'],
+                            wtype=workload_type_mapping['w' if SPLIT_BACKPROP else 'b'],
                             workload_type_num=WORKLOAD_TYPE_NUM,
                             layer_wise=True,
                             recomp=stream._layer_recomp_rate[lid],

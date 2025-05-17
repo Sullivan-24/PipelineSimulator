@@ -37,7 +37,7 @@ OVERLAP_DEGREE = None
 MEMORY_CONSTRAIN = 0.9
 MEMORY_REDUCATION = 0.0
 TERMINAL_FLAG = False
-
+IDEAL_SITUATION = True
 EMB_F_TIME = 0
 HEAD_F_TIME = 2
 HEAD_B_TIME = 2
@@ -88,6 +88,17 @@ if SPLIT_BACKPROP:
     W_TIME = 10
     COMM_TIME = 0
 
+if IDEAL_SITUATION:
+    EMB_F_TIME = 0
+    EMB_B_TIME = 0
+    EMB_W_TIME = 0
+    HEAD_F_TIME = 0
+    HEAD_B_TIME = 0
+    HEAD_W_TIME = 0
+    CE_F_TIME = 0
+    CE_B_TIME = 0
+    CE_W_TIME = 0
+
 LAYERWISE = False
 RECOMP = True
 AUTO_RECOMP_SEARCH = False
@@ -122,7 +133,7 @@ DENSITY_MIN = 1
 
 
 # Memory overhead calculation
-GPU_MAX_MEM = 80 * G / G
+GPU_MAX_MEM = 40 * G / G
 FP32 = 4 # 4 Bytes
 FP16 = 2 # 2 Bytes
 MIX_TRAINING = True

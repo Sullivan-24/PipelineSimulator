@@ -245,7 +245,7 @@ class GSimulator:
                     required_memory = get_required_memory(
                         stage_id=lid,
                         layer_num=LAYER_NUM//DEVICE_NUM//CHUNK_NUM,
-                        workload_type=workload_type_mapping['w' if SPLIT_BACKPROP else 'b'],
+                        wtype=workload_type_mapping['w' if SPLIT_BACKPROP else 'b'],
                         workload_type_num=WORKLOAD_TYPE_NUM,
                         layer_wise=False,
                         recomp=self._stage_recomp_rate[lid],

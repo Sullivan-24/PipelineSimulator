@@ -34,6 +34,14 @@ class Workload:
                         stage_id = self.sid - 1,
                         workload_type = WorkloadType.F)
                 )
+        elif self.wtype == WorkloadType.R:
+            self.constraints.add(
+                    WorkloadConstraint(
+                        device_id = self.did,
+                        microbatch_id = self.mid,
+                        stage_id = self.sid,
+                        workload_type = WorkloadType.F)
+                )
         elif self.wtype == WorkloadType.B:
             if self.sid + 1 < self.total_stages:
                 self.constraints.add(
@@ -50,6 +58,14 @@ class Workload:
                         stage_id=self.total_stages - 1, 
                         microbatch_id=self.mid, 
                         workload_type = WorkloadType.F)
+                )
+            if self.recomp:
+                self.constraints.add(
+                    WorkloadConstraint(
+                        device_id = self.did,
+                        stage_id=self.sid, 
+                        microbatch_id=self.mid, 
+                        workload_type = WorkloadType.R)
                 )
         elif self.wtype == WorkloadType.W:
             self.constraints.add(
@@ -108,6 +124,10 @@ class Workload:
     @property
     def is_f(self):
         return self.wtype == WorkloadType.F
+    
+    @property
+    def is_r(self):
+        return self.wtype == WorkloadType.R
     
     def __repr__(self):
         return (f"did={self.did}, mid={self.mid}, sid={self.sid}, wtype={self.wtype.name}, "

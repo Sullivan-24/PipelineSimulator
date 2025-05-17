@@ -1,79 +1,26 @@
 from .Stage import *
 from ..utils import save_to_file
 
-def get_required_memory_by_workload_old(workload:Workload):
-        stage_id = workload.sid
-        layer_num = gpc["LAYER_NUM"] // gpc["DEVICE_NUM"] // gpc["CHUNK_NUM"]
-        workload_type = workload.wtype
-        workload_type_num = gpc["WORKLOAD_TYPE_NUM"]
-        layer_wise=gpc["LAYERWISE"]
-        recomp=workload.recomp
-        # wrapper of get required memory
-        return get_required_memory(
-            stage_id=stage_id,
-            layer_num=layer_num,
-            workload_type=workload_type,
-            workload_type_num=workload_type_num,
-            layer_wise=layer_wise,
-            recomp=recomp
-        )
-
 # TODO rethinking the head memory cost
-def get_required_memory(stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True, recomp=None):
-        if workload_type ==WorkloadType.F:
-            required_memory = Activation.FULL * layer_num
-            if recomp:
-                required_memory = layer_num * (Activation.FULL * (1 - recomp) + Activation.INPUT * recomp)
-            if stage_id == gpc["STAGE_NUM"] - 1:
-                required_memory += Activation.LOSS
+def get_required_memory(stage_id, layer_num, wtype, recomp):
+    if wtype ==WorkloadType.F:
+        required_memory = Activation.FULL * layer_num
+        if recomp:
+            required_memory = layer_num * (Activation.FULL * (1 - recomp) + Activation.INPUT * recomp)
+        if stage_id == gpc["STAGE_NUM"] - 1:
+            required_memory += Activation.LOSS
+    elif wtype == WorkloadType.R:
+        required_memory = layer_num * (Activation.FULL - Activation.INPUT)
+    else:
+        if gpc["SPLIT_BACKPROP"]:
+            if wtype == WorkloadType.B:
+                required_memory = (Gradient.INPUT - Activation.FULL * ACT_B_RATIO) * layer_num
+            elif wtype == WorkloadType.W:
+                required_memory = Gradient.PARAMETER * layer_num
         else:
-            if gpc["SPLIT_BACKPROP"]:
-                if workload_type == WorkloadType.B:
-                    required_memory = (Gradient.INPUT - Activation.FULL * ACT_B_RATIO) * layer_num
-                    if recomp:
-                        required_memory += (Activation.FULL - Activation.INPUT) * recomp * layer_num
-                elif workload_type == WorkloadType.W:
-                    required_memory = Gradient.PARAMETER * layer_num #NOTE Memory Spike
-                else:
-                    raise ValueError(f"get_required_memory: Unsupported workload type {workload_type}!")
-            else:
-                if workload_type == WorkloadType.B:
-                    required_memory = (Gradient.INPUT + Gradient.PARAMETER - Activation.FULL) * layer_num
-                    if recomp:
-                        required_memory += (Activation.FULL - Activation.INPUT) * recomp * layer_num
-                else:
-                    raise ValueError(f"get_required_memory: Unsupported workload type {workload_type}!")
-        return required_memory
-
-def get_required_memory_old(stage_id, layer_num, workload_type, workload_type_num = 3, layer_wise=True, recomp=None):
-        assert workload_type_num == gpc["WORKLOAD_TYPE_NUM"], "Mismatch in number of workload type!"
-        if workload_type ==WorkloadType.F:
-            required_memory = Activation.FULL * layer_num 
-            if recomp:
-                required_memory = layer_num * (Activation.FULL * (1 - recomp) + Activation.INPUT * recomp)
-            if layer_wise and stage_id == gpc["LAYER_NUM"] + 1:
-                required_memory = Activation.LOSS
-            elif not layer_wise and stage_id == gpc["STAGE_NUM"] - 1:
-                    required_memory += Activation.LOSS
-        elif workload_type == WorkloadType.B:
-            required_memory = Gradient.INPUT * layer_num
-            if recomp:
-                required_memory += layer_num * (Activation.FULL - Activation.INPUT) * recomp 
-            if workload_type_num == 2:
-                required_memory += Gradient.PARAMETER * layer_num
-            if layer_wise and stage_id == gpc["LAYER_NUM"] + 1 and gpc["SPLIT_BACKPROP"]:
-                required_memory = Gradient.HEAD_INPUT
-        elif workload_type == WorkloadType.W:
-            assert workload_type_num == 3, "Workload number error!"
-            required_memory = Gradient.PARAMETER * layer_num
-            if layer_wise and stage_id == gpc["LAYER_NUM"] + 1:
-                required_memory = Gradient.HEAD_PARA
-        else:
-            raise ValueError("get_required_memory: Unsupported workload type!")
-
-        if layer_wise and (stage_id == 0 or stage_id == gpc["LAYER_NUM"] + 2):
-            required_memory = 0
-        return required_memory
+            if wtype == WorkloadType.B:
+                required_memory = (Gradient.INPUT + Gradient.PARAMETER - Activation.FULL) * layer_num
+    return required_memory
 
 class MemoryMonitor:
     def __init__(self, nmb:int, stages:dict, device_id:int, max_memory:float):
@@ -210,6 +157,7 @@ class Device:
         self.exe_num_f = 0
         self.exe_num_b = 0
         self.exe_num_w = 0
+        self.exe_num_r = 0
         self.overlap_flag = False
         self.order_balance = True
         self.next_workload_type = None
@@ -288,6 +236,7 @@ class Device:
         #     workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W]
         f_b_diff = self.exe_num_f - self.exe_num_b
         f_w_diff = self.exe_num_f - self.exe_num_w
+        r_b_diff = self.exe_num_r - self.exe_num_b
         if f_b_diff >= self.begin_warmup_num or f_w_diff >= self.begin_warmup_num:
             if f_b_diff >= f_w_diff:
                 workload_type_order = [WorkloadType.B, WorkloadType.W,WorkloadType.F]
@@ -296,12 +245,14 @@ class Device:
         else:
             workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W]
 
-        # if self.last_workload_type == WorkloadType.F:
-        #     workload_type_order = [WorkloadType.B, WorkloadType.W,WorkloadType.F]
-        # elif self.last_workload_type == WorkloadType.B:
-        #     workload_type_order = [WorkloadType.W, WorkloadType.F,WorkloadType.B]
-        # else:
-        #     workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W]
+        index = workload_type_order.index(WorkloadType.B)
+        if r_b_diff > 0:
+            workload_type_order.insert(index + 1, WorkloadType.R)
+        else:
+            # if self.current_mem_usage < memory_constrain:
+            workload_type_order.insert(index, WorkloadType.R)
+
+        workload_type_order = [WorkloadType.F, WorkloadType.B,WorkloadType.W, WorkloadType.R]
 
         self.workload_type_priority_order = workload_type_order
         # workload_type_order = [WorkloadType.W,WorkloadType.B,WorkloadType.F]
@@ -341,7 +292,7 @@ class Device:
         else:
             head_ce_workloads = []
             for mid in range(self.nmb):
-                for workload_type in [WorkloadType.W, WorkloadType.B]:
+                for workload_type in [WorkloadType.W, WorkloadType.B, WorkloadType.R]:
                     for stage_id in self.stages:
                         # if stage_id == gpc["STAGE_NUM"] - 1:
                         if (not gpc["HEAD_DP"] and (stage_id == gpc["STAGE_NUM"] - 1)) or (gpc["HEAD_DP"] and (stage_id == gpc["STAGE_NUM"])):
@@ -603,7 +554,7 @@ class Device:
                 if self.get_executable_workload_num_by_type(wtype=WorkloadType.B):
                     self.warmup_end_flag = True
 
-                # if time == 3590 and self.did == 0:
+                # if time == 422 and self.did == 2:
                 #     print(self.executable_workloads)
                 #     input("WAIT")
                     
@@ -613,32 +564,32 @@ class Device:
                     sid = workload.sid
                     mid = workload.mid
                     did = workload.did
-                    if not HETER_DEVICE:
-                        if self.exe_num_f < self.begin_warmup_num:
-                            if workload_type != WorkloadType.F:
-                                continue
-                        else:
-                            if self.get_finished_workload_num_by_type(wtype=WorkloadType.B) == 0:
-                                if workload.sid != gpc["STAGE_NUM"] - 1:
-                                    continue
-                            else:
-                                # Strict type order constrain
-                                if not self.warmup_end_flag:
-                                    continue
-                                else:
-                                    if not self.steady_start_flag and workload.wtype != WorkloadType.F:
-                                        continue
-                                    else:
-                                        if not self.is_bottleneck_device():
-                                            if self.steady_start_flag:
-                                                if self.exe_num_f - self.exe_num_b >= self.begin_warmup_num + 1 and self.last_workload_type == workload.wtype:
-                                                    continue
+                    # if not HETER_DEVICE:
+                    #     if self.exe_num_f < self.begin_warmup_num:
+                    #         if workload_type != WorkloadType.F:
+                    #             continue
+                    #     else:
+                    #         if self.get_finished_workload_num_by_type(wtype=WorkloadType.B) == 0:
+                    #             if workload.sid != gpc["STAGE_NUM"] - 1:
+                    #                 continue
+                    #         else:
+                    #             # Strict type order constrain
+                    #             if not self.warmup_end_flag:
+                    #                 continue
+                    #             else:
+                    #                 if not self.steady_start_flag and workload.wtype != WorkloadType.F:
+                    #                     continue
+                    #                 else:
+                    #                     if not self.is_bottleneck_device():
+                    #                         if self.steady_start_flag:
+                    #                             if self.exe_num_f - self.exe_num_b >= self.begin_warmup_num + 1 and self.last_workload_type == workload.wtype:
+                    #                                 continue
 
                     # if not self.memory_monitor.is_executable_workload(workload=workload, current_mem=self.current_mem_usage):
                     #     continue
-                    if self.steady_start_flag:
-                        if not self.memory_monitor.is_safe(workload=workload, current_mem=self.current_mem_usage+MEMORY_REDUCATION):
-                            continue
+                    # if self.steady_start_flag:
+                    #     if not self.memory_monitor.is_safe(workload=workload, current_mem=self.current_mem_usage+MEMORY_REDUCATION):
+                    #         continue
                     
                     proc_workload = self.stages[sid].execute_workload(time, mid=mid,workload_type=workload_type)
                     if proc_workload:
@@ -654,6 +605,9 @@ class Device:
                         elif workload_type == WorkloadType.W:
                             if self.stages[sid].stage_type in (StageType.LAYER, StageType.LAYERS):
                                 self.exe_num_w += 1
+                        elif workload_type == WorkloadType.R:
+                            if self.stages[sid].stage_type in (StageType.LAYER, StageType.LAYERS):
+                                self.exe_num_r += 1
                         else:
                             raise Exception("Error workload type.")
                         
@@ -736,10 +690,10 @@ class Device:
 
                 for mid in range(gpc["MICRO_BATCH_NUM"]):
                     for sid in self.stages:
-                        required_memory = get_required_memory_old(
+                        required_memory = get_required_memory(
                             stage_id=sid, 
                             layer_num=gpc["LAYER_NUM"]//gpc["STAGE_NUM"],
-                            workload_type=workload_type,
+                            wtype=workload_type,
                             workload_type_num=gpc["WORKLOAD_TYPE_NUM"], 
                             layer_wise=True,
                             recomp=self.stages[sid].recomp,
@@ -805,7 +759,7 @@ class Device:
         return False
 
     def update_memory_usage(self) -> int:
-        if self.proc_workload.state == Workload.IN_PROGRESS and self.proc_workload.wtype in (WorkloadType.F, WorkloadType.B):
+        if self.proc_workload.state == Workload.IN_PROGRESS and self.proc_workload.wtype in (WorkloadType.F, WorkloadType.R, WorkloadType.B):
             self.stages[self.proc_workload.sid].update_memory_usage(workload=self.proc_workload)
         elif self.proc_workload.state == Workload.COMPLETED and self.proc_workload.wtype == WorkloadType.W:
             self.stages[self.proc_workload.sid].update_memory_usage(workload=self.proc_workload)

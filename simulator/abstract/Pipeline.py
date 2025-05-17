@@ -14,6 +14,7 @@ workload_type_mapping = {
     'f':WorkloadType.F,
     'b':WorkloadType.B,
     'w':WorkloadType.W,
+    'r':WorkloadType.R,
 }
 
 class PipelineScheduler:
@@ -125,7 +126,7 @@ class PipelineScheduler:
         self.num_finished_microbatch = 0
         self.run_schedule = run_schedule
         self.manual_recomp_set = []
-        self.manual_recomp_set = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0]
+        self.manual_recomp_set = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1,1,1,1]
         
         self.fail_indexes = set()
         # pp4 tp4 zero4 I1F1B recomp set
@@ -570,19 +571,6 @@ class PipelineScheduler:
                             if s == sid:
                                 if mid in d.stages[s].workloads.keys():
                                     d.stages[s].workloads.pop(mid)
-    
-    def record_workload_old(self, workload: Workload):
-        if workload:
-            wlt = workload.wtype.value.lower()
-            mid = workload.mid
-            sid = workload.sid
-            k = '{}_{}_{}'.format(wlt,mid,sid)
-            self.results[k] = workload.start_time
-            if self.last_workload is None or workload.start_time + workload.duration > self.last_workload.start_time + self.last_workload.duration:
-                self.last_workload = workload
-            if workload.wtype is not WorkloadType.F:
-                for device in self.devices:
-                    device.overlap_flag = True
 
     def update_workload_execution_record(self):
         for device in self.devices:
@@ -635,8 +623,6 @@ class PipelineScheduler:
         for device in self.devices:
             processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
             self.record_workload(processing_workload)
-            if processing_workload:
-                pass
             
     def reduce_recomp_degree(self):
         
@@ -901,7 +887,7 @@ class PipelineScheduler:
         else:
             res = {}
             for key in self.results:
-                if key.startswith(("f_","b_","w_")):
+                if key.startswith(("f_","b_","w_","r_")):
                     res[key] = self.results[key]
             painter_conf = {
                 "device_num": self.device_num,

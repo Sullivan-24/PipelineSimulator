@@ -127,7 +127,7 @@ class SchedulingPainter:
             # y0 = (self._pp_height + self._pp_align) * pid + 5
             y0 = (self._pp_height + self._pp_align) * did + 5
             #修改画图中每个block的宽度
-            block_width = self._forward_length[pid] if k == 'f' else (self._backward_b_length[pid] if k == 'b' else self._backward_w_length[pid])
+            block_width = self._forward_length[pid] if k in ('f', 'r') else (self._backward_b_length[pid] if k == 'b' else self._backward_w_length[pid])
             x1 = x0 + block_width
             # y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
             y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
@@ -200,7 +200,7 @@ class SchedulingPainter:
             tags = [
                 f"p_{pid}_m_{self._item2mid[current_item]}_{fb}"
                 for pid in range(self._pp_size)
-                for fb in ("f", "b", "w") #点击后的效果，加上w的判断
+                for fb in ("f", "b", "w", "r") #点击后的效果，加上w的判断
             ]
             
             items_same_microbatch = []
