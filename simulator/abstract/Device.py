@@ -132,8 +132,12 @@ class Device:
     def __init__(self, device_id: int, max_activation_counts: int, nmb:int, static_schedule: list = None, memory_usage_constrain_rate: float = 1, max_mem: int = gpc["GPU_MAX_MEM"], comp_power: float = 1, layer_density: list = None):
         self.did = device_id
         self.warmup_end_flag = False
-        self.begin_warmup_num = (gpc["CHUNK_NUM"] - 1) * gpc["PP_SIZE"] + 1 + gpc["PP_SIZE"] - 1 - self.did
-        # self.begin_warmup_num = (gpc["CHUNK_NUM"] - 1) * gpc["PP_SIZE"] + 1 + (gpc["PP_SIZE"] - 1 - self.did) * 2
+        self.true_pp_size = gpc["PP_SIZE"]//gpc["ZERO_SIZE"]
+        self.dp_rank = self.did // self.true_pp_size
+        self.pp_rank = device_id % self.true_pp_size
+        self.nmb_pp = nmb // gpc["ZERO_SIZE"]
+        #self.begin_warmup_num = (gpc["CHUNK_NUM"] - 1) * gpc["PP_SIZE"] + 1 + gpc["PP_SIZE"] - 1 - self.did
+        self.begin_warmup_num = (gpc["CHUNK_NUM"] - 1) * self.true_pp_size + 1 + (self.true_pp_size - 1 - self.pp_rank) * 2
         self.idle_time = 0
         self.steady_start_flag = False
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
@@ -150,7 +154,7 @@ class Device:
         self.workload_type_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
         self.last_workload_type = None
         self.total_layers = 0
-        self.mid_traverse_order:list[int] = list(range(0,self.nmb))
+        self.mid_traverse_order:list[int] = list(range(0,self.nmb))[self.dp_rank*self.nmb_pp:(self.dp_rank+1)*self.nmb_pp]
         self.warmup_num_f = 0
         self.warmup_num_b = 0
         self.warmup_num_w = 0
@@ -184,6 +188,7 @@ class Device:
             self.layer_density = layer_density
 
         self.workload_execute_record: list[list[Workload]] = [[] for _ in range(gpc["DEVICE_NUM"])]
+        print(f"device_id:{self.did}, dp_rank:{self.dp_rank}, mid_traverse_order:{self.mid_traverse_order}")
 
     def get_required_memory_by_workload(self, workload:Workload):
         # wrapper of get required memory
@@ -192,8 +197,8 @@ class Device:
     def init_memory_monitor(self):
         self.memory_monitor = MemoryMonitor(self.nmb, self.stages, self.did, max_memory=self.max_memory * gpc["MEMORY_CONSTRAIN"])
         self.memory_monitor.init_monitor()
-
-    def get_executable_workload(self, time)->list[Workload]:
+    #judege the priority of scheduling workloads 
+    def get_executable_workload(self, time, proc_workloads)->list[Workload]:
         executable_workoads = []
         workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
         memory_constrain = MEMORY_CONSTRAIN * self.max_memory
@@ -265,6 +270,7 @@ class Device:
         #         workload_type_order = [WorkloadType.W, WorkloadType.B, WorkloadType.F]
 
         # raise priority of head and ce
+
         if gpc["LAYERWISE"]:
             head_ce_workloads = []
             for workload_type in [WorkloadType.W, WorkloadType.B,WorkloadType.F]:
@@ -305,8 +311,10 @@ class Device:
 
         delayed_workload = []
         canceled_workload = []
+        comp_power = 2
+        if self.did in gpc["HETER_DEVICES"]:
+            comp_power = 1
         for workload_type in workload_type_order:
-            
             for mid in range(self.nmb):
                 for stage_id in self.stages:
                     if stage_id > gpc["LAYER_NUM"] and gpc["LAYERWISE"]:
@@ -314,7 +322,57 @@ class Device:
                     workloads = self.stages[stage_id].workloads
                     if mid not in workloads: continue
                     if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable(time=time):
+                        dispatch = True #judge this workload is executable or not
+                        if mid in self.mid_traverse_order:
+                            dispatch = False
                         workload = workloads[mid][workload_type]
+                        
+                        if workload in proc_workloads:continue
+                        workload_endtime = workload.ready_time + workload.duration
+                        if dispatch: #本来不应该在此dp执行的，判断是否要调度到此dp执行,若调度到此dp执行，需要比在其他所有dp组的执行时间短，则dispatch为False
+                            for dp_rank in range(gpc["ZERO_SIZE"]):
+                                if dp_rank == self.dp_rank:
+                                    continue
+                                did_with_same_pp_ranks = dp_rank*self.true_pp_size + self.pp_rank
+                                if workload not in self.workload_execute_record[did_with_same_pp_ranks]:
+                                    _comp_power = 2
+                                    if did_with_same_pp_ranks in gpc["HETER_DEVICES"]:
+                                        _comp_power = 1
+                                    _duration = workload.duration * comp_power/ _comp_power
+                                    if proc_workloads[did_with_same_pp_ranks] is not None:
+                                        if proc_workloads[did_with_same_pp_ranks].end_time + _duration >= workload_endtime:
+                                            break
+                                        else:
+                                            dispatch = False
+                                    else:
+                                        if _duration >= workload.duration:
+                                            break
+                                        else:
+                                            dispatch = False
+                        else:#本来应该在此dp执行的，判断是否要调度到其他dp执行,若调度到其他dp执行，只需要有一个其他dp比在此dp执行时间短，则dispatch为True
+                            for dp_rank in range(gpc["ZERO_SIZE"]):
+                                if dp_rank == self.dp_rank:
+                                    continue
+                                did_with_same_pp_ranks = dp_rank*self.true_pp_size + self.pp_rank
+                                if workload in self.workload_execute_record[did_with_same_pp_ranks]:
+                                    dispatch = True
+                                    break
+                                else:
+                                    _comp_power = 2
+                                    if did_with_same_pp_ranks in gpc["HETER_DEVICES"]:
+                                        _comp_power = 1
+                                    _duration = workload.duration * comp_power/ _comp_power
+                                    print(f"proc_workloads:{proc_workloads}, did_with_same_pp_ranks:{did_with_same_pp_ranks}")
+                                    if proc_workloads[did_with_same_pp_ranks] is not None:
+                                        if proc_workloads[did_with_same_pp_ranks].end_time + _duration < workload_endtime:
+                                            dispatch = True
+                                            break
+                                    else:
+                                        if _duration < workload.duration:
+                                            dispatch = True
+                                            break
+                        if dispatch:
+                            continue
                         if gpc["OVERLAP_AWARE_SCHEDULE"] and self.exe_num_b > 0 and self.should_delay_for_overlap(time=time, workload=workload):
                             if self.is_bottleneck_device():
                                 delayed_workload.append(workloads[mid][workload_type])
@@ -471,13 +529,13 @@ class Device:
                 workload_num += 1
         return workload_num
 
-    def execute_workload(self, time, run_schedule=False) -> None:
+    def execute_workload(self, time, proc_workloads, run_schedule=False) -> None:
         assert time >= 0, f"Time should be non-negative (but got {time})."
         if self.state == Device.IDLE:
             if gpc["SCHEDULE_METHOD"] == Schedule.UnifiedPP and gpc["HEAD_DP"]:
                 self.executable_workloads = self.get_executable_workload(time=time)
                 save_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n", 'a')
-                
+               
                 if self.get_executable_workload_num_by_type(wtype=WorkloadType.B):
                     self.warmup_end_flag = True
 
@@ -548,9 +606,9 @@ class Device:
                         #     print(self.memory_monitor.workloads_reserved_mem)
                         return proc_workload
             elif gpc["SCHEDULE_METHOD"] == Schedule.UnifiedPP and not gpc["HEAD_DP"]:
-                self.executable_workloads = self.get_executable_workload(time=time)
+                self.executable_workloads = self.get_executable_workload(time=time,proc_workloads=proc_workloads)
                 save_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n", 'a')
-                
+                print(f"device_id:{self.did}, executable_workloads:{self.executable_workloads}")
                 if self.get_executable_workload_num_by_type(wtype=WorkloadType.B):
                     self.warmup_end_flag = True
 

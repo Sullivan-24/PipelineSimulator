@@ -28,12 +28,16 @@ class PipelineScheduler:
         self.layer_num = gpc["LAYER_NUM"]
         self.devices: list[Device] = []
         self.placement = [] if not placement else placement 
-        # self.placement = [ # head
-        #     [0, 4, 6, 10, 11, 14],
-        #     [1, 5, 7, 15],
-        #     [2, 8, 12],
-        #     [3, 9, 13],
-        # ]
+        self.placement = [ # head
+            [0],
+            [1],
+            [2],
+            [3],
+            [0],
+            [1],
+            [2],
+            [3],
+        ]
         # self.placement = [ # no head
         #     [0, 4, 6, 10, 12],
         #     [1, 5, 7, 11, 13],
@@ -101,14 +105,14 @@ class PipelineScheduler:
         #     [5, 11, 17, 23, 29, 35, 41, 47, 53, 59, 65, 71, 77] ,
         # ]
         # self.placement = [
-        #     [0, 4, 12, 16, 24, 47] ,
-        #     [1, 5, 13, 17, 25, 28, 36, 40] ,
-        #     [2, 6, 14, 18, 26, 29, 37, 41, 42] ,
-        #     [3, 7, 15, 19, 27, 30, 31, 38, 39] ,
-        #     [8, 20, 32, 43] ,
-        #     [9, 21, 33, 44] ,
-        #     [10, 22, 34, 45] ,
-        #     [11, 23, 35, 46] ,
+        # [0, 4, 12, 16, 24, 28, 36, 40],
+        # [1, 5, 13, 17, 25, 29, 37, 41],
+        # [2, 6, 14, 18, 26, 30, 38, 42],
+        # [3, 7, 15, 19, 27, 31, 39, 43, 47],
+        # [8, 20, 32, 44],
+        # [9, 21, 33, 45],
+        # [10, 22, 34, 46],
+        # [11, 23, 35],
         # ]
         # print(len(self.placement[0]))
         # print(len(self.placement[1]))
@@ -120,13 +124,13 @@ class PipelineScheduler:
         self.schedule_method = gpc["SCHEDULE_METHOD"]
         self.layer_wise = gpc["LAYERWISE"]
         self.head_dp = gpc["HEAD_DP"]
-        self.microbatch_schedule_range = range(0,min(gpc["SCHEDULE_UNIT"], self.nmb))
+        # self.microbatch_schedule_range = range(0,min(gpc["SCHEDULE_UNIT"], self.nmb))
         self.acc_finished_mb = 0
         self.finish_flag = False
         self.num_finished_microbatch = 0
         self.run_schedule = run_schedule
         self.manual_recomp_set = []
-        self.manual_recomp_set = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1,1,1,1]
+        #self.manual_recomp_set = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1,1,1,1]
         
         self.fail_indexes = set()
         # pp4 tp4 zero4 I1F1B recomp set
@@ -147,7 +151,7 @@ class PipelineScheduler:
             for value in list(reversed(range(self.layer_num)))
         ]
         self._init_stage()
-        self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
+        # self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
         self.schedule = [[] for _ in range(self.device_num)]
         self.generate_schedule()
         self.set_schedule()
@@ -235,7 +239,8 @@ class PipelineScheduler:
             max_mem = gpc["GPU_MAX_MEM"]
             comp_power = 2
             if gpc["HETER_DEVICE"]:
-                if did >= self.device_num // 2:
+                # if did >= self.device_num // 2:
+                if did in gpc["HETER_DEVICES"]:
                     max_mem = gpc["GPU_MAX_MEM"] / 2
                     comp_power = comp_power / 2
             device = Device(
@@ -582,6 +587,7 @@ class PipelineScheduler:
                 device.overlap_aware_executable_workload_reorder(workload=workload)         
 
     def check_workload_status(self, time):
+        proc_workloads=[None for _ in range(gpc["DEVICE_NUM"])]
         for device in self.devices:
             if device._finish_proc_workload(time=time):
                 if device.proc_workload.wtype == WorkloadType.W:
@@ -613,15 +619,17 @@ class PipelineScheduler:
                 self.update_constraints(time=time, constraint=device.proc_workload)
                 device.update_memory_usage()
                 device.state = Device.IDLE
+            else:
+                proc_workloads[device.did] = device.proc_workload
+        return proc_workloads
+        # if self.num_finished_microbatch == (1 + self.layer_num) * len(self.microbatch_schedule_range):
+        #     self.num_finished_microbatch = 0
+        #     self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < self.nmb]
+        #     self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
 
-        if self.num_finished_microbatch == (1 + self.layer_num) * len(self.microbatch_schedule_range):
-            self.num_finished_microbatch = 0
-            self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < self.nmb]
-            self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
-
-    def execute_workload(self, time):
+    def execute_workload(self, time, proc_workloads):
         for device in self.devices:
-            processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
+            processing_workload = device.execute_workload(run_schedule=self.run_schedule, time=time, proc_workloads=proc_workloads)
             self.record_workload(processing_workload)
             
     def reduce_recomp_degree(self):
@@ -713,8 +721,8 @@ class PipelineScheduler:
         # self.run_schedule = False
         self.reset_time()
         while self.get_time() <= time_limit and not self.finish_flag and not gpc["TERMINAL_FLAG"]:
-            self.check_workload_status(time=self.time)
-            self.execute_workload(time=self.time)
+            proc_workloads = self.check_workload_status(time=self.time)
+            self.execute_workload(time=self.time, proc_workloads=proc_workloads)
             self.check_device_states()
             self.update_time()
         if self.finish_flag:

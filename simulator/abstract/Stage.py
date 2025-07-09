@@ -97,6 +97,9 @@ class Stage:
             self.layer_density = [1 for _ in range(gpc["LAYER_NUM"])]
         else:
             self.layer_density = layer_density
+        self.true_pp_size = gpc["PP_SIZE"]//gpc["ZERO_SIZE"]
+        self.dp_rank = self.did // self.true_pp_size
+        self.pp_rank = device_id % self.true_pp_size
         self._add_workload()
         
     def _add_workload(self) -> None:
@@ -110,13 +113,16 @@ class Stage:
                     continue
                 if self.sid == gpc["STAGE_NUM"]:
                     if mid == 0:
-                        if self.did != gpc["PP_SIZE"] - 1:
+                        # if self.did != gpc["PP_SIZE"] - 1:
+                        if self.pp_rank != self.true_pp_size - 1:
                             continue
                     if mid == 8:
-                        if self.did != gpc["PP_SIZE"] - 3:
+                        # if self.did != gpc["PP_SIZE"] - 3:
+                        if self.pp_rank != self.true_pp_size - 3:
                             continue
                     if mid == 9:
-                        if self.did != gpc["PP_SIZE"] - 2:
+                        # if self.did != gpc["PP_SIZE"] - 2:
+                        if self.pp_rank != self.true_pp_size - 2:
                             continue
             self.workloads[mid] = {}
             fpw = Workload(

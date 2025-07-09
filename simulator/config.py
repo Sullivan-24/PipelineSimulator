@@ -26,10 +26,11 @@ if SCHEDULE_METHOD == Schedule.STANDARD_1F1B:
 # 495 * 153 motivation graph size
 # --------------------- Solver config ---------------------
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
-HETER_DEVICE = False
+HETER_DEVICE = True
+HETER_DEVICES = [6]
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 # --------------------- Simulator config ---------------------
-FIND_OPTIMAL_RECOMP = True
+FIND_OPTIMAL_RECOMP = False
 TIME_LIMIT = 20000
 HEAD_DP = False if test_upp else False
 # [1, 2, 100, None]
@@ -48,8 +49,7 @@ CE_W_TIME = 0
 F_TIME = 4
 B_TIME = 4
 W_TIME = 4
-COMM_TIME = 0
-
+COMM_TIME = [0,0,0,0]
 # No backward splitting
 EMB_F_TIME = 0
 EMB_B_TIME = 4
@@ -63,9 +63,9 @@ CE_W_TIME = 0
 F_TIME = 12
 B_TIME = 24
 W_TIME = 0
-COMM_TIME = 0
+COMM_TIME = [0,0,0,0]
 
-SPLIT_BACKPROP = True
+SPLIT_BACKPROP = False
 if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.ZBV):
     SPLIT_BACKPROP = True
     if SCHEDULE_METHOD == Schedule.ZBV:
@@ -86,7 +86,7 @@ if SPLIT_BACKPROP:
     F_TIME = 12
     B_TIME = 14
     W_TIME = 10
-    COMM_TIME = 0
+    COMM_TIME = [0,0,0,0]
 
 if IDEAL_SITUATION:
     EMB_F_TIME = 0
@@ -100,7 +100,7 @@ if IDEAL_SITUATION:
     CE_W_TIME = 0
 
 LAYERWISE = False
-RECOMP = True
+RECOMP = False
 AUTO_RECOMP_SEARCH = False
 RUN_SCHEDULE = False
 RUN_STANDARD_ZBV = False
@@ -133,7 +133,7 @@ DENSITY_MIN = 1
 
 
 # Memory overhead calculation
-GPU_MAX_MEM = 40 * G / G
+GPU_MAX_MEM = 5 * G / G
 FP32 = 4 # 4 Bytes
 FP16 = 2 # 2 Bytes
 MIX_TRAINING = True
@@ -210,7 +210,7 @@ PLA_FILE_PATH = f"schedule_results/placements/heter{HETER_DEVICE}/vs{VOCAB_SIZE}
 TEMP_PLA_PATH = f"schedule_results/placement.txt"
 TEMP_RES_PATH = f"schedule_results/result.txt"
 
-STAGE_NUM = int(DEVICE_NUM * CHUNK_NUM)
+STAGE_NUM = 4#int(DEVICE_NUM * CHUNK_NUM)
 assert STAGE_NUM <= LAYER_NUM, f"Stage ({STAGE_NUM}) should be less than Layer ({LAYER_NUM}). "
 
 WORKLOAD_TYPE_NUM = 3
