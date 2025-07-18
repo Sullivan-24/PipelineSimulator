@@ -27,94 +27,118 @@ class PipelineScheduler:
         self.device_num = gpc["DEVICE_NUM"]
         self.layer_num = gpc["LAYER_NUM"]
         self.devices: list[Device] = []
-        self.placement = [] if not placement else placement 
-        # self.placement = [ # head
-        #     [0, 4, 6, 10, 11, 14],
-        #     [1, 5, 7, 15],
-        #     [2, 8, 12],
-        #     [3, 9, 13],
-        # ]
-        # self.placement = [ # no head
-        #     [0, 4, 6, 10, 12],
-        #     [1, 5, 7, 11, 13],
-        #     [2, 8, 14],
-        #     [3, 9, 15],
-        # ]
+        self.placement = [] if not placement else placement
+        # 222 0
+        # 145 A
+        # 152 AB
+        # 130 ABC
+        # Standard 1F1B 4034 666 
+        # Standard I1F1B 3662
+        # ZBH 3638 616
+        # Alpa gpt3
         # self.placement = [
-        #     [0, 4, 12] ,
-        #     [1, 5, 13] ,
-        #     [2, 6, 14] ,
-        #     [3, 7, 15] ,
-        #     [8] ,
-        #     [9] ,
-        #     [10] ,
-        #     [11] ,
+        #     [1,1,1,1,1,1,1,1],
+        #     [1,1,1,1,1,1,1,1],
+        #     [1,1,1,1,1,1,1,1],
+        #     [1,1,1,1,1,1,1,1],
         # ]
+        # Alpa ds
         # self.placement = [
-        #     [0, 4, 6, 8, 15] ,
-        #     [1, 5, 7, 9, 14] ,
-        #     [2, 12, 10] ,
-        #     [3, 13, 11] ,
+        #     [1,1,1,1,1,1,1,1,1,1],
+        #     [1,1,1,1,1,1,1,1],
+        #     [1,1,1,1,1,1,1,1],
+        #     [1,1,1,1,1,1],
         # ]
+        # Alpa llama3
         # self.placement = [
-        #     [0, 1, 2, 3, 4,5,6] ,
-        #     [7, 8, 9, 10] ,
-        #     [11, 12, 13] ,
-        #     [14, 15] ,
+        #     [1,1,1,1,1,1,1,1],
+        #     [1,1,1,1,1,1,1,1,1],
+        #     [1,1,1,1,1,1,1,1,1],
+        #     [1,1,1,1,1,1],
         # ]
-        # self.placement = [ # 5375
-        #     [0, 8, 12, 20, 28, 47],
-        #     [1, 9, 13, 21, 29, 32, 35, 42, 45],
-        #     [2, 10, 14, 22, 30, 33, 36, 43, 46],
-        #     [3, 11, 15, 23, 31, 34, 37, 44],
-        #     [4, 16, 24, 38],
-        #     [5, 17, 25, 39],
-        #     [6, 18, 26, 40],
-        #     [7, 19, 27, 41],
+        # Alpa gemma
+        self.placement = [
+            [1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1],
+        ]
+        # UPP 127 148 172 221
+        #     1.74 1.49 1.28
+        # self.placement = [ # 3002 475
+        #     [0, 4, 7, 11, 14, 18, 21, 25, 28],
+        #     [1, 5, 8, 12, 15, 19, 22, 26, 29],
+        #     [2, 6, 9, 13, 16, 20, 23, 27, 30],
+        #     [3, 10, 17, 24, 31],
         # ]
-        # self.placement = [ # 5576
-        #     [0, 8, 16, 24, 32, 47],
-        #     [1, 9, 17, 25, 33, 36, 39, 42, 45],
-        #     [2, 10, 18, 26, 34, 37, 40, 43, 46],
-        #     [3, 11, 19, 27, 35, 38, 41, 44],
-        #     [4, 12, 20, 28],
-        #     [5, 13, 21, 29],
-        #     [6, 14, 22, 30],
-        #     [7, 15, 23, 31],
+        # self.placement = [ # 466
+        #     [0, 4, 8, 12, 16, 19, 22, 25, 28],
+        #     [1, 5, 9, 13, 17, 20, 23, 26, 29],
+        #     [2, 6, 10, 14, 18, 21, 24, 27, 30],
+        #     [3, 7, 11, 15, 31],
         # ]
-        # self.placement = [ # 5022
-        #     [0, 4, 6, 10, 12, 16, 18, 22, 24, 28, 30, 34, 36, 40, 47] ,
-        #     [1, 5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 35, 37, 41, 44, 45, 46] ,
-        #     [2, 8, 14, 20, 26, 32, 38, 42] ,
-        #     [3, 9, 15, 21, 27, 33, 39, 43] ,
+        # self.placement = [ # 464 Gemma
+        #     [0, 4, 8, 12, 16, 19, 22, 25, 28],
+        #     [1, 6, 9, 13, 17, 20, 23, 26, 29],
+        #     [2, 7, 10, 14, 18, 21, 24, 27, 30],
+        #     [3, 5, 11, 15, 31],
         # ]
-        # self.placement = [ # 8473 mem 0.775 
-        #     [8, 10, 14, 16, 20, 22, 26, 28, 32, 34, 38, 40, 44, 46, 50, 52, 56, 58, 62, 64, 68, 70, 74, 76, 79] ,
-        #     [0, 1, 4, 5, 9, 11, 15, 17, 21, 23, 27, 29, 33, 35, 39, 41, 45, 47, 51, 53, 57, 59, 63, 65, 69, 71, 75, 77] ,
-        #     [2, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 78] ,
-        #     [3, 7, 13, 19, 25, 31, 37, 43, 49, 55, 61, 67, 73] ,
+        # self.placement = [ # 464 llama3
+        #     [0, 4, 8, 12, 16, 20, 23, 26],
+        #     [1, 5, 9, 13, 17, 21, 24, 27, 29],
+        #     [2, 6, 10, 14, 18, 22, 25, 28, 30],
+        #     [3, 7, 11, 15, 19, 31],
         # ]
-        # self.placement = [
-        #     [0, 2, 6, 8, 12, 14, 18, 20, 24, 26, 30, 32, 36, 38, 42, 44, 48, 50, 54, 56, 60, 62, 66, 68, 72, 74, 78] ,
-        #     [1, 3, 7, 9, 13, 15, 19, 21, 25, 27, 31, 33, 37, 39, 43, 45, 49, 51, 55, 57, 61, 63, 67, 69, 73, 75, 79] ,
-        #     [4, 10, 16, 22, 28, 34, 40, 46, 52, 58, 64, 70, 76] ,
-        #     [5, 11, 17, 23, 29, 35, 41, 47, 53, 59, 65, 71, 77] ,
+        # self.placement = [ # 464 ds
+        #     [0, 4, 8, 12, 16, 20, 23, 26],
+        #     [1, 5, 9, 13, 17, 21, 24, 27, 29],
+        #     [2, 6, 10, 14, 18, 22, 25, 28, 30],
+        #     [3, 7, 11, 15, 19, 31],
         # ]
-        # self.placement = [
-        #     [0, 4, 12, 16, 24, 47] ,
-        #     [1, 5, 13, 17, 25, 28, 36, 40] ,
-        #     [2, 6, 14, 18, 26, 29, 37, 41, 42] ,
-        #     [3, 7, 15, 19, 27, 30, 31, 38, 39] ,
-        #     [8, 20, 32, 43] ,
-        #     [9, 21, 33, 44] ,
-        #     [10, 22, 34, 45] ,
-        #     [11, 23, 35, 46] ,
+        # self.placement = [ # 464 gpt3
+        #     [0, 4, 8, 12, 16, 20, 24, 31],
+        #     [1, 5, 9, 13, 17, 21, 25, 30],
+        #     [2, 6, 10, 14, 18, 22, 26, 29],
+        #     [3, 7, 11, 15, 19, 23, 27, 28],
         # ]
-        # print(len(self.placement[0]))
-        # print(len(self.placement[1]))
-        # print(len(self.placement[2]))
-        # print(len(self.placement[3]))
-        # input()
+        # self.placement = [ # 3002 483
+        #     [0, 4, 8, 12, 31],
+        #     [1, 5, 9, 13, 16, 19, 22, 25, 28],
+        #     [2, 6, 10, 14, 17, 20, 23, 26, 29],
+        #     [3, 7, 11, 15, 18, 21, 24, 27, 30],
+        # ]
+        # self.placement = [[0, 3, 6, 9, 12, 15, 19, 23, 27], [1, 4, 7, 10, 13, 16, 20, 24, 28], [2, 5, 8, 11, 14, 17, 21, 25, 29], [18, 22, 26, 30, 31]]
+        # self.placement = [ # 2901 FBW 2798 BFW! 485 BFW
+        #     [0, 7, 14, 21, 31],
+        #     [1, 4, 8, 11, 15, 18, 22, 25, 28],
+        #     [2, 5, 9, 12, 16, 19, 23, 26, 29],
+        #     [3, 6, 10, 13, 17, 20, 24, 27, 30],
+        # ]
+
+        # self.placement = [ # 1991
+        #     [0, 2, 6, 15],
+        #     [1, 3, 7, 10, 11, 14],
+        #     [4, 8, 12],
+        #     [5, 9, 13],
+        # ]
+        # self.placement = [ # 1991
+        #     [0, 1, 2, 3,4,5,6,7,8],
+        #     [0, 1, 2, 3,4,5,6,7,8,9],
+        #     [0, 1, 2, 3,4,5,6,7,8,9],
+        #     [0, 1, 2],
+        # ]
+        # self.placement = [ # 2132
+        #     [0, 2, 15],
+        #     [1, 3, 6, 7, 10, 11, 14],
+        #     [4, 8, 12],
+        #     [5, 9, 13],
+        # ]
+        # self.placement = [ # 2080
+        #     [0, 2, 6, 8, 9, 12],
+        #     [1, 3, 7, 15],
+        #     [4, 10, 13],
+        #     [5, 11, 14],
+        # ]
         self.nmb = gpc["MICRO_BATCH_NUM"]
         self.stage_num = gpc["STAGE_NUM"]
         self.schedule_method = gpc["SCHEDULE_METHOD"]
@@ -126,7 +150,7 @@ class PipelineScheduler:
         self.num_finished_microbatch = 0
         self.run_schedule = run_schedule
         self.manual_recomp_set = []
-        self.manual_recomp_set = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1,1,1,1]
+        # self.manual_recomp_set = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1,1,1,1]
         
         self.fail_indexes = set()
         # pp4 tp4 zero4 I1F1B recomp set
@@ -236,8 +260,8 @@ class PipelineScheduler:
             comp_power = 2
             if gpc["HETER_DEVICE"]:
                 if did >= self.device_num // 2:
-                    max_mem = gpc["GPU_MAX_MEM"] / 2
-                    comp_power = comp_power / 2
+                    max_mem = gpc["GPU_MAX_MEM"] / gpc["HETER_RATIO"]
+                    comp_power = comp_power / gpc["HETER_RATIO"]
             device = Device(
                         device_id = did, 
                         max_activation_counts=gpc["MAX_ACTIVATION_COUNTS"], 
@@ -268,10 +292,16 @@ class PipelineScheduler:
             )
             if not self.placement:
                 self.placement = self.pipeline_placement_solver.get_placements()
-            # input(11111)
-            # if self.layer_wise:
-            #     assert False, 'Layerwise test not ready'
-        if self.placement:
+        if self.placement and (self.schedule_method == Schedule.STANDARD_1F1B or self.schedule_method == Schedule.STANDARD_ZBH1):
+            assert self.placement is not None
+            for did in range(self.device_num):
+                self.devices[did].add_stage(did, layer_num = len(self.placement[did]), recomp=self.recomp_set[did])
+            print("Alpa")
+        elif self.placement and self.schedule_method == Schedule.UnifiedPP and CHUNK_NUM == 1:
+            for did in range(self.device_num):
+                self.devices[did].add_stage(did, layer_num = len(self.placement[did]), recomp=self.recomp_set[did])
+            print("S1F1B + model partition + workload scheduling")
+        elif self.placement:
             offset = 0
             if self.layer_wise:
                 offset = 1
@@ -423,11 +453,9 @@ class PipelineScheduler:
                     mids[i]+=1
 
     def generate_1f1b_schedule(self):
-        assert gpc["WORKLOAD_TYPE_NUM"] == 2
-        assert not gpc["SPLIT_BACKPROP"]
         assert gpc["CHUNK_NUM"] == 1
-        workload_type_order = [WorkloadType.B, WorkloadType.F]
-        workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1}
+        workload_type_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F] if SPLIT_BACKPROP else [WorkloadType.B, WorkloadType.F]
+        workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1, WorkloadType.W : 2}
         for did in range(self.device_num):
             mids = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
             # warmup
@@ -446,6 +474,10 @@ class PipelineScheduler:
                 else:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                 iter+=1
+        for schedule in self.schedule:
+            for w in schedule:
+                print(w[0].name, end="")
+            print()
 
     def generate_zbh1_schedule(self):
         assert gpc["WORKLOAD_TYPE_NUM"] == 3
@@ -529,6 +561,8 @@ class PipelineScheduler:
                     operation_flag = 'b'
                 elif operation_flag == 'b':
                     if mids[idx_in_b_mids] < self.nmb:
+                        if gpc["RECOMP"]:
+                            self.schedule[did].append((WorkloadType.R ,mids[idx_in_b_mids], b_next_sid))
                         self.schedule[did].append((WorkloadType.B ,mids[idx_in_b_mids], b_next_sid))
                         if gpc["WORKLOAD_TYPE_NUM"] == 3:
                             self.schedule[did].append((WorkloadType.W ,mids[idx_in_b_mids], b_next_sid))
@@ -702,12 +736,18 @@ class PipelineScheduler:
     def check_device_states(self):
         for device in self.devices:
             if device.state == Device.IDLE:
-                if device.exe_num_w != device.nmb * len(device.stages):
-                    device.idle_time += 1
+                # if device.exe_num_w != device.nmb * len(device.stages):
+                device.idle_time += 1
+        #     print(device.state, end=" ")
+        # print()
 
     def print_device_utilization(self):
+        avg_bubble = 0
         for device in self.devices:
-            print(f"Device {device.did} idle time :{device.idle_time}, idle ratio:{round(device.idle_time / self.get_time(), 4)}")
+            bubble_ratio = round(device.idle_time / self.get_time(), 4)
+            print(f"Device {device.did} idle time : {device.idle_time}, idle ratio: {bubble_ratio*100}")
+            avg_bubble += bubble_ratio
+        print(f"Avg bubble ratio: {avg_bubble/len(self.devices)*100}")
 
     def run_pipeline_parallelism(self, time_limit = gpc["TIME_LIMIT"]):
         # self.run_schedule = False

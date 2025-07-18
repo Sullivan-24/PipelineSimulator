@@ -7,6 +7,44 @@ from tkinter import font
 from .utils import parse_microbatch_key, save_to_file
 from .abstract.mutils import *
 from .PainterColor import set_color
+import tkinter as tk
+from PIL import Image, EpsImagePlugin
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.backends.backend_pdf import PdfPages
+
+import os
+os.environ["PATH"] += os.pathsep + "/opt/homebrew/bin"
+EpsImagePlugin.gs_windows_binary = "/opt/homebrew/bin/gs"  # 请根据你的机器修改路径
+
+def save_canvas_as_pdf(canvas, filename="output.pdf", scale=5):
+    canvas.update()
+    
+    width = canvas.winfo_width()
+    height = canvas.winfo_height()
+    
+    ps_filename = "temp_output.ps"
+
+    # 使用实际尺寸导出（不要放大 pagewidth 等）
+    canvas.postscript(file=ps_filename, colormode='color')
+
+    try:
+        # 打开 EPS 图像
+        img = Image.open(ps_filename)
+        img.load()
+
+        # 计算新尺寸（高分辨率放大）
+        new_size = (img.width * scale, img.height * scale)
+        img = img.resize(new_size, resample=Image.LANCZOS)
+
+        # 转为 PDF
+        img.save(filename, "PDF")
+        print(f"Saved high-res PDF to {filename}")
+    except Exception as e:
+        print("Failed to convert canvas to PDF:", e)
+    finally:
+        if os.path.exists(ps_filename):
+            os.remove(ps_filename)
 
 class SchedulingPainter:
     """Scheduling Painter"""
@@ -58,11 +96,25 @@ class SchedulingPainter:
         # Convert data offset to pixels
         data = {key: val * self._pixel_base for key, val in data.items()}
 
-        max_key = max(data, key=data.get)
+        canvas_width = -1
+        for k,v in data.items():
+            kid, pid, mid, did = parse_microbatch_key(k)
+            length = 0
+            if kid == 'f':
+                length = self._forward_length[pid]
+            elif kid == 'b':
+                length = self._backward_b_length[pid]
+            elif kid == 'w':
+                length = self._backward_w_length[pid]
+            else:
+                print("Type not found!")
+            if data[k] + length + 2 * self._pp_align > canvas_width:
+                max_key = k
+                canvas_width = data[k] + length + 2 * self._pp_align
+
         _, max_key_pid, _, _ = parse_microbatch_key(max_key)
 
-        canvas_width = data[max_key] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
-        # canvas_height = (self._pp_height + self._pp_align) * self._pp_size
+        # canvas_width = data[k] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
         # 按照 Device 画示意图
         canvas_height = (self._pp_height + self._pp_align) * self._device_size
 
@@ -104,17 +156,77 @@ class SchedulingPainter:
         label_canvas.pack()
 
         # 1. Create main canvas
-        main_canvas = tk.Canvas(self._tk_root, bg='#FFFFFF', width=canvas_width, height=canvas_height)
+        main_canvas = tk.Canvas(self._tk_root, bg='#FFFFFF', width=canvas_width, height=canvas_height+5)
         main_canvas.pack()
 
+        # width_scale = 100 / max(canvas_width, 1)
+        # fig, ax = plt.subplots(figsize=(12 * width_scale,6))
+        # _pp_align = 0
+        # _pp_height = 10
+        # # 画每个 device 的 timeline 背景
+        # for pid in range(self._device_size):
+        #     y0 = (_pp_height + _pp_align) * pid + 5
+        #     y1 = y0 + _pp_height
+        #     rect = patches.Rectangle((_pp_align, y0), canvas_width-2*self._pp_align, _pp_height,
+        #                             linewidth=0.25, edgecolor='black', facecolor='white')
+        #     ax.add_patch(rect)
+
+        # # 画每个 microbatch block
+        # for microbatch_key, offset in data.items():
+        #     k, pid, mid, did = parse_microbatch_key(microbatch_key)
+
+        #     x0 = _pp_align + offset
+        #     y0 = (_pp_height + _pp_align) * did + 5
+
+        #     if k == 'f' or k == 'r':
+        #         width = self._forward_length[pid]
+        #     elif k == 'b':
+        #         width = self._backward_b_length[pid]
+        #     elif k == 'w':
+        #         width = self._backward_w_length[pid]
+        #     else:
+        #         width = 10
+
+        #     x1 = x0 + width
+        #     y1 = y0 + _pp_height
+
+        #     color = set_color(pid, k, self._device_size)
+        #     block = patches.Rectangle((x0, y0), width, _pp_height,
+        #                             linewidth=0.25, edgecolor='black', facecolor=color)
+        #     ax.add_patch(block)
+
+        #     if SHOW_WORKLOAD_TEXT:
+        #         ax.text(x0 + width / 2, y0 + _pp_height / 2,
+        #                 str(mid),
+        #                 ha='center', va='center', fontsize=8)
+
+        # # 图形美化
+        # ax.set_xlim(0, canvas_width)
+        # ax.set_ylim(0, canvas_height)
+        # ax.axis('off')
+        # ax.invert_yaxis()
+
+
+        # # 保存为 PDF
+        # with PdfPages(f'/Users/hanayukino/pipeline_schedule_{SCHEDULE_METHOD.name}.pdf') as pdf:
+        #     pdf.savefig(fig, pad_inches=0)
+
+        # plt.show()
+
+        # plt.close(fig)
+        # print("Saved to pipeline_schedule.pdf")
+        
+        # return
+        
         # 2. Add timeline for each pipeline
         # for pid in range(self._pp_size):
         # 按照 Device 画示意图
+        pad = 0
         for pid in range(self._device_size):
             x0 = self._pp_align
-            y0 = (self._pp_height + self._pp_align) * pid + 5
+            y0 = (self._pp_height + self._pp_align) * pid + pad + 5
             x1 = canvas_width - self._pp_align
-            y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
+            y1 = (self._pp_height + self._pp_align) * (pid + 1) - pad + 5
             main_canvas.create_rectangle(x0, y0, x1, y1, fill="#FFFFFF", outline="black")
 
         # 3. Draw execution block for each microbatch according to start and end time
@@ -124,13 +236,13 @@ class SchedulingPainter:
 
             x0 = self._pp_align + offset
             # did = self._pid2did(pid=pid) # 获取对应的device id，把每个stage画在对应的device上
-            # y0 = (self._pp_height + self._pp_align) * pid + 5
-            y0 = (self._pp_height + self._pp_align) * did + 5
+            # y0 = (self._pp_height + self._pp_align) * pid + pad
+            y0 = (self._pp_height + self._pp_align) * did + pad + 5
             #修改画图中每个block的宽度
             block_width = self._forward_length[pid] if k in ('f', 'r') else (self._backward_b_length[pid] if k == 'b' else self._backward_w_length[pid])
             x1 = x0 + block_width
-            # y1 = (self._pp_height + self._pp_align) * (pid + 1) - 5
-            y1 = (self._pp_height + self._pp_align) * (did + 1) - 5
+            # y1 = (self._pp_height + self._pp_align) * (pid + 1) - pad
+            y1 = (self._pp_height + self._pp_align) * (did + 1) - pad + 5
 
             # save schedule representation in painter
             if HEAD_DP:
@@ -153,12 +265,12 @@ class SchedulingPainter:
                     (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
                 )
                 self._item2block[text] = block
-            else:
-                if mid in (0, self._device_size + 1):
-                    text = main_canvas.create_text(
-                        (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
-                    )
-                    self._item2block[text] = block
+            # else:
+            #     if mid in (0, self._device_size + 1):
+            #         text = main_canvas.create_text(
+            #             (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
+            #         )
+            #         self._item2block[text] = block
 
             self._highlight_state[block] = False
             self._item2color[block] = color
@@ -214,4 +326,6 @@ class SchedulingPainter:
 
         main_canvas.bind("<Button-1>", _trigger_hook)
 
+        button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_as_pdf(main_canvas))
+        button.pack()
         self._tk_root.mainloop()

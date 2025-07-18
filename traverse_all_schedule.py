@@ -95,7 +95,7 @@ def run_schedule(draw=False):
     simulator.show_mem_usage(show_all=True)
     if draw:
         simulator.draw()
-    print(simulator.workload_execute_record)
+    # print(simulator.workload_execute_record)
     print("Time:{}.".format(simulator.last_workload.end_time))
     return simulator.last_workload.end_time, simulator.finish_flag
 

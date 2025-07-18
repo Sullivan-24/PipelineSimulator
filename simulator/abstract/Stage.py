@@ -9,7 +9,7 @@ class StageType:
     CE = 4
     LAYERS = 5
 
-def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:WorkloadType, recomp, comp_power:float = 1)->float:
+def get_workload_duration_old(sid:int, layer_wise:bool, layer_num:int, wtype:WorkloadType, recomp, layer_idxs:list=None, comp_power:float = 1)->float:
     if layer_wise:
         assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}."
     if wtype in (WorkloadType.F, WorkloadType.R):
@@ -67,6 +67,62 @@ def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:Workloa
         raise ValueError(f"Wrong workload type: {wtype}.")
     return int(duration / comp_power)
 
+def calculate_total_time(wtype:WorkloadType, recomp, layer_idxs:list)->float:
+    if layer_idxs == None:
+        return 0
+    total_time = 0
+    type_time_map = {
+        WorkloadType.F:"F_TIMES",
+        WorkloadType.B:"B_TIMES",
+        WorkloadType.W:"W_TIMES",
+    }
+    times = gpc[type_time_map[wtype]]
+    for idx in layer_idxs:
+        total_time += times[idx]
+
+    if recomp and wtype == WorkloadType.B:
+        for idx in layer_idxs:
+            total_time += gpc["F_TIMES"][idx]
+    return total_time
+
+def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:WorkloadType, recomp, layer_idxs:list=None, comp_power:float = 1)->float:
+    if layer_wise:
+        assert f"LAYERWISE not enabled."
+    
+    duration = calculate_total_time(wtype=wtype, recomp=recomp, layer_idxs=layer_idxs)
+    # print(f"Sid:{sid}, Duration:{duration}.")
+    if wtype in (WorkloadType.F, WorkloadType.R):
+        if sid == 0:
+            duration += gpc["EMB_F_TIME"]
+        elif sid == gpc["STAGE_NUM"] - 1 and not HEAD_DP:
+            duration += gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]
+        elif sid == gpc["STAGE_NUM"] and HEAD_DP:
+            duration = gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]
+    elif wtype == WorkloadType.B: # Consider recomputation
+        recomp = 0 #DEBUG seperate R and B
+        if sid == gpc["STAGE_NUM"] - 1 and not HEAD_DP:
+            duration += gpc["HEAD_B_TIME"] + gpc["CE_B_TIME"] + (gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]) * recomp
+            if not gpc["SPLIT_BACKPROP"]:
+                duration += gpc["HEAD_W_TIME"]
+        elif sid == gpc["STAGE_NUM"] and HEAD_DP:
+            duration = gpc["HEAD_B_TIME"] + gpc["CE_B_TIME"] + (gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]) * recomp
+            if not gpc["SPLIT_BACKPROP"]:
+                duration += gpc["HEAD_W_TIME"]
+        elif sid == 0:
+            duration += gpc["EMB_B_TIME"]
+            if not gpc["SPLIT_BACKPROP"]:
+                duration += gpc["EMB_W_TIME"]
+    elif wtype == WorkloadType.W:
+        if sid == gpc["STAGE_NUM"] - 1 and not HEAD_DP:
+            duration += gpc["HEAD_W_TIME"]
+        elif sid == gpc["STAGE_NUM"] and HEAD_DP:
+            duration = gpc["HEAD_W_TIME"]
+        elif sid == 0:
+            duration += gpc["EMB_W_TIME"]
+    else:
+        raise ValueError(f"Wrong workload type: {wtype}.")
+    return int(duration / comp_power)
+
 class Stage:
     
     INTERLEAVED = 1
@@ -90,6 +146,7 @@ class Stage:
         self.recomp = recomp
         self.layerwise = layerwise
         self.layer_num = layer_num
+        self.layer_idxs = list(range(stage_id * layer_num, stage_id * layer_num + layer_num))
         self.comp_power = comp_power
         if layerwise: 
             assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}"
@@ -130,6 +187,7 @@ class Stage:
                     layer_num=self.layer_num,
                     wtype=WorkloadType.F,
                     recomp=self.recomp,
+                    layer_idxs=self.layer_idxs,
                     comp_power=self.comp_power,
                 ),
                 recomp=self.recomp,
@@ -150,6 +208,7 @@ class Stage:
                     layer_num=self.layer_num,
                     wtype=WorkloadType.B,
                     recomp=self.recomp,
+                    layer_idxs=self.layer_idxs,
                     comp_power=self.comp_power,
                 ), 
                 recomp=self.recomp,
@@ -168,6 +227,7 @@ class Stage:
                         layer_num=self.layer_num,
                         wtype=WorkloadType.R,
                         recomp=self.recomp,
+                        layer_idxs=self.layer_idxs,
                         comp_power=self.comp_power,
                     ), 
                     recomp=self.recomp,
@@ -187,6 +247,7 @@ class Stage:
                         layer_num=self.layer_num,
                         wtype=WorkloadType.W,
                         recomp=self.recomp,
+                        layer_idxs=self.layer_idxs,
                         comp_power=self.comp_power,
                     ),
                     recomp=self.recomp,
@@ -295,7 +356,7 @@ class Stage:
                 return None
             elif self.stage_type == StageType.CE and workload_type in (WorkloadType.W, ):
                 return None
-            print("Lack of workload info.")
+            # print("Lack of workload info.")
         return None
 
     def __repr__(self) -> str:

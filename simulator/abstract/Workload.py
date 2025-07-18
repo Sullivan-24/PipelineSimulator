@@ -49,7 +49,7 @@ class Workload:
                         device_id = self.did,
                         stage_id = self.sid+1, 
                         microbatch_id= self.mid, 
-                        workload_type = WorkloadType.B)
+                        workload_type = WorkloadType.B if not (gpc['SCHEDULE_METHOD'] == Schedule.STANDARD_1F1B and SPLIT_BACKPROP == True) else WorkloadType.W)
                 )
             else:
                 self.constraints.add(

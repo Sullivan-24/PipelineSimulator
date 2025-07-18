@@ -206,7 +206,6 @@ class PipelinePlacement:
     def get_placements(self):
         # Sort layers by computation cost in descending order, keeping their original indices
         sorted_layers = sorted(enumerate(self.layer_computation_cost), key=lambda x: -x[1])
-        
         # Initialize devices: memory_used, total_time, and layers list
         devices = [
             {
@@ -263,6 +262,7 @@ class PipelinePlacement:
             dev['layers'].sort()
             dev['layer_num'] = len(dev['layers'])
             dsa.append(dev['layers'])
+        dsa = sorted(dsa, key=lambda x : x[0])
         for device in devices:
             print(device)
         for dsa_in_pp in dsa:
@@ -400,15 +400,11 @@ if __name__ == "__main__":
     
     # print("\n每个chunk的最大时间:", chunk_max)
     # print("流水线整体最大时间:", total_max)
-    pp_size = 8
-    layer_num = 80
+    pp_size = 4
+    layer_num = 32
     layer_computation_cost = [1 for _ in range(layer_num)]
-    layer_computation_cost[-1] = 2
+    layer_computation_cost[-1] += 4.5
     pp_compute_power = [1 for _ in range(pp_size)]
-    pp_compute_power[0] = 2
-    pp_compute_power[1] = 2
-    pp_compute_power[2] = 2
-    pp_compute_power[3] = 2
     
     test_placement = PipelinePlacement(layer_num=layer_num, 
                                     layer_computation_cost=layer_computation_cost,
@@ -423,6 +419,9 @@ if __name__ == "__main__":
     #     print(p)
     # ps = test_placement.get_reduced_placements()
     ps = test_placement.get_placements()
+    print("------------")
+    print(ps)
+    print("------------")
     # test_placement.get_placements()
     # pp4 layer8 也不行
     # test_placement.get_placements_dp()

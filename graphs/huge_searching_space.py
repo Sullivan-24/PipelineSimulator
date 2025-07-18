@@ -52,14 +52,14 @@ def varyseq():
     import math
 
     def count_valid_fbw_permutations(N):
-        total = math.factorial(3 * N) // (6 ** N)
+        total = math.log10(math.factorial(3 * N) // (6 ** N))
         return total
 
     def count_valid_fb_permutations(N):
-        total = math.factorial(2 * N) // (2 ** N)
+        total = math.log10(math.factorial(2 * N) // (2 ** N))
         return total
 
-    nmbs = [2, 4, 8, 12, 16, 20, 24, 32]
+    nmbs = [2, 4, 8, 12, 16, 20, 24, 32, 48, 64, 128]
     cases = [[], []]
     for i in range(2):
         for nmb in nmbs:

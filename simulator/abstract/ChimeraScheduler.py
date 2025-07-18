@@ -138,9 +138,9 @@ class ChimeraPipelineScheduler:
     def chimera_execute_workload(self, device: Device):
         if device.state == Device.IDLE:
             now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
-            if device.last_workload_type == WorkloadType.B:
+            if device.last_wtype == WorkloadType.B:
                 now_workload_priority_order = [WorkloadType.F, WorkloadType.B, WorkloadType.W]
-            elif device.last_workload_type == WorkloadType.F:
+            elif device.last_wtype == WorkloadType.F:
                 now_workload_priority_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
             
             for workload_type in now_workload_priority_order:
@@ -164,7 +164,7 @@ class ChimeraPipelineScheduler:
 
                         proc_workload = device.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
                         if proc_workload:
-                            device.last_workload_type = workload_type
+                            device.last_wtype = workload_type
                             device.proc_workload = proc_workload
                             device.update_memory_usage()
                             device.state = Device.BUSY
