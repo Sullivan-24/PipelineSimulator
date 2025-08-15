@@ -7,13 +7,13 @@ RUN_MODE = RunMode.LAYERWISE_GUROBI_SOLVE
 RUN_MODE = RunMode.GUROBI_SOLVE
 RUN_MODE = RunMode.CHIMERA
 RUN_MODE = RunMode.SIM_SOLVE
-
+TK_SILENCE_DEPRECATION=1
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
 SCHEDULE_METHOD = Schedule.UnifiedPP
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_1F1B
-# SCHEDULE_METHOD = Schedule.STANDARD_ZBH1
+SCHEDULE_METHOD = Schedule.STANDARD_ZBH1
 # SCHEDULE_METHOD = Schedule.ZBV
 STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.SEARCHED
@@ -26,7 +26,7 @@ if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.STANDARD_1F1B):
 # --------------------- Solver config ---------------------
 Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
-HETER_DEVICE = True
+HETER_DEVICE = False
 HETER_RATIO = 1
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 # --------------------- Simulator config ---------------------

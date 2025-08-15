@@ -97,11 +97,11 @@ class Config(dict):
 
         return config
 
-global_context = Config.from_file("/Users/hanayukino/Code/PipelineSimulator/simulator/config.py")
+global_context = Config.from_file("/Users/ma/PipelineSimulator/simulator/config.py")
 
 if __name__ == "__main__":
     c = Config()
-    c = Config.from_file("/Users/hanayukino/Code/PipelineSimulator/simulator/config.py")
+    c = Config.from_file("/Users/ma/PipelineSimulator/simulator/config.py")
     print(c)
     c['K'] = 1
     print(c["K"])
