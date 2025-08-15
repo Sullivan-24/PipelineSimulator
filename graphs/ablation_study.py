@@ -2,6 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from e2e_data import *
+import matplotlib.colors as mcolors
+fontsize=18
+titlesize=22 + fontsize
+labelsize= 20 + fontsize
+ticksize= 16 + fontsize
+legendsize= 20 + fontsize - 0.5
+
 # 数据预处理函数
 def process_data(data):
     return [v if v != "OOM" else 0 for v in data]
@@ -13,7 +20,7 @@ def get_min_v(array):
         min_v = min(min_v, v)
     return min_v
 
-def draw_ablation_study():
+def draw_ablation_study_old():
     def sinplot():
         # 配置绘图参数
         plt.rcParams.update({
@@ -82,4 +89,74 @@ def draw_ablation_study():
     plt.savefig('/Users/hanayukino/ablation_study.pdf', bbox_inches='tight')
     plt.show()
 
-draw_ablation_study()
+def draw_ablation():
+    def sinplot():
+
+        plt.figure(figsize=(18, 8))
+        base_color = '#E54C5E'  # 基础红色
+        
+        methods = ["Baseline", "+1", "+2", "+3", "+1+2", "+1+3", "+2+3", "+1+2+3"]
+        models = list(ablation_data.keys())
+        bar_width = 0.25
+        x = np.arange(len(methods))
+        legend_handles = []
+
+        # 为每个模型创建分面柱状图
+        for i, model in enumerate(models):
+            # 按性能排序
+            sorted_items = ablation_data[model].items()
+            values = [item[1] for item in sorted_items]
+            
+            if i == 2:
+                base_color = '#E54C5E'
+            elif i == 1:
+                base_color = '#d04c99'
+            else:
+                base_color = '#9164c6'
+            # 生成透明度渐变 (性能越高颜色越深)
+            alphas = np.linspace(0.2, 0.9, len(values))
+            colors = [mcolors.to_rgba(base_color, alpha=alpha) for alpha in alphas]
+            
+            # 绘制柱状图 (横向偏移避免重叠)
+            bars = plt.bar(x + i*bar_width, values, width=bar_width-0.05,
+                        edgecolor='black', linewidth=1.2,
+                        color=colors, label=model)
+            
+            legend_handles.append(plt.Rectangle((0,0), 1, 1, 
+                                        fc=base_color,  # 完全不透明
+                                        ec='black',
+                                        lw=1.2))
+            # 添加数值标签
+            for bar, val in zip(bars, values):
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2, height*1.01,
+                        f'{val*100:.0f}%', ha='center', va='bottom', rotation=90,
+                        fontsize=ticksize, color='black')
+
+        # 图表装饰
+        plt.xticks(x + bar_width*(len(models)-1)/2, methods, rotation=15, fontsize=ticksize)
+        ylim_min, ylim_max = 0.6, 1.1
+        ylim_range = np.arange(ylim_min, ylim_max, 0.1)
+        plt.ylim((ylim_min,ylim_max))
+        plt.yticks(ylim_range, fontsize=ticksize)
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        plt.ylabel('Normalized Performance', fontsize=labelsize-1)
+        plt.title('Ablation Study Across Models', fontsize=titlesize, pad=20, y=0.98)
+        # plt.legend(fontsize=11, frameon=False, bbox_to_anchor=(1, 1))
+        # plt.legend(fontsize=11, frameon=False)
+        plt.legend(legend_handles, models, 
+            fontsize=legendsize, 
+            frameon=False,
+            loc='upper left',  # 将图例放在左上方
+            bbox_to_anchor=(0, 1.05),
+            labelspacing=0.25,
+            handletextpad=0.25,
+        )
+        plt.tight_layout()
+
+    sinplot()
+    sns.despine()
+    plt.savefig('/Users/hanayukino/ablation_study.pdf', bbox_inches='tight')
+    plt.show()
+
+draw_ablation()
