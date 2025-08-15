@@ -28,41 +28,7 @@ class PipelineScheduler:
         self.layer_num = gpc["LAYER_NUM"]
         self.devices: list[Device] = []
         self.placement = [] if not placement else placement
-        # 222 0
-        # 145 A
-        # 152 AB
-        # 130 ABC
-        # Standard 1F1B 4034 666 
-        # Standard I1F1B 3662
-        # ZBH 3638 616
-        # Alpa gpt3
-        # self.placement = [
-        #     [1,1,1,1,1,1,1,1],
-        #     [1,1,1,1,1,1,1,1],
-        #     [1,1,1,1,1,1,1,1],
-        #     [1,1,1,1,1,1,1,1],
-        # ]
-        # Alpa ds
-        # self.placement = [
-        #     [1,1,1,1,1,1,1,1,1,1],
-        #     [1,1,1,1,1,1,1,1],
-        #     [1,1,1,1,1,1,1,1],
-        #     [1,1,1,1,1,1],
-        # ]
-        # Alpa llama3
-        # self.placement = [
-        #     [1,1,1,1,1,1,1,1],
-        #     [1,1,1,1,1,1,1,1,1],
-        #     [1,1,1,1,1,1,1,1,1],
-        #     [1,1,1,1,1,1],
-        # ]
-        # Alpa gemma
-        self.placement = [
-            [1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1],
-        ]
+        self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
         # UPP 127 148 172 221
         #     1.74 1.49 1.28
         # self.placement = [ # 3002 475
@@ -83,62 +49,100 @@ class PipelineScheduler:
         #     [2, 7, 10, 14, 18, 21, 24, 27, 30],
         #     [3, 5, 11, 15, 31],
         # ]
-        # self.placement = [ # 464 llama3
-        #     [0, 4, 8, 12, 16, 20, 23, 26],
-        #     [1, 5, 9, 13, 17, 21, 24, 27, 29],
-        #     [2, 6, 10, 14, 18, 22, 25, 28, 30],
-        #     [3, 7, 11, 15, 19, 31],
+        # self.placement = [ # 464 Gemma
+        #     [0, 3, 6, 9, 12, 16, 20, 24, 28],
+        #     [1, 4, 7, 10, 13, 17, 21, 25, 29],
+        #     [2, 5, 8, 11, 14, 18, 22, 26, 30],
+        #     [15, 19, 23, 27, 31],
         # ]
-        # self.placement = [ # 464 ds
-        #     [0, 4, 8, 12, 16, 20, 23, 26],
-        #     [1, 5, 9, 13, 17, 21, 24, 27, 29],
-        #     [2, 6, 10, 14, 18, 22, 25, 28, 30],
-        #     [3, 7, 11, 15, 19, 31],
+        # self.placement = [ # 464 Gemma
+        #     [0, 1, 8, 9, 16, 17, 22, 23, 28],
+        #     [2, 3, 10, 11, 18, 19, 24, 25, 29],
+        #     [4, 5, 12, 13, 20, 21, 26, 27, 30],
+        #     [6, 7, 14, 15, 31],
         # ]
-        # self.placement = [ # 464 gpt3
-        #     [0, 4, 8, 12, 16, 20, 24, 31],
-        #     [1, 5, 9, 13, 17, 21, 25, 30],
-        #     [2, 6, 10, 14, 18, 22, 26, 29],
-        #     [3, 7, 11, 15, 19, 23, 27, 28],
-        # ]
-        # self.placement = [ # 3002 483
-        #     [0, 4, 8, 12, 31],
-        #     [1, 5, 9, 13, 16, 19, 22, 25, 28],
-        #     [2, 6, 10, 14, 17, 20, 23, 26, 29],
-        #     [3, 7, 11, 15, 18, 21, 24, 27, 30],
-        # ]
-        # self.placement = [[0, 3, 6, 9, 12, 15, 19, 23, 27], [1, 4, 7, 10, 13, 16, 20, 24, 28], [2, 5, 8, 11, 14, 17, 21, 25, 29], [18, 22, 26, 30, 31]]
-        # self.placement = [ # 2901 FBW 2798 BFW! 485 BFW
-        #     [0, 7, 14, 21, 31],
-        #     [1, 4, 8, 11, 15, 18, 22, 25, 28],
-        #     [2, 5, 9, 12, 16, 19, 23, 26, 29],
-        #     [3, 6, 10, 13, 17, 20, 24, 27, 30],
-        # ]
+        if GEMMA:
+            if SEQ_LEN == 2*K:
+                if DEVICE_NUM == 4:
+                    self.layer_assignment=[9,9,8,6]
+                if DEVICE_NUM == 8:
+                    if LAYER_NUM == 64:
+                        # Mist 256
+                        self.layer_assignment=[5, 9, 9, 9, 9, 9, 9, 5]
+                        self.layer_assignment=[9, 9, 9, 8, 8, 8, 8, 5]
+                        # Mist 512
+                        self.layer_assignment=[5, 9, 9, 9, 9, 9, 9, 5]
+                        self.layer_assignment=[9, 9, 9, 8, 8, 8, 8, 5]
+                    if LAYER_NUM == 128:
+                        self.layer_assignment=[14, 17, 17, 17, 17, 17, 17, 12]
+                if DEVICE_NUM == 16:
+                    # Mist
+                    self.layer_assignment=[1, 5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5]
+                    self.layer_assignment=[9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 1]
+            if SEQ_LEN == 4*K:
+                if DEVICE_NUM == 4:
+                    self.layer_assignment=[10,9,8,5]
+                if DEVICE_NUM == 8:
+                    self.layer_assignment=[10, 9, 9, 9, 8, 8, 8, 3]
+                    if LAYER_NUM == 128:
+                        self.layer_assignment=[18, 17, 17, 17, 17, 17, 17, 8]
+                if DEVICE_NUM == 16:
+                    # Mist
+                    self.layer_assignment=[1, 5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5]
+                    self.layer_assignment=[9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 1]
+        if DEEPSEEK:
+            if DEVICE_NUM == 4:
+                self.layer_assignment=[5,4,4,3]
+                if SEQ_LEN == 4*K:
+                    self.layer_assignment=[6,4,4,2]
+            if DEVICE_NUM == 8:
+                if VOCAB_SIZE // DEEPSEEK_VOC == 4 and LAYER_NUM == 64:
+                    self.layer_assignment=[12,8,8,8,8,8,8,4]
+                    assert sum(self.layer_assignment) == LAYER_NUM, "Wrong layer assignment."
+                elif VOCAB_SIZE // DEEPSEEK_VOC == 2 and LAYER_NUM == 32:
+                    self.layer_assignment=[6,4,4,4,4,4,4,2]
+                else:
+                    self.layer_assignment=[6,4,4,4,4,4,4,2]
+            if DS_SCALE == 2:
+                self.layer_assignment=[6,5,4,4,4,4,4,1]
+            if DS_SCALE == 4:
+                self.layer_assignment=[13,9,8,8,8,8,8,2]
+                self.layer_assignment=[12,9,9,8,8,8,8,2]
 
-        # self.placement = [ # 1991
-        #     [0, 2, 6, 15],
-        #     [1, 3, 7, 10, 11, 14],
-        #     [4, 8, 12],
-        #     [5, 9, 13],
-        # ]
-        # self.placement = [ # 1991
-        #     [0, 1, 2, 3,4,5,6,7,8],
-        #     [0, 1, 2, 3,4,5,6,7,8,9],
-        #     [0, 1, 2, 3,4,5,6,7,8,9],
-        #     [0, 1, 2],
-        # ]
-        # self.placement = [ # 2132
-        #     [0, 2, 15],
-        #     [1, 3, 6, 7, 10, 11, 14],
-        #     [4, 8, 12],
-        #     [5, 9, 13],
-        # ]
-        # self.placement = [ # 2080
-        #     [0, 2, 6, 8, 9, 12],
-        #     [1, 3, 7, 15],
-        #     [4, 10, 13],
-        #     [5, 11, 14],
-        # ]
+        if NEMOTRONH:
+            if DEVICE_NUM == 4:
+                self.layer_assignment=[7,7,7,7]
+                if SEQ_LEN == 2*K:
+                    self.layer_assignment=[8,7,8,5]
+                if SEQ_LEN == 4*K:
+                    self.layer_assignment=[8,8,8,4]
+            if DEVICE_NUM == 8:
+                if LAYER_NUM == 56:
+                    if SEQ_LEN == 2*K:
+                        self.layer_assignment=[9,8,7,8,7,7,7,3]
+                    if SEQ_LEN == 4*K:
+                        self.layer_assignment=[9,8,7,8,8,7,7,2]
+                if LAYER_NUM == 112:
+                    self.layer_assignment=[16, 16, 15, 15, 16, 16, 15, 3]
+            if DEVICE_NUM == 16:
+                if SEQ_LEN == 2*K:
+                    self.layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]
+                if SEQ_LEN == 4*K:
+                    self.layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]
+
+        assert sum(self.layer_assignment) == LAYER_NUM
+
+        if SCHEDULE_METHOD != Schedule.UnifiedPP:
+            self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
+
+        
+        self.placement = [
+            [1 for _ in range(layer_num)] for layer_num in self.layer_assignment
+        ]
+
+        with open("partition.txt", 'w') as f:
+            f.write(str(self.layer_assignment))
+            f.flush()
         self.nmb = gpc["MICRO_BATCH_NUM"]
         self.stage_num = gpc["STAGE_NUM"]
         self.schedule_method = gpc["SCHEDULE_METHOD"]
@@ -150,17 +154,8 @@ class PipelineScheduler:
         self.num_finished_microbatch = 0
         self.run_schedule = run_schedule
         self.manual_recomp_set = []
-        # self.manual_recomp_set = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1,1,1,1]
         
         self.fail_indexes = set()
-        # pp4 tp4 zero4 I1F1B recomp set
-        # self.manual_recomp_set = [0 for _ in range(self.layer_num)]
-        # self.manual_recomp_set[2] = 1
-        # self.manual_recomp_set[3] = 1
-        # self.manual_recomp_set[6] = 1
-        # self.manual_recomp_set[7] = 1
-        # self.manual_recomp_set[11] = 1
-        # self.manual_recomp_set[15] = 1
 
         min_value = min(list(reversed(range(self.layer_num))))
         max_value = max(list(reversed(range(self.layer_num))))
@@ -270,18 +265,17 @@ class PipelineScheduler:
                         max_mem=max_mem,
                         comp_power=comp_power,
                         layer_density=self.layer_density,
+                        pipeline=self,
                     )
             dev_compute_power.append(comp_power)
             self.devices.append(device)
         self.set_recomp()
         if gpc["HETER_DEVICE"] and not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH1):
-            layer_computation_cost = [1 for _ in range(self.layer_num)]
-            if self.layer_wise:
-                layer_computation_cost.append(gpc["HEAD_F_TIME"] / gpc["F_TIME"])
-                layer_computation_cost.append(gpc["CE_F_TIME"] / gpc["F_TIME"])
-            else:
-                layer_computation_cost[-1] += (gpc["HEAD_F_TIME"] + gpc["CE_F_TIME"]) / gpc["F_TIME"] * 0
-            total_layer = self.layer_num if not self.layer_wise else self.layer_num + 2
+            layer_computation_cost = [F_TIMES[i]+B_TIMES[i]+W_TIMES[i] for i in range(self.layer_num)]
+            head_total = gpc["HEAD_F_TIME"] + gpc["HEAD_B_TIME"] + gpc["HEAD_W_TIME"]
+            ce_total = gpc["CE_F_TIME"] + gpc["CE_B_TIME"] + gpc["CE_W_TIME"]
+            layer_computation_cost[-1] += head_total + ce_total
+            total_layer = self.layer_num
             self.pipeline_placement_solver = PipelinePlacement(
                 layer_num=total_layer,
                 layer_computation_cost=layer_computation_cost,
@@ -292,24 +286,25 @@ class PipelineScheduler:
             )
             if not self.placement:
                 self.placement = self.pipeline_placement_solver.get_placements()
-        if self.placement and (self.schedule_method == Schedule.STANDARD_1F1B or self.schedule_method == Schedule.STANDARD_ZBH1):
+        if self.placement and self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH1, Schedule.STANDARD_AFAB):
             assert self.placement is not None
+            layer_idx_start = 0
             for did in range(self.device_num):
-                self.devices[did].add_stage(did, layer_num = len(self.placement[did]), recomp=self.recomp_set[did])
+                self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
+                layer_idx_start += len(self.placement[did])
             print("Alpa")
         elif self.placement and self.schedule_method == Schedule.UnifiedPP and CHUNK_NUM == 1:
+            layer_idx_start = 0
             for did in range(self.device_num):
-                self.devices[did].add_stage(did, layer_num = len(self.placement[did]), recomp=self.recomp_set[did])
+                self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
+                layer_idx_start += len(self.placement[did])
             print("S1F1B + model partition + workload scheduling")
         elif self.placement:
-            offset = 0
-            if self.layer_wise:
-                offset = 1
+            layer_idx_start = 0
             for did in range(self.device_num):
                 for pid in self.placement[did]:
-                    self.devices[did].add_stage(pid + offset, layer_num = layer_num, recomp=self.recomp_set[pid + offset])
-            if self.layer_wise:
-                self.devices[self.device_num - 1].add_stage(0, layer_num = layer_num, recomp=self.recomp_set[0])
+                    self.devices[did].add_stage(pid, layer_num = layer_num, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start)
+                    layer_idx_start += layer_num
         elif self.layer_wise:
             if gpc["STAGE_PLACEMENT"] == Placement.INTERLEAVED:
                 print("Use Interleaved placement")
@@ -360,11 +355,7 @@ class PipelineScheduler:
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
             elif gpc["STAGE_PLACEMENT"] == Placement.SEARCHED:
                 print("Use Searched placement")
-                # for pid in range(self.stage_num - self.device_num):
-                #     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
-                # for pid in range(self.stage_num - self.device_num, self.stage_num):
-                #     self.devices[self.device_num - (pid % self.device_num) - 1].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
-                
+
                 for pid in range(self.device_num):
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
                 for pid in range(self.device_num, self.device_num * 2):
@@ -406,10 +397,8 @@ class PipelineScheduler:
         save_to_file(gpc["PLA_FILE_PATH"], str(self.placement), 'w')
 
     def set_recomp(self):
-        if self.layer_wise:
-            self.recomp_set = [1 if gpc["RECOMP"] else 0 for _ in range(self.layer_num + 3)]
-        else:
-            self.recomp_set = [1 if gpc["RECOMP"] else 0 for _ in range(self.stage_num)]
+        self.recomp_set = [1 if gpc["RECOMP"] else 0 for _ in range(self.stage_num)]
+        print("Stage num:",self.stage_num)
         if self.manual_recomp_set:
             print("Use manual recomp set")
             self.recomp_set = self.manual_recomp_set

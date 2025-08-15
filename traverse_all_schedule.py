@@ -91,7 +91,11 @@ def run_schedule(draw=False):
             simulator.result2file()
             print("ZBV F=B=W Schedule saved to data.txt.")
             return -1, True
+    start_time = time.time()
     simulator.run_pipeline_parallelism()
+    end_time = time.time()
+    print(f"Time: {end_time - start_time}")
+
     simulator.show_mem_usage(show_all=True)
     if draw:
         simulator.draw()
@@ -159,6 +163,6 @@ def main():
     save_to_file(f"traverse_res_{Schedule.ZBV.name}.txt", content ,'w')
 if __name__ == "__main__":
     # start_time = time.time()
-    run_schedule(draw=True)
+    run_schedule(draw=False)
     # end_time = time.time()
     # print(f"Schedule generation time:{end_time-start_time}")

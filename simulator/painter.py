@@ -75,6 +75,7 @@ class SchedulingPainter:
         self._highlight_state = {}
         self._item2color = {}
         self._item2block = {}
+        self._item2step = {}
         self._item2mid = {}
 
     def _highlight_and_resume_block(self, canvas, item_id):
@@ -90,11 +91,26 @@ class SchedulingPainter:
             if pid in self._devices[did]:
                 return did
 
+    def generate_step_within_device(self, data:dict):
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        for key, val in data.items():
+            did = key.split('_')[-1]
+            grouped[did].append((key, val))
+
+        data_step_idx = {}
+        for did, kv_list in grouped.items():
+            sorted_list = sorted(kv_list, key=lambda x: x[1])
+            for idx, (key, _) in enumerate(sorted_list):
+                data_step_idx[key] = idx
+        return data_step_idx
+
     def draw(self, data: dict) -> None:
         """draw with tkinter"""
 
         # Convert data offset to pixels
         data = {key: val * self._pixel_base for key, val in data.items()}
+        data_step_idx = self.generate_step_within_device(data)
 
         canvas_width = -1
         for k,v in data.items():
@@ -141,13 +157,13 @@ class SchedulingPainter:
         )
 
         coords_label_1 = label_canvas.create_text(
-            canvas_width * 0.25, y_label, text="BlockCoords:(start,end)"
+            canvas_width * 0.15, y_label, text="BlockCoords:(start,end)"
         )
         coords_label_2 = label_canvas.create_text(
-            canvas_width * 0.5, y_label, text="BlockCoords:(start,end)"
+            canvas_width * 0.35, y_label, text="BlockCoords:(start,end)"
         )
         coords_label_3 = label_canvas.create_text(
-            canvas_width * 0.75, y_label, text="BlockCoords:(start,end)"
+            canvas_width * 0.55, y_label, text="BlockCoords:(start,end)"
         )
 
         coords_label = label_canvas.create_text(
@@ -275,6 +291,7 @@ class SchedulingPainter:
             self._highlight_state[block] = False
             self._item2color[block] = color
             self._item2block[block] = block
+            self._item2step[block] = data_step_idx[microbatch_key]
             # 求余考虑virtual stage的情况
             self._item2mid[block] = mid
         
@@ -296,17 +313,19 @@ class SchedulingPainter:
             item_coords = main_canvas.coords(current_item)
             current_start = int(item_coords[0] - self._pp_align) // self._pixel_base
             current_end = int(item_coords[2] - self._pp_align) // self._pixel_base
+
+            step = self._item2step[current_item]
             label_canvas.itemconfig(
-                coords_label, text=f"BlockCoords:({current_start},{current_end})"
+                coords_label, text=f"Step {step} ({current_start},{current_end})"
             )
             label_canvas.itemconfig(
-                coords_label_1, text=f"BlockCoords:({current_start},{current_end})"
+                coords_label_1, text=f"Step {step} ({current_start},{current_end})"
             )
             label_canvas.itemconfig(
-                coords_label_2, text=f"BlockCoords:({current_start},{current_end})"
+                coords_label_2, text=f"Step {step} ({current_start},{current_end})"
             )
             label_canvas.itemconfig(
-                coords_label_3, text=f"BlockCoords:({current_start},{current_end})"
+                coords_label_3, text=f"Step {step} ({current_start},{current_end})"
             )
 
             tags = [

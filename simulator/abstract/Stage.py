@@ -129,7 +129,7 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, microbatch_num:int, layer_num: int, layerwise:bool = False, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
+    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, microbatch_num:int, layer_num: int, layer_idx_start: int, layerwise:bool = False, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
         self.did: int = device_id
         self.sid: int = stage_id
         self.nmb: int = microbatch_num
@@ -146,7 +146,8 @@ class Stage:
         self.recomp = recomp
         self.layerwise = layerwise
         self.layer_num = layer_num
-        self.layer_idxs = list(range(stage_id * layer_num, stage_id * layer_num + layer_num))
+        self.layer_idx_start = layer_idx_start
+        self.layer_idxs = list(range(layer_idx_start, layer_idx_start + layer_num))
         self.comp_power = comp_power
         if layerwise: 
             assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}"

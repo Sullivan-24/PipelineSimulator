@@ -45,7 +45,6 @@ class SPSimulator:
         ), "sequential order constraint strategy is not supported"
 
         self._solver                = z3.Optimize()
-        self._recomputing_rate      = []
         self._layers                = []
         self._forward_offsets       = [[] for _ in range(self._pp_size)]
         self._backward_b_offsets    = [[] for _ in range(self._pp_size)]
@@ -178,16 +177,6 @@ class SPSimulator:
                 self._solver.add(
                         self._forward_offsets[0][0] == 0
                 )
-                
-        # Set W stage increasing order within the same device
-        # for dsa in self._devices:
-        #     for idx in range(0, len(dsa)):
-        #         if idx < len(dsa) - 1:
-        #             self._solver.add(
-        #                 self._backward_w_offsets[dsa[idx]][-1]
-        #                 >= self._backward_w_offsets[dsa[idx + 1]][0]
-        #                 + self._backward_w_length[dsa[idx + 1]]
-        #             )
                     
     def _pipeline_activation_accumulation_constraint(self):
         for pp in range(self._pp_size):
@@ -211,7 +200,6 @@ class SPSimulator:
                 self._solver.add(_actvaition_count <= self._max_activation_counts[pp])
 
     def _serial_computation_within_device_constraint(self):
-        print_to_file(self._file_path, "Stage alignment:{}.\n".format(self._devices))
         total_constraints = 0
         same_mb_redundant_constraints = 0
         for did in range(self._device_size):
@@ -235,8 +223,6 @@ class SPSimulator:
                 )
                 for j in range(i + 1, len(_pp_vars)):
                     total_constraints += 1
-                    # 根据_real_pipeline_modeling_constraint_strict中对重叠关系的分析，同一mb之间不存在重叠。
-                    # 只有不同mb之间会存在重叠情况，剔除多余的约束条件后，测试d=5 mb=5时，时间变化为35s→25s，但发现d=4 mb=4时，时间基本不变化
                     if j // (self._num_microbatches * 3) == i // (self._num_microbatches * 3):
                         if j % self._num_microbatches == i % self._num_microbatches:
                             same_mb_redundant_constraints += 1
@@ -257,46 +243,23 @@ class SPSimulator:
                             _pp_vars[j] + _j_length <= _pp_vars[i],
                         )
                     )
-                    # 替换成Not and后不等价
-                    # self._solver.add(
-                    #     z3.Not(z3.And(
-                    #         _pp_vars[i] + _i_length >= _pp_vars[j],
-                    #         _pp_vars[j] + _j_length >= _pp_vars[i],
-                    #     ))
-                    # )
-                    # 类似图形学中判断两直线是否重叠，避免使用OR语句
-                    # 改写后却变慢：
-                    # a1 = _pp_vars[i]
-                    # b1 = _pp_vars[i] + _i_length
-                    # a2 = _pp_vars[j]
-                    # b2 = _pp_vars[j] + _j_length
-                    # self._solver.add(
-                    #     (b2 - a1)*(a2 - b1) >= 0
-                    # )
                     
-        print_to_file(self._file_path, "Total Constraints within Device:{}, Redundant Constraints:{}.\n".format(total_constraints, same_mb_redundant_constraints))
+        # print_to_file(self._file_path, "Total Constraints within Device:{}, Redundant Constraints:{}.\n".format(total_constraints, same_mb_redundant_constraints))
 
     def _build_layer_constraint(self):
         for i in range(self._pp_size):
+            # self._solver.add(
+            #     self._layers[i] >= 1,
+            #     self._layers[i] <= self._model_size
+            # )
             self._solver.add(
-                self._layers[i] >= 1,
-                self._layers[i] <= self._model_size
+                self._layers[i] == self._model_size // self._pp_size
             )
         self._solver.add(sum(self._layers) == self._model_size)
-        
-    def _build_recomputing_rate_constraint(self):
-        # discrete_values = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0] # faster!
-        # discrete_values = [0, 0.2, 0.4, 0.6, 0.8, 1.0] # slower!
-        for i in range(self._pp_size):
-            self._solver.add(       # faster, in a way, z3.Or may slower solving?!
-                self._recomputing_rate[i] >= 0,
-                self._recomputing_rate[i] <= 1
-            )
-            # self._solver.add(z3.Or([self._recomputing_rate[i] == v for v in discrete_values]))
     
     def _update_fbw_length(self):
         self._forward_length = [self._layers[i] * self._basic_forward_length[i] for i in range(self._pp_size)]
-        self._backward_b_length = [self._layers[i] * (self._basic_backward_b_length[i] + self._basic_forward_length[i] * self._recomputing_rate[i]) for i in range(self._pp_size)]
+        self._backward_b_length = [self._layers[i] * self._basic_backward_b_length[i] for i in range(self._pp_size)]
         self._backward_w_length = [self._layers[i] * self._basic_backward_w_length[i] for i in range(self._pp_size)]
     
     def _reset_comm_length(self, dsa):
@@ -312,7 +275,6 @@ class SPSimulator:
         
         for i in range(self._pp_size):
             self._layers.append(z3.Int(f"l_{i}"))
-            self._recomputing_rate.append(z3.Real(f"r_{i}"))
             for mb in range(self._num_microbatches):
                 self._forward_offsets[i].append(z3.Int(f"f_{mb}_{i}"))
                 self._backward_b_offsets[i].append(z3.Int(f"b_{mb}_{i}"))
@@ -321,7 +283,6 @@ class SPSimulator:
                 self._solver.add(self._forward_offsets[i][-1] >= 0)
 
         self._build_layer_constraint()
-        self._build_recomputing_rate_constraint()
         self._update_fbw_length()
 
         self._comm_length = self._reset_comm_length(self._devices)
@@ -331,42 +292,23 @@ class SPSimulator:
         self._serial_computation_within_device_constraint()
 
         # constraint 3: the accumulation count of activations does not exceed max_activation_counts
-        self._pipeline_activation_accumulation_constraint()
+        # self._pipeline_activation_accumulation_constraint()
 
     def _build_optimize_objectives(self) -> None:
         # 1. minimize the execution time of each microbatch
         max_var = z3.Int("max_start_offset")
-        # Add optimization objectives according to devices
-        # Reduce optimize objectives to O(d), but not return the optimal result.
-        # for dsa in self._devices:
-        #     pp = dsa[0]
-        #     self._solver.add(max_var >= self._backward_w_offsets[pp][-1])
-
         # Add optimization objectives according to stages
         for pp in range(self._pp_size):
             # Complexity of optimization objectives is O(s)
             # Need to ensure the W of each microbatch is in increasing order
             # self._solver.add(max_var >= self._backward_w_offsets[pp][-1])
             
-            self._solver.add(max_var >= self._backward_w_offsets[pp][-1] + self._backward_w_length[pp])
+            # self._solver.add(max_var >= self._backward_w_offsets[pp][-1] + self._backward_w_length[pp])
 
             # Complexity of optimization objectives is O(s * microbatches)
             # This behavior will dramatically increase the searching complexity
-            # for var in self._backward_w_offsets[pp]:
-            #     self._solver.add(max_var >= var)
-        
-        # Reduce optimize objectives to O(1)
-        # self._solver.add(max_var >= z3.Sum([self._backward_w_offsets[i][-1] for i in range(self._pp_size)]))
-        
-        # Set search upper bound
-        # max_f_len = max(self._basic_forward_length)
-        # max_b_len = max(self._basic_backward_b_length)
-        # max_w_len = max(self._basic_backward_w_length)
-        # sum_f_len = sum(self._basic_forward_length)
-        # sum_b_len = sum(self._basic_backward_b_length)
-        # sum_w_len = sum(self._basic_backward_w_length)
-        # gpipe_zb_time = (sum_f_len + max(sum_b_len, sum_w_len) + (self._device_size - 1) * (max_f_len + max_b_len + max_w_len) + max_w_len + self._device_size * comm)
-        # self._solver.add(max_var <= gpipe_zb_time)
+            for var in self._backward_w_offsets[pp]:
+                self._solver.add(max_var >= var)
 
         # Optimize
         self._solver.minimize(max_var)
@@ -376,9 +318,9 @@ class SPSimulator:
             "device_num": self._device_size,
             "devices": self._devices,
             "stage_num": self._pp_size,
-            "pp_height": 50,
+            "pp_height": 25,
             "pp_align": 10,
-            "pixel_base": 2,
+            "pixel_base": 1,
             "nmb": self._num_microbatches,
             "forward_length": self._forward_length,
             "backward_length": self._backward_b_length,
@@ -386,7 +328,6 @@ class SPSimulator:
             "comm_length": self._comm_length,
             "file_path": self._file_path,
         }
-
         SchedulingPainter(painter_conf).draw(results)
 
     def run(self, base_solution=False, draw=False) -> None:
@@ -401,28 +342,26 @@ class SPSimulator:
 
         # 3. runs the solver.
         start_time = time.time()
-        print_to_file(self._file_path, "Z3 Solver Solving...\n")
         check = self._solver.check()
         end_time = time.time()
         if  check == z3.sat:
-            print_to_file(self._file_path, f"Result: SAT, Cost: {end_time - start_time:.2f}.\n")
-            # tranforms the result to a dictionary.
+            # print_to_file(self._file_path, f"Result: SAT, nmb: {self._num_microbatches}, Cost: {end_time - start_time:.2f}\n")
+            print_to_file(self._file_path, f"{self._num_microbatches} : {end_time - start_time:.2f},\n")
+
             model = self._solver.model()
             self.model_result = model
             results = {str(key) : model[key] for key in model}
-            print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"].as_long()))
+            # print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"].as_long()))
             for i in range(self._pp_size):
                 number_of_layers = model[self._layers[i]].as_long()
-                recompute_rate = float(model[self._recomputing_rate[i]].as_fraction())
                 self._forward_length[i] = self._basic_forward_length[i] * number_of_layers
-                self._backward_b_length[i] = (self._basic_backward_b_length[i] + self._basic_forward_length[i] * recompute_rate) * number_of_layers 
+                self._backward_b_length[i] = self._basic_backward_b_length[i] * number_of_layers 
                 self._backward_w_length[i] = self._basic_backward_w_length[i] * number_of_layers
             if draw:
-                # 4. draws the result.
-                draw_results = {str(key) : model[key].as_long() for key in model if str(key)[0:2] in ["f_","b_","w_"]}
-                self._draw(resort_microbatch_index(self._num_microbatches ,draw_results))
+                draw_results = {str(key) + str(key)[-2:] : model[key].as_long() for key in model if str(key)[0:2] in ["f_","b_","w_"]}
+                self._draw(draw_results)
             return results
         else:
-            print_to_file(self._file_path, f"Result: UNSAT, Cost: {end_time - start_time:.2f}.\n")
+            print_to_file(self._file_path, f"Result: UNSAT, Cost: {end_time - start_time:.2f}\n")
             return {"max_start_offset": 999999999999}
 

@@ -53,24 +53,19 @@ class GSimulator:
         self._stage_b_length = []
         self._stage_w_length = []
 
-        self._stage_recomp_rate = []
-
         self._stage_f_offsets = [[] for _ in range(self._pp_size)]
         self._stage_b_offsets = [[] for _ in range(self._pp_size)]
         self._stage_w_offsets = [[] for _ in range(self._pp_size)]
 
-        if device_stage_alignments:
-            self._devices = device_stage_alignments
-        else:
-            self._devices = [[] for _ in range(self._device_size)]
-            self._fix_stages()
+        self._devices = [[] for _ in range(self._device_size)]
+        self._fix_stages()
 
         # baseline solution
-        if self._base_solution:
-            self.pipeline_scheduler = Pipeline.PipelineScheduler(placement=self._devices)
-            self.pipeline_scheduler.run_pipeline_parallelism()
-            print(self.pipeline_scheduler.results)
-            # self.pipeline_scheduler.draw()
+        # if self._base_solution:
+        #     self.pipeline_scheduler = Pipeline.PipelineScheduler(placement=self._devices)
+        #     self.pipeline_scheduler.run_pipeline_parallelism()
+        #     print(self.pipeline_scheduler.results)
+        #     # self.pipeline_scheduler.draw()
         self.model_result = None
 
     def estimate_time_cost(self):
@@ -86,10 +81,9 @@ class GSimulator:
 
     def set_M_value(self, estimated_cost):
         import math
-        n = math.floor(math.log10(estimated_cost)) + 2  # 计算位数
+        n = math.floor(math.log10(estimated_cost)) + 4  # 计算位数
         print_to_file(self._file_path, "Set M to {}.\n".format(10 ** (n + 1)))
         return 10 ** (n + 1)  # 返回 10 的 (n + 1) 次方
-
 
     def show_device_stage_mapping(self):
         for did, ds in enumerate(self._devices):
@@ -100,24 +94,13 @@ class GSimulator:
         for key in self.model_result:
             if str(key).startswith(prefixes):
                 print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
-            # if not (str(key).startswith("Do") or str(key).startswith("act") or str(key).startswith("binary")):
-            #     print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
             if str(key) == "max_start_offset":
                 print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
 
     def _fix_stages(self):
-        if self._schedule_method in (Schedule.ZBV, Schedule.GREEDY_v1, Schedule.GREEDY_v2):
-            for pid in range(self._pp_size):
-                if (pid // self._device_size) % 2 == 0:
-                    self._devices[pid % self._device_size].append(pid)
-                else:
-                    self._devices[self._device_size - 1 - pid % self._device_size].append(pid)
-        elif self._schedule_method in (Schedule.ZBH1, Schedule.ONE_F_ONE_B, Schedule.INTERLEAVED):
-            for pid in range(self._pp_size):
-                self._devices[pid % self._device_size].append(pid)
-        else:
-            assert("Stage alignment is not set.")
-
+        for pid in range(self._pp_size):
+            self._devices[pid % self._device_size].append(pid)
+        
     def _reset_comm_length(self, dsa):
         new_comm_length = [[COMM_TIME if i != j else 0 for j in range(self._pp_size)] for i in range(self._pp_size)]
         for d in dsa:
@@ -129,8 +112,6 @@ class GSimulator:
 
     def _build_constraints(self) -> None:
         for sid in range(self._pp_size):
-
-            self._stage_recomp_rate.append(self.model.addVar(vtype=GRB.BINARY, name=f"theta_{sid}"))
             for mid in range(self._num_microbatches):
                 
                 self._stage_f_offsets[sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid}_{sid}", lb=0))
@@ -144,14 +125,14 @@ class GSimulator:
                 self._stage_w_length.append(self.model.addVar(vtype=GRB.INTEGER, name=f"s{sid}_w"))
 
             self._stage_f_length.append(self._profiled_layer_f_length[sid])
-            self.model.addConstr(self._stage_b_length[sid] == self._profiled_layer_b_length[sid] + self._stage_recomp_rate[sid] * self._stage_f_length[sid], name=f"length_of_b_{sid}")
+            self.model.addConstr(self._stage_b_length[sid] == self._profiled_layer_b_length[sid], name=f"length_of_b_{sid}")
             if SPLIT_BACKPROP:
                 self.model.addConstr(self._stage_w_length[sid] == self._profiled_layer_w_length[sid])
 
         self._comm_length = self._reset_comm_length(self._devices)
         self._real_pipeline_modeling_constraint_strict()
         self._serial_computation_within_device_constraint()
-        self._add_memory_constraints()
+        # self._add_memory_constraints()
         # self._pipeline_activation_accumulation_constraint()
 
     def freeze_schedule_by_mid(self, mid):
@@ -353,8 +334,6 @@ class GSimulator:
 
     def _serial_computation_within_device_constraint(self):
         print_to_file(self._file_path, "Stage alignment:{}.\n".format(self._devices))
-        total_constraints = 0
-        same_mb_redundant_constraints = 0
         for did in range(self._num_device):
             # 加入对w的判断，同时修改_length的判断
             layers_within_device = self._devices[did]
@@ -377,11 +356,6 @@ class GSimulator:
                     )
                 )
                 for j in range(i + 1, len(_pp_vars)):
-                    total_constraints += 1
-                    if j // (self._num_microbatches * type_of_workload) == i // (self._num_microbatches * type_of_workload):
-                        if j % self._num_microbatches == i % self._num_microbatches:
-                            same_mb_redundant_constraints += 1
-                            continue
                     j_pp = layers_within_device[j // group_size]
                     _j_length = (
                         self._stage_f_length[j_pp]
@@ -398,8 +372,6 @@ class GSimulator:
                     M = self.M
                     self.model.addConstr(_pp_vars[j] >= _pp_vars[i] + _i_length - (1 - y) * M, name=f"Do{did}_{i}_{j}1") 
                     self.model.addConstr(_pp_vars[j] + _j_length <= _pp_vars[i] + y * M, name=f"Do{did}_{i}_{j}2")
-                    
-        print_to_file(self._file_path, "Total Constraints within Device:{}, Redundant Constraints:{}.\n".format(total_constraints, same_mb_redundant_constraints))
 
     def _build_optimize_objectives(self) -> None:
         max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
@@ -417,8 +389,6 @@ class GSimulator:
             if var.VarName in self.pipeline_scheduler.results.keys():
                 var.Start = self.pipeline_scheduler.results[var.VarName]
 
-        self.model.write("schedule_results/model.lp")
-
     def run(self, draw=False) -> None:
         """run simulation"""
         self._build_constraints()        
@@ -427,11 +397,11 @@ class GSimulator:
         self.model.setParam('TimeLimit', self._time_limit)
         # self.model.setParam('MIPGap', 0.00)
 
-        if self._base_solution:
-            self.set_baseline_solution()
+        # if self._base_solution:
+        #     self.set_baseline_solution()
 
-        for mid in range(MICRO_BATCH_NUM):
-            self.freeze_schedule_by_mid(mid=mid)
+        # for mid in range(MICRO_BATCH_NUM):
+        #     self.freeze_schedule_by_mid(mid=mid)
 
         start_time = time.time()
         print_to_file(self._file_path, "Gurobi Solver Solving...\n")
@@ -468,18 +438,11 @@ class GSimulator:
         results = {var.varName: var.x for var in self.model.getVars()}
         self.model_result = results
         print_to_file(self._file_path, "MinExeTime:{}.\n".format(results["max_start_offset"]))
-        for i in range(self._pp_size):
-            # self._stage_f_length[i] = self.model_result[self._stage_f_length[i].varName]
-            self._stage_b_length[i] = self.model_result[self._stage_b_length[i].varName] 
-            print(self._stage_b_length[i])
-            # input()
-            if SPLIT_BACKPROP:
-                self._stage_w_length[i] = self.model_result[self._stage_w_length[i].varName]
-        
         if draw:
             # 4. draws the result.
-            results = {str(key) : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}
-            self._draw(resort_microbatch_index(self._num_microbatches ,results))
+            results = {str(key)+str(key)[-2:] : self.model_result[key] for key in self.model_result if str(key)[0:2] in ["f_","b_","w_"]}
+            # self._draw(resort_microbatch_index(self._num_microbatches ,results))
+            self._draw(results)
 
         # for s in self._de_st_mb.keys():
         #     print(self._de_st_mb[s])
@@ -549,9 +512,9 @@ class GSimulator:
             "pp_align": PP_ALIGN,
             "pixel_base": PIXEL_BASE,
             "nmb": self._num_microbatches,
-            "forward_length": self._stage_f_length,
-            "backward_length": self._stage_b_length,
-            "backward_length2": self._stage_w_length,
+            "forward_length": self._profiled_layer_f_length,
+            "backward_length": self._profiled_layer_b_length,
+            "backward_length2": self._profiled_layer_w_length,
             "comm_length": self._comm_length,
             "file_path": self._file_path,
             "max_time": self.model_result['max_start_offset'],

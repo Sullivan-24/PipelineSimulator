@@ -12,28 +12,22 @@ from simulator.abstract import ChimeraScheduler
 from simulator.abstract.mutils import *
 
 def set_workload_length(config):
-    if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
-        config["f_time"] = [EMB_F_TIME] + [F_TIME for _ in range(LAYER_NUM)] + [HEAD_F_TIME, CE_F_TIME]
-        config["b_time"] = [0] + [B_TIME for _ in range(LAYER_NUM)] + [HEAD_B_TIME, CE_B_TIME]
-        config["w_time"] = [0] + [W_TIME for _ in range(LAYER_NUM)] + [HEAD_W_TIME, CE_W_TIME]
-        config["layer_num"] = config["layer_num"] + 3
-    else:
-        config["f_time"] =    [F_TIME for _ in range(LAYER_NUM)] 
-        config["b_time"] = [B_TIME for _ in range(LAYER_NUM)] 
-        config["w_time"] = [W_TIME for _ in range(LAYER_NUM)]
-        
-        fwd_time = config["f_time"]
-        fwd_time[0] += EMB_F_TIME
-        fwd_time[-1] += CE_F_TIME + HEAD_F_TIME
-        config["f_time"] = fwd_time
+    config["f_time"] = F_TIMES
+    config["b_time"] = B_TIMES
+    config["w_time"] = W_TIMES
+    
+    fwd_time = config["f_time"]
+    fwd_time[0] += EMB_F_TIME
+    fwd_time[-1] += CE_F_TIME + HEAD_F_TIME
+    config["f_time"] = fwd_time
 
-        iwd_time = config["b_time"]
-        iwd_time[-1] += CE_B_TIME + HEAD_B_TIME
-        config["b_time"] = iwd_time
+    iwd_time = config["b_time"]
+    iwd_time[-1] += CE_B_TIME + HEAD_B_TIME
+    config["b_time"] = iwd_time
 
-        gwd_time = config["w_time"]
-        gwd_time[-1] += CE_W_TIME + HEAD_W_TIME
-        config["w_time"] = gwd_time
+    gwd_time = config["w_time"]
+    gwd_time[-1] += CE_W_TIME + HEAD_W_TIME
+    config["w_time"] = gwd_time
 
 def check_standard_zbv_conditions():
     if EMB_F_TIME!=0:
@@ -70,7 +64,7 @@ def clear_old_files():
         memory_record_filepath = f"schedule_results/memory/device{did}.txt"
         clear_old_file(memory_record_filepath)
 
-def main():
+def main(nmb=None):
     config = {
         "run_mode": RUN_MODE,
         "device_num": int(DEVICE_NUM),
@@ -78,10 +72,7 @@ def main():
         "stage_order_search": STAGE_SEARCH_METHOD,
         "stage_num": int(STAGE_NUM),
         "layer_num": int(LAYER_NUM),
-        "nmb": int(MICRO_BATCH_NUM),
-        "f_time": [F_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-        "b_time": [B_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
-        "w_time": [W_TIME / (int(STAGE_NUM) // int(DEVICE_NUM)) for _ in range(STAGE_NUM)],
+        "nmb": int(MICRO_BATCH_NUM) if nmb is None else nmb,
         "device_mem": [GPU_MAX_MEM for _ in range(DEVICE_NUM)],
         "mix_training": MIX_TRAINING,
         "para_num": PARAMETER_NUM,
@@ -90,24 +81,17 @@ def main():
         "max_activation_counts": [MAX_ACTIVATION_COUNTS for _ in range(STAGE_NUM)],
         # "file_path": filename,
         "file_path": None,
-        "base_solution" : BASE_SOLUTION,
+        "base_solution" : False,
         "schedule_method": SCHEDULE_METHOD,
-        "emb_head_ce": LAYERWISE,
+        "emb_head_ce": False,
     }
     set_workload_length(config=config)
-
     clear_old_files()
-     
-    print("SEQ={},HID={}".format(SEQ_LEN,HIDDEN_SIZE))
-    print("Activation Layer={},Activation Input={},Activation Loss={}".format(Activation.FULL, Activation.INPUT, Activation.LOSS))
-    print("Gradient Input={},Gradient Parameters={},Gradient Head={}".format(Gradient.INPUT,Gradient.PARAMETER, Gradient.HEAD_INPUT))
-    print("LOSS={},VOC={}".format(Activation.LOSS,VOCAB_SIZE))
+    simulator = SPSimulator(config)
+    simulator.run(draw=False)
+    # simulator.show_solution_detail()
 
-    print("LAYER_MEM:{}".format(StateMemory.LAYER))
-    print("MODEL MEM:{}".format(StateMemory.LAYER * LAYER_NUM // DEVICE_NUM))
-    print("OPT MEM:{}".format(StateMemory.OPTIMIZER))
-    # input()
-
+    return
     if config["run_mode"] == RunMode.SEARCH_SCHEDULE:
         config["file_path"] = os.path.join("results", filename)
         s_time = time.time()
@@ -187,6 +171,5 @@ if __name__ == "__main__":
     timestamp = current_time.strftime("%Y%m%d%H%M%S")
     filename = f"{timestamp}-{DEVICE_NUM}-{MICRO_BATCH_NUM}-{int(F_TIME)}-{int(B_TIME)}-{int(W_TIME)}.txt"
 
-    print(f"Begin solving procedure...")
-    main()
-    print(f"Finish.")
+    for nmb in range(1, 13):
+        main(nmb=nmb)

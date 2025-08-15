@@ -13,6 +13,7 @@ SCHEDULE_METHOD = Schedule.Layerwise
 SCHEDULE_METHOD = Schedule.UnifiedPP
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_1F1B
+# SCHEDULE_METHOD = Schedule.STANDARD_AFAB
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH1
 # SCHEDULE_METHOD = Schedule.ZBV
 STAGE_PLACEMENT = Placement.INTERLEAVED
@@ -20,18 +21,19 @@ STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
-if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.STANDARD_1F1B):
+if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB):
     CHUNK_NUM = 1
-# 495 * 153 motivation graph size
+SPLIT_BACKPROP = True
 # --------------------- Solver config ---------------------
 Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
 HETER_DEVICE = True
 HETER_RATIO = 1
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
+OVERLAP_AWARE_SCHEDULE = True
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = False
-TIME_LIMIT = 20000
+TIME_LIMIT = 50000
 HEAD_DP = False if test_upp else False
 # [1, 2, 100, None]
 OVERLAP_DEGREE = None
@@ -42,62 +44,28 @@ IDEAL_SITUATION = False
 
 # Gemma
 EMB_F_TIME = 0
-EMB_B_TIME = 3
+EMB_B_TIME = 0
 EMB_W_TIME = 0
-HEAD_F_TIME = 15
-HEAD_B_TIME = 12
+HEAD_F_TIME = 0
+HEAD_B_TIME = 0
 HEAD_W_TIME = 0
 CE_F_TIME = 0
 CE_B_TIME = 0
 CE_W_TIME = 0
-F_TIME = 2
-B_TIME = 4
+F_TIME = 0
+B_TIME = 0
 W_TIME = 0
 COMM_TIME = 0
 
-# # llama3
-# EMB_F_TIME = 0
-# EMB_B_TIME = 3
-# EMB_W_TIME = 0
-# HEAD_F_TIME = 8
-# HEAD_B_TIME = 6
-# HEAD_W_TIME = 0
-# CE_F_TIME = 0
-# CE_B_TIME = 0
-# CE_W_TIME = 0
-# F_TIME = 2
-# B_TIME = 4
-# W_TIME = 0
-# COMM_TIME = 0
 
-# # GPT3
-# EMB_F_TIME = 0
-# EMB_B_TIME = 3
-# EMB_W_TIME = 0
-# HEAD_F_TIME = 3
-# HEAD_B_TIME = 2
-# HEAD_W_TIME = 0
-# CE_F_TIME = 0
-# CE_B_TIME = 0
-# CE_W_TIME = 0
-# F_TIME = 2
-# B_TIME = 4
-# W_TIME = 0
-# COMM_TIME = 0
-
-DEEPSEEK=False
-
-SPLIT_BACKPROP = True
 if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.ZBV):
     SPLIT_BACKPROP = True
     if SCHEDULE_METHOD == Schedule.ZBV:
         STAGE_PLACEMENT = Placement.WAVELIKE
-# elif SCHEDULE_METHOD in (Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED):
-#     SPLIT_BACKPROP = False
 
 if SPLIT_BACKPROP:
-    EMB_B_TIME = 1
-    EMB_W_TIME = 2
+    EMB_B_TIME = 0
+    EMB_W_TIME = 0
     HEAD_W_TIME = HEAD_B_TIME // 2
     HEAD_B_TIME = HEAD_B_TIME // 2
     CE_B_TIME = 0
@@ -136,17 +104,122 @@ if not RUN_SCHEDULE and RUN_STANDARD_ZBV:
     B_TIME = 12
     W_TIME = 12
 
+DEEPSEEK=False
+GEMMA=True
+NEMOTRONH=False
+if DEEPSEEK + GEMMA + NEMOTRONH > 1:
+    print(f"DeepSeek:{DEEPSEEK}, Gemma:{GEMMA}, NemotronH:{NEMOTRONH}")
+
+SAVE_MEMORY = False
+CONSTRAIN_WARMUP=False
+
+F_TIME = 10
 F_TIMES = [F_TIME] * LAYER_NUM
-B_TIMES = [B_TIME] * LAYER_NUM
-W_TIMES = [W_TIME] * LAYER_NUM
+B_TIMES = [F_TIME] * LAYER_NUM
+W_TIMES = [F_TIME] * LAYER_NUM
+
+if GEMMA:
+    if SEQ_LEN == 2*K:
+        HEAD_RATIO = {
+            256*1024 : [4.2, 1.4, 0.4],
+            256*1024*2 : [6.5, 1.9, 0.7],
+            256*1024*4 : [12.7, 4.6, 1.6],
+        }
+        B_TIMES = [t*1.8 for i,t in enumerate(F_TIMES)]
+        HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
+        HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
+        if SPLIT_BACKPROP:
+            B_TIMES = [t*1.6 for i,t in enumerate(F_TIMES)]
+            W_TIMES = [t*0.2 for i,t in enumerate(F_TIMES)]
+            HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
+            HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
+    if SEQ_LEN == 4*K:
+        HEAD_RATIO = {
+            256*1024 : [5.7, 1.3, 0.6],
+            256*1024*2 : [10.8, 2.4, 1.1],
+            256*1024*4 : [19.6, 6.2, 2.3],
+        }
+        B_TIMES = [t*1.9 for i,t in enumerate(F_TIMES)]
+        HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
+        HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
+        if SPLIT_BACKPROP:
+            B_TIMES = [t*1.7 for i,t in enumerate(F_TIMES)]
+            W_TIMES = [t*0.2 for i,t in enumerate(F_TIMES)]
+            HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
+            HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
+
 
 if DEEPSEEK:
-    F_TIMES = [t//2  if i < LAYER_NUM//4 else t for i,t in enumerate(F_TIMES)]
-    B_TIMES = [t//2  if i < LAYER_NUM//4 else t for i,t in enumerate(B_TIMES)]
-    W_TIMES = [t//2  if i < LAYER_NUM//4 else t for i,t in enumerate(W_TIMES)]
-    F_TIMES = [t + t//2  if i > LAYER_NUM//4*3 else t for i,t in enumerate(F_TIMES)]
-    B_TIMES = [t + t//2  if i > LAYER_NUM//4*3 else t for i,t in enumerate(B_TIMES)]
-    W_TIMES = [t + t//2  if i > LAYER_NUM//4*3 else t for i,t in enumerate(W_TIMES)]
+    if SEQ_LEN == 2*K:
+        HEAD_RATIO = {
+            128*1024 : [5.0, 1.2, 0.6],
+            256*1024 : [8.3, 2.4, 1.2],
+            256*1024*2 : [15.2, 4.8, 2.4],
+        }
+        B_TIMES = [t*3.7 if i >= LAYER_NUM//PP_SIZE - 1  else t * 2.0 for i,t in enumerate(F_TIMES)]
+        HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
+        HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
+        if SPLIT_BACKPROP:
+            B_TIMES = [t*3.5 if i >= LAYER_NUM//PP_SIZE - 1  else t * 1.8 for i,t in enumerate(F_TIMES)]
+            W_TIMES = [t*0.2 if i >= LAYER_NUM//PP_SIZE - 1  else t * 0.2 for i,t in enumerate(F_TIMES)]
+            HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
+            HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
+        F_TIMES = [t*2.5 if i >= LAYER_NUM//PP_SIZE - 1 else t for i,t in enumerate(F_TIMES)]
+
+    if SEQ_LEN == 4*K:
+        HEAD_RATIO = {
+            128*1024 : [5.9, 1.7, 0.8],
+            256*1024 : [10.8, 3.4, 1.5],
+            256*1024*2 : [21.5, 7.9, 3.3],
+        }
+        B_TIMES = [t*3.6 if i >= LAYER_NUM//PP_SIZE - 1  else t * 2.0 for i,t in enumerate(F_TIMES)]
+        HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
+        HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
+        if SPLIT_BACKPROP:
+            B_TIMES = [t*3.4 if i >= LAYER_NUM//PP_SIZE - 1  else t * 1.8 for i,t in enumerate(F_TIMES)]
+            W_TIMES = [t*0.2 if i >= LAYER_NUM//PP_SIZE - 1  else t * 0.2 for i,t in enumerate(F_TIMES)]
+            HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
+            HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
+        F_TIMES = [t*2.2 if i >= LAYER_NUM//PP_SIZE - 1 else t for i,t in enumerate(F_TIMES)]
+
+if NEMOTRONH:
+    diff = 3 * N_SCALE
+    print(f"Note: Diff is {diff}.")
+    if SEQ_LEN == 2*K:
+        # [2.9022, 4.369, 0.4800, 1.0000, 2.5500, 0.0196]
+        # [10.0833, 1.1133, 0.5433]
+        # [12.3867, 2.1000, 0.8400]
+        # [25.1900, 5.5333, 2.0267]
+        HEAD_RATIO = {
+            128*1024 : [10.1, 1.1, 0.5],
+            256*1024 : [12.4, 2.1, 0.8],
+            256*1024*2 : [25.2, 5.5, 2.0],
+        }
+        B_TIMES = [t*4.9 if (i+1)%diff==0  else t * 2.6 for i,t in enumerate(F_TIMES)]
+        HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
+        HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
+        if SPLIT_BACKPROP:
+            B_TIMES = [t*4.4 if (i+1)%diff==0  else t * 2.5 for i,t in enumerate(F_TIMES)]
+            W_TIMES = [t*0.5 if (i+1)%diff==0  else t * 0.1 for i,t in enumerate(F_TIMES)]
+            HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
+            HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
+        F_TIMES = [t*2.9 if (i+1)%diff==0 else t for i,t in enumerate(F_TIMES)]
+    if SEQ_LEN == 4*K:
+        # [3.2017, 5.0917, 0.5500, 1.0000, 2.7767, 0.0133]
+        HEAD_RATIO = {
+            128*1024 : [18.3, 1.9, 1.1],
+            256*1024 : [23.4, 5.2, 1.7],
+            256*1024*2 : [40.8, 10.5, 3.2],
+        }
+        B_TIMES = [t*5.7 if (i+1)%diff==0  else t * 2.8 for i,t in enumerate(F_TIMES)]
+        HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
+        HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
+        if SPLIT_BACKPROP:
+            B_TIMES = [t*5.1 if (i+1)%diff==0  else t * 2.7 for i,t in enumerate(F_TIMES)]
+            W_TIMES = [t*0.6 if (i+1)%diff==0  else t * 0.1 for i,t in enumerate(F_TIMES)]
+            HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
+            HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
+        F_TIMES = [t*3.2 if (i+1)%diff==0 else t for i,t in enumerate(F_TIMES)]
 
 
 SCHEDULE_UNIT = MICRO_BATCH_NUM // 1
@@ -227,10 +300,10 @@ class Gradient:
 
 
 # --------------------- Painter Config ---------------------
-PIXEL_BASE = 4
+PIXEL_BASE = 1
 PP_HEIGHT = 25
 PP_ALIGN = 5
-SHOW_WORKLOAD_TEXT = True
+SHOW_WORKLOAD_TEXT = False
 if CHUNK_NUM > PP_SIZE:
     SHOW_WORKLOAD_TEXT = False
 # --------------------- Painter Config ---------------------
