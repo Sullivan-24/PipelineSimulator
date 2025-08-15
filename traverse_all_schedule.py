@@ -163,6 +163,6 @@ def main():
     save_to_file(f"traverse_res_{Schedule.ZBV.name}.txt", content ,'w')
 if __name__ == "__main__":
     # start_time = time.time()
-    run_schedule(draw=False)
+    run_schedule(draw=True)
     # end_time = time.time()
     # print(f"Schedule generation time:{end_time-start_time}")

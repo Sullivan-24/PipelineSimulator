@@ -10,6 +10,7 @@ class WorkloadType(Enum):
     R = "R"
 
 class Placement(Enum):
+    STANDARD_1F1B = 0
     WAVELIKE = 1
     VSHAPE = 2
     INTERLEAVED = 3

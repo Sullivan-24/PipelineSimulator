@@ -8,43 +8,43 @@ from .utils import parse_microbatch_key, save_to_file
 from .abstract.mutils import *
 from .PainterColor import set_color
 import tkinter as tk
-from PIL import Image, EpsImagePlugin
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.backends.backend_pdf import PdfPages
+# from PIL import Image, EpsImagePlugin
+# import matplotlib.pyplot as plt
+# import matplotlib.patches as patches
+# from matplotlib.backends.backend_pdf import PdfPages
 
 import os
-os.environ["PATH"] += os.pathsep + "/opt/homebrew/bin"
-EpsImagePlugin.gs_windows_binary = "/opt/homebrew/bin/gs"  # 请根据你的机器修改路径
+# os.environ["PATH"] += os.pathsep + "/opt/homebrew/bin"
+# EpsImagePlugin.gs_windows_binary = "/opt/homebrew/bin/gs"  # 请根据你的机器修改路径
 
-def save_canvas_as_pdf(canvas, filename="output.pdf", scale=5):
-    canvas.update()
+# def save_canvas_as_pdf(canvas, filename="output.pdf", scale=5):
+#     canvas.update()
     
-    width = canvas.winfo_width()
-    height = canvas.winfo_height()
+#     width = canvas.winfo_width()
+#     height = canvas.winfo_height()
     
-    ps_filename = "temp_output.ps"
+#     ps_filename = "temp_output.ps"
 
-    # 使用实际尺寸导出（不要放大 pagewidth 等）
-    canvas.postscript(file=ps_filename, colormode='color')
+#     # 使用实际尺寸导出（不要放大 pagewidth 等）
+#     canvas.postscript(file=ps_filename, colormode='color')
 
-    try:
-        # 打开 EPS 图像
-        img = Image.open(ps_filename)
-        img.load()
+#     try:
+#         # 打开 EPS 图像
+#         img = Image.open(ps_filename)
+#         img.load()
 
-        # 计算新尺寸（高分辨率放大）
-        new_size = (img.width * scale, img.height * scale)
-        img = img.resize(new_size, resample=Image.LANCZOS)
+#         # 计算新尺寸（高分辨率放大）
+#         new_size = (img.width * scale, img.height * scale)
+#         img = img.resize(new_size, resample=Image.LANCZOS)
 
-        # 转为 PDF
-        img.save(filename, "PDF")
-        print(f"Saved high-res PDF to {filename}")
-    except Exception as e:
-        print("Failed to convert canvas to PDF:", e)
-    finally:
-        if os.path.exists(ps_filename):
-            os.remove(ps_filename)
+#         # 转为 PDF
+#         img.save(filename, "PDF")
+#         print(f"Saved high-res PDF to {filename}")
+#     except Exception as e:
+#         print("Failed to convert canvas to PDF:", e)
+#     finally:
+#         if os.path.exists(ps_filename):
+#             os.remove(ps_filename)
 
 class SchedulingPainter:
     """Scheduling Painter"""
@@ -345,6 +345,6 @@ class SchedulingPainter:
 
         main_canvas.bind("<Button-1>", _trigger_hook)
 
-        button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_as_pdf(main_canvas))
-        button.pack()
+        # button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_as_pdf(main_canvas))
+        # button.pack()
         self._tk_root.mainloop()

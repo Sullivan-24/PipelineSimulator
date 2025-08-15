@@ -16,18 +16,19 @@ SCHEDULE_METHOD = Schedule.UnifiedPP
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH1
 # SCHEDULE_METHOD = Schedule.ZBV
-STAGE_PLACEMENT = Placement.INTERLEAVED
+STAGE_PLACEMENT = Placement.STANDARD_1F1B
+# STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.SEARCHED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
-if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB):
+if STAGE_PLACEMENT == Placement.STANDARD_1F1B or  SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB):
     CHUNK_NUM = 1
 SPLIT_BACKPROP = True
 # --------------------- Solver config ---------------------
 Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
-HETER_DEVICE = True
+HETER_DEVICE = False
 HETER_RATIO = 1
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True
@@ -40,7 +41,7 @@ OVERLAP_DEGREE = None
 MEMORY_CONSTRAIN = 0.9
 MEMORY_REDUCATION = 0.0
 TERMINAL_FLAG = False
-IDEAL_SITUATION = False
+IDEAL_SITUATION = True
 
 # Gemma
 EMB_F_TIME = 0
@@ -55,8 +56,8 @@ CE_W_TIME = 0
 F_TIME = 0
 B_TIME = 0
 W_TIME = 0
-COMM_TIME = 0
-
+COMM_TIME = [0 for _ in range(PP_SIZE)]
+COMM_TIME[3] = 30
 
 if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.ZBV):
     SPLIT_BACKPROP = True
@@ -73,16 +74,6 @@ if SPLIT_BACKPROP:
     W_TIME = B_TIME // 2
     B_TIME = B_TIME // 2
 
-if IDEAL_SITUATION:
-    EMB_F_TIME = 0
-    EMB_B_TIME = 0
-    EMB_W_TIME = 0
-    HEAD_F_TIME = 0
-    HEAD_B_TIME = 0
-    HEAD_W_TIME = 0
-    CE_F_TIME = 0
-    CE_B_TIME = 0
-    CE_W_TIME = 0
 
 LAYERWISE = False
 RECOMP = False
@@ -113,7 +104,9 @@ if DEEPSEEK + GEMMA + NEMOTRONH > 1:
 SAVE_MEMORY = False
 CONSTRAIN_WARMUP=False
 
-F_TIME = 10
+F_TIME = 2.5
+# B_TIME = 16
+# W_TIME = 4
 F_TIMES = [F_TIME] * LAYER_NUM
 B_TIMES = [F_TIME] * LAYER_NUM
 W_TIMES = [F_TIME] * LAYER_NUM
@@ -221,7 +214,17 @@ if NEMOTRONH:
             HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
         F_TIMES = [t*3.2 if (i+1)%diff==0 else t for i,t in enumerate(F_TIMES)]
 
-
+if IDEAL_SITUATION:
+    EMB_F_TIME = 0
+    EMB_B_TIME = 0
+    EMB_W_TIME = 0
+    HEAD_F_TIME = 0
+    HEAD_B_TIME = 0
+    HEAD_W_TIME = 0
+    CE_F_TIME = 0
+    CE_B_TIME = 0
+    CE_W_TIME = 0
+    
 SCHEDULE_UNIT = MICRO_BATCH_NUM // 1
 REVERSE_LAST_STAGES = False
 REVERSE_FIRST_STAGES = False
@@ -303,7 +306,7 @@ class Gradient:
 PIXEL_BASE = 1
 PP_HEIGHT = 25
 PP_ALIGN = 5
-SHOW_WORKLOAD_TEXT = False
+SHOW_WORKLOAD_TEXT = True
 if CHUNK_NUM > PP_SIZE:
     SHOW_WORKLOAD_TEXT = False
 # --------------------- Painter Config ---------------------
