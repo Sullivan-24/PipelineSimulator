@@ -105,13 +105,14 @@ if not RUN_SCHEDULE and RUN_STANDARD_ZBV:
     W_TIME = 12
 
 DEEPSEEK=False
-GEMMA=True
+GEMMA=False
 NEMOTRONH=False
+VARYLEN=True
 if DEEPSEEK + GEMMA + NEMOTRONH > 1:
     print(f"DeepSeek:{DEEPSEEK}, Gemma:{GEMMA}, NemotronH:{NEMOTRONH}")
 
 SAVE_MEMORY = False
-CONSTRAIN_WARMUP=False
+CONSTRAIN_WARMUP = False
 
 F_TIME = 10
 F_TIMES = [F_TIME] * LAYER_NUM
@@ -185,42 +186,70 @@ if DEEPSEEK:
 if NEMOTRONH:
     diff = 3 * N_SCALE
     print(f"Note: Diff is {diff}.")
-    if SEQ_LEN == 2*K:
-        # [2.9022, 4.369, 0.4800, 1.0000, 2.5500, 0.0196]
-        # [10.0833, 1.1133, 0.5433]
-        # [12.3867, 2.1000, 0.8400]
-        # [25.1900, 5.5333, 2.0267]
-        HEAD_RATIO = {
-            128*1024 : [10.1, 1.1, 0.5],
-            256*1024 : [12.4, 2.1, 0.8],
-            256*1024*2 : [25.2, 5.5, 2.0],
-        }
-        B_TIMES = [t*4.9 if (i+1)%diff==0  else t * 2.6 for i,t in enumerate(F_TIMES)]
-        HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
-        HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
+    try:
+        from graphs.e2e_data import profiled_data
+        ratios = profiled_data["NEMOTRONH"][HIDDEN_SIZE][SEQ_LEN][VOCAB_SIZE]
+        [tf_mf, tb_mf, tw_mf, mf_mf, mb_mf, mw_mf, hf_mf, hb_mf, hw_mf] = [round(r, 1) for r in ratios]
+        B_TIMES = [t*(tb_mf+tw_mf) if (i+1)%diff==0  else t * mb_mf for i,t in enumerate(F_TIMES)]
+        HEAD_F_TIME = F_TIME * hf_mf
+        HEAD_B_TIME = F_TIME * (hb_mf + hw_mf)
         if SPLIT_BACKPROP:
-            B_TIMES = [t*4.4 if (i+1)%diff==0  else t * 2.5 for i,t in enumerate(F_TIMES)]
-            W_TIMES = [t*0.5 if (i+1)%diff==0  else t * 0.1 for i,t in enumerate(F_TIMES)]
-            HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
-            HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
-        F_TIMES = [t*2.9 if (i+1)%diff==0 else t for i,t in enumerate(F_TIMES)]
-    if SEQ_LEN == 4*K:
-        # [3.2017, 5.0917, 0.5500, 1.0000, 2.7767, 0.0133]
-        HEAD_RATIO = {
-            128*1024 : [18.3, 1.9, 1.1],
-            256*1024 : [23.4, 5.2, 1.7],
-            256*1024*2 : [40.8, 10.5, 3.2],
-        }
-        B_TIMES = [t*5.7 if (i+1)%diff==0  else t * 2.8 for i,t in enumerate(F_TIMES)]
-        HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
-        HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
-        if SPLIT_BACKPROP:
-            B_TIMES = [t*5.1 if (i+1)%diff==0  else t * 2.7 for i,t in enumerate(F_TIMES)]
-            W_TIMES = [t*0.6 if (i+1)%diff==0  else t * 0.1 for i,t in enumerate(F_TIMES)]
-            HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
-            HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
-        F_TIMES = [t*3.2 if (i+1)%diff==0 else t for i,t in enumerate(F_TIMES)]
+            B_TIMES = [t*tb_mf if (i+1)%diff==0  else t * (mb_mf-0.1) for i,t in enumerate(F_TIMES)]
+            W_TIMES = [t*tw_mf if (i+1)%diff==0  else t * 0.1 for i,t in enumerate(F_TIMES)]
+            HEAD_B_TIME = F_TIME * hb_mf
+            HEAD_W_TIME = F_TIME * hw_mf
+        F_TIMES = [t*tf_mf if (i+1)%diff==0 else t for i,t in enumerate(F_TIMES)]
+        print("------ Use profiled ratios. -----")
+    except:
+        print("----- No profiled data! Use predefined ratios. -----")
+        if SEQ_LEN == 2*K:
+            HEAD_RATIO = {
+                128*1024 : [10.1, 1.1, 0.5],
+                256*1024 : [12.4, 2.1, 0.8],
+                256*1024*2 : [25.2, 5.5, 2.0],
+            }
+            B_TIMES = [t*4.9 if (i+1)%diff==0  else t * 2.6 for i,t in enumerate(F_TIMES)]
+            HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
+            HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
+            if SPLIT_BACKPROP:
+                B_TIMES = [t*4.4 if (i+1)%diff==0  else t * 2.5 for i,t in enumerate(F_TIMES)]
+                W_TIMES = [t*0.5 if (i+1)%diff==0  else t * 0.1 for i,t in enumerate(F_TIMES)]
+                HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
+                HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
+            F_TIMES = [t*2.9 if (i+1)%diff==0 else t for i,t in enumerate(F_TIMES)]
+        if SEQ_LEN == 4*K:
+            # [3.2017, 5.0917, 0.5500, 1.0000, 2.7767, 0.0133]
+            HEAD_RATIO = {
+                128*1024 : [18.3, 1.9, 1.1],
+                256*1024 : [23.4, 5.2, 1.7],
+                256*1024*2 : [40.8, 10.5, 3.2],
+            }
+            B_TIMES = [t*5.7 if (i+1)%diff==0  else t * 2.8 for i,t in enumerate(F_TIMES)]
+            HEAD_F_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][0]
+            HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
+            if SPLIT_BACKPROP:
+                B_TIMES = [t*5.1 if (i+1)%diff==0  else t * 2.7 for i,t in enumerate(F_TIMES)]
+                W_TIMES = [t*0.6 if (i+1)%diff==0  else t * 0.1 for i,t in enumerate(F_TIMES)]
+                HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
+                HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
+            F_TIMES = [t*3.2 if (i+1)%diff==0 else t for i,t in enumerate(F_TIMES)]
 
+
+if VARYLEN:
+    diff = 12
+    from graphs.e2e_data import profiled_data
+    ratios = profiled_data["NEMOTRONH"][HIDDEN_SIZE][SEQ_LEN][VOCAB_SIZE]
+    [tf_mf, tb_mf, tw_mf, mf_mf, mb_mf, mw_mf, hf_mf, hb_mf, hw_mf] = [round(r, 1) for r in ratios]
+    B_TIMES = [t*(tb_mf+tw_mf) if (i+1)%diff==0  else t * mb_mf for i,t in enumerate(F_TIMES)]
+    HEAD_F_TIME = F_TIME * hf_mf
+    HEAD_B_TIME = F_TIME * (hb_mf + hw_mf)
+    if SPLIT_BACKPROP:
+        B_TIMES = [t*tb_mf if (i+1)%diff==0  else t * (mb_mf-0.1) for i,t in enumerate(F_TIMES)]
+        W_TIMES = [t*tw_mf if (i+1)%diff==0  else t * 0.1 for i,t in enumerate(F_TIMES)]
+        HEAD_B_TIME = F_TIME * hb_mf
+        HEAD_W_TIME = F_TIME * hw_mf
+    F_TIMES = [t*tf_mf if (i+1)%diff==0 else t for i,t in enumerate(F_TIMES)]
+    print("------ Test vary length sequence. -----")
 
 SCHEDULE_UNIT = MICRO_BATCH_NUM // 1
 REVERSE_LAST_STAGES = False

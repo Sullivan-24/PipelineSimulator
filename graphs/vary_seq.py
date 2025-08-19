@@ -2,42 +2,33 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from e2e_data import *
-xy_label_size = 28
-xy_tick_size = 28
-def varyseq(arch="heter"):
-    import matplotlib.pyplot as plt
+fontsize=6
+titlesize=20 + fontsize
+labelsize= 20 + fontsize
+ticksize= 16 + fontsize
+legendsize= 20 + fontsize - 1
+def varyseq():
 
-    # 数据
-    vary_seq = {
-        "OctoPipe": [1752, 2345, 2582, 2630, 2596],
-        "ZBH": [1772, 2254, 2439, 2480, 2450],
-        "Dapple": [1730, 2203, 2401, 2395, 2380],
-    }
-    sequence_lengths = ["2K", "4K", "8K", "12K", "16K"]
-    colors = {'OctoPipe':'#F53255', 
-              'ZBH':'#F46920', 
-              'Dapple':'#FFAF00',
-    }
+    x = list(vary_length_seqence.keys())
+    methods = list(next(iter(vary_length_seqence.values())).keys())
 
-    # 画图
-    plt.figure(figsize=(12, 4))
-    for label, values in vary_seq.items():
-        if label == 'ZBH':
-            plt.plot(sequence_lengths, values, marker='*', lw=3, markersize=12, linestyle='--', label=label,color=colors[label])
-        elif label == 'Dapple':
-            plt.plot(sequence_lengths, values, marker='o', lw=3, markersize=12, label=label,color=colors[label])
-        else:
-            plt.plot(sequence_lengths, values, marker='^', lw=3, markersize=12, label=label,color=colors[label])
+    # 画折线图
+    plt.figure(figsize=(10, 6))
+    for method in methods:
+        y = [vary_length_seqence[seq][method] for seq in x]
+        plt.plot(x, y, marker=markers[method],markersize=14, linewidth=2.5, color=line_colors[method], label=method)
 
-    plt.xlabel("Sequence Length", fontsize = xy_label_size)
-    plt.ylabel("TGS", fontsize=xy_label_size)
-    # plt.title("TGS vs. Sequence Length", fontsize=xy_label_size)
-    plt.legend(loc='lower right', prop={'size':xy_tick_size-1})
+    plt.xlabel("Sequence Length",fontsize=labelsize)
+    plt.xticks(fontsize=ticksize)
+    plt.ylabel("Throughput (TGS)",fontsize=labelsize)
+    plt.yticks(fontsize=ticksize)
+    plt.title("Throughput across varying sequence lengths",fontsize=titlesize)
+    plt.legend(fontsize=legendsize, frameon=True)
     plt.grid(True)
     plt.tight_layout()
-    plt.xticks(fontsize=xy_tick_size)
-    plt.yticks(fontsize=xy_tick_size)
-    plt.savefig(f"/Users/hanayukino/e2e_performance_varyseq_{arch}.pdf", 
+    sns.despine()
+
+    plt.savefig(f"/Users/hanayukino/e2e_performance_varyseq.pdf", 
               format='pdf', 
               dpi=300,
               bbox_inches="tight")

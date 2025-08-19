@@ -129,8 +129,27 @@ class PipelineScheduler:
                     self.layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]
                 if SEQ_LEN == 4*K:
                     self.layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]
+                
+        if VARYLEN:
+            if SEQ_LEN == 1*K:
+                self.layer_assignment=[14, 14, 15, 15, 14, 14, 15, 11]
+            if SEQ_LEN == 2*K:
+                self.layer_assignment=[14, 15, 15, 15, 14, 14, 15, 10]
+            if SEQ_LEN == 4*K:
+                self.layer_assignment=[13, 14, 16, 16, 14, 15, 16, 8]
+            if SEQ_LEN == 8*K:
+                self.layer_assignment=[16, 16, 15, 15, 16, 16, 14, 4]
+                self.layer_assignment=[15, 16, 16, 15, 16, 16, 15, 3]
+            if SEQ_LEN == 16*K:
+                self.layer_assignment=[13, 17, 17, 15, 17, 16, 16, 1]
+            if SEQ_LEN == 32*K:
+                if DEVICE_NUM == 8:
+                    self.layer_assignment=[14, 14, 17, 17, 17, 16, 16, 1]
+                    self.layer_assignment=[16, 16, 16, 16, 16, 15, 16, 1]
+                if DEVICE_NUM == 4:
+                    self.layer_assignment=[31, 33, 33, 15]
 
-        assert sum(self.layer_assignment) == LAYER_NUM
+        assert sum(self.layer_assignment) == LAYER_NUM, f"{sum(self.layer_assignment)} != {LAYER_NUM}"
 
         if SCHEDULE_METHOD != Schedule.UnifiedPP:
             self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
@@ -140,6 +159,7 @@ class PipelineScheduler:
             [1 for _ in range(layer_num)] for layer_num in self.layer_assignment
         ]
 
+        # self.placement = []
         with open("partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))
             f.flush()
@@ -298,7 +318,7 @@ class PipelineScheduler:
             for did in range(self.device_num):
                 self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
                 layer_idx_start += len(self.placement[did])
-            print("S1F1B + model partition + workload scheduling")
+            # print("S1F1B + model partition + workload scheduling")
         elif self.placement:
             layer_idx_start = 0
             for did in range(self.device_num):
@@ -390,7 +410,7 @@ class PipelineScheduler:
 
         self.placement = []
         for did in range(self.device_num):
-            print(list(self.devices[did].stages.keys()))
+            # print(list(self.devices[did].stages.keys()))
             self.placement.append(list(self.devices[did].stages.keys()))
 
         save_to_file(gpc["TEMP_PLA_PATH"], str(self.placement), 'w')
@@ -398,12 +418,10 @@ class PipelineScheduler:
 
     def set_recomp(self):
         self.recomp_set = [1 if gpc["RECOMP"] else 0 for _ in range(self.stage_num)]
-        print("Stage num:",self.stage_num)
         if self.manual_recomp_set:
             print("Use manual recomp set")
             self.recomp_set = self.manual_recomp_set
             return
-        print("Set recomputation")
     def set_schedule(self):
         for did in range(self.device_num):
             self.devices[did].static_schedule = self.schedule[did]
@@ -424,8 +442,8 @@ class PipelineScheduler:
         elif self.schedule_method == Schedule.STANDARD_INTERLEAVED and not self.layer_wise:
             self.generate_interleaved_1f1b_schedule()
             print("Generate STANDARD_INTERLEAVED Schedule.")
-        else:
-            print("Using UPP Schedule.")
+        # else:
+        #     print("Using UPP Schedule.")
 
     def generate_afab_schedule(self):
         assert gpc["CHUNK_NUM"] == 1
@@ -463,10 +481,10 @@ class PipelineScheduler:
                 else:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                 iter+=1
-        for schedule in self.schedule:
-            for w in schedule:
-                print(w[0].name, end="")
-            print()
+        # for schedule in self.schedule:
+        #     for w in schedule:
+        #         print(w[0].name, end="")
+        #     print()
 
     def generate_zbh1_schedule(self):
         assert gpc["WORKLOAD_TYPE_NUM"] == 3
@@ -738,7 +756,7 @@ class PipelineScheduler:
             avg_bubble += bubble_ratio
         print(f"Avg bubble ratio: {avg_bubble/len(self.devices)*100}")
 
-    def run_pipeline_parallelism(self, time_limit = gpc["TIME_LIMIT"]):
+    def run_pipeline_parallelism(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         # self.run_schedule = False
         self.reset_time()
         while self.get_time() <= time_limit and not self.finish_flag and not gpc["TERMINAL_FLAG"]:
@@ -747,15 +765,19 @@ class PipelineScheduler:
             self.check_device_states()
             self.update_time()
         if self.finish_flag:
-            print("Success")
-            self.print_device_utilization()
+            if show_success:
+                print("Success")
+            if show_utilization:
+                self.print_device_utilization()
             self.record_recomp_set()
-            if not self.show_mem_usage():
-                print("Fail due to OOM")
+            if not self.show_mem_usage(show_mem=show_mem):
+                if show_mem:
+                    print("Fail due to OOM")
             else:
                 self.temp_results = copy.deepcopy(self.results)
         else:
-            print("Fail")
+            if show_success:
+                print("Fail")
 
         if AUTO_RECOMP_SEARCH:
             # self.record_recomp_set()
@@ -811,7 +833,7 @@ class PipelineScheduler:
                 print("Wrong answer!")
         return self.last_workload.end_time
 
-    def show_mem_usage(self, device_id=(0,), show_all=False):
+    def show_mem_usage(self, device_id=(0,), show_mem=True):
         peak_mem_usages = [0 for _ in range(len(self.devices))]
         for device in self.devices:
             aim_file_path = "schedule_results/memory/device{}.txt".format(device.did)
@@ -827,10 +849,12 @@ class PipelineScheduler:
         oom = False
         for did, device in enumerate(self.devices):
             if device.max_memory < peak_mem_usages[did]:
-                print(f"Out of Memory in Device {device.did}. ({peak_mem_usages[did]} > {device.max_memory})")
+                if show_mem:
+                    print(f"Out of Memory in Device {device.did}. ({peak_mem_usages[did]} > {device.max_memory})")
                 oom = True
 
-        print(peak_mem_usages)
+        if show_mem:
+            print(peak_mem_usages)
         return not oom
     
     def get_workloadload_duration(self):

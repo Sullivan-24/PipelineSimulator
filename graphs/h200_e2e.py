@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from e2e_data import h200_data as data
 from e2e_data import *
 import seaborn as sns
-fontsize=14
+fontsize=16
 titlesize=22 + fontsize
 labelsize= 20 + fontsize
 ticksize= 16 + fontsize

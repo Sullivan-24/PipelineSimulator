@@ -3,8 +3,8 @@ import numpy as np
 import seaborn as sns
 from e2e_data import *
 import matplotlib.colors as mcolors
-fontsize=18
-titlesize=22 + fontsize
+fontsize=6
+titlesize=20 + fontsize
 labelsize= 20 + fontsize
 ticksize= 16 + fontsize
 legendsize= 20 + fontsize - 0.5
@@ -92,7 +92,7 @@ def draw_ablation_study_old():
 def draw_ablation():
     def sinplot():
 
-        plt.figure(figsize=(18, 8))
+        plt.figure(figsize=(10, 6))
         base_color = '#E54C5E'  # 基础红色
         
         methods = ["Baseline", "+1", "+2", "+3", "+1+2", "+1+3", "+2+3", "+1+2+3"]
@@ -108,22 +108,30 @@ def draw_ablation():
             values = [item[1] for item in sorted_items]
             
             if i == 2:
-                base_color = '#E54C5E'
+                base_color = '#9164c6'
+                model_name = "Mist"
             elif i == 1:
                 base_color = '#d04c99'
+                model_name = "ZB"
             else:
-                base_color = '#9164c6'
+                base_color = '#E54C5E'
+                model_name = "OctoPipe"
+
+            base_color = colors[model_name]
+            hatch = hatches[model_name]
+
             # 生成透明度渐变 (性能越高颜色越深)
             alphas = np.linspace(0.2, 0.9, len(values))
-            colors = [mcolors.to_rgba(base_color, alpha=alpha) for alpha in alphas]
+            loc_colors = [mcolors.to_rgba(base_color, alpha=alpha) for alpha in alphas]
             
             # 绘制柱状图 (横向偏移避免重叠)
             bars = plt.bar(x + i*bar_width, values, width=bar_width-0.05,
                         edgecolor='black', linewidth=1.2,
-                        color=colors, label=model)
+                        color=loc_colors, hatch=hatch, label=model)
             
             legend_handles.append(plt.Rectangle((0,0), 1, 1, 
                                         fc=base_color,  # 完全不透明
+                                        hatch=hatch,
                                         ec='black',
                                         lw=1.2))
             # 添加数值标签
