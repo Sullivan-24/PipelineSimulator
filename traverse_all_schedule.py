@@ -83,7 +83,7 @@ def set_env(sim_config):
     for k in sim_config:
         gpc[k] = sim_config[k]
 
-def run_schedule(draw=False):
+def run_schedule(draw=True, show_mem=True, show_utilization=True, show_success=True, show_res=True):
     simulator = PipelineScheduler(pipeline_idx=0, run_schedule=gpc["RUN_SCHEDULE"])
     if gpc["RUN_STANDARD_ZBV"] and not gpc["RUN_SCHEDULE"] and gpc["SCHEDULE_METHOD"] == Schedule.ZBV:
         if check_standard_zbv_conditions():
@@ -91,16 +91,13 @@ def run_schedule(draw=False):
             simulator.result2file()
             print("ZBV F=B=W Schedule saved to data.txt.")
             return -1, True
-    start_time = time.time()
-    simulator.run_pipeline_parallelism()
-    end_time = time.time()
-    print(f"Time: {end_time - start_time}")
-
-    simulator.show_mem_usage(show_all=True)
+    simulator.run_pipeline_parallelism(show_mem=show_mem,show_utilization=show_utilization, show_success=show_success)
+    simulator.show_mem_usage(show_mem=show_mem)
     if draw:
         simulator.draw()
     # print(simulator.workload_execute_record)
-    print("Time:{}.".format(simulator.last_workload.end_time))
+    if show_res:
+        print("Time:{}.".format(simulator.last_workload.end_time))
     return simulator.last_workload.end_time, simulator.finish_flag
 
 def main():
@@ -162,7 +159,13 @@ def main():
         content += str(r)+"\n"
     save_to_file(f"traverse_res_{Schedule.ZBV.name}.txt", content ,'w')
 if __name__ == "__main__":
-    # start_time = time.time()
-    run_schedule(draw=False)
-    # end_time = time.time()
-    # print(f"Schedule generation time:{end_time-start_time}")
+
+    run_schedule(show_mem=False)
+
+    # for i in [1, 2, 4, 8, 16, 32, 64, 128, 256]:
+    #     gpc["MICRO_BATCH_NUM"] = i
+    #     start_time = time.time()
+    #     run_schedule(draw=False, show_mem=False, show_res=False, show_utilization=False, show_success=False)
+    #     end_time = time.time()
+    #     print(f"{gpc["MICRO_BATCH_NUM"]} : {end_time-start_time},")
+

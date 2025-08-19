@@ -248,13 +248,13 @@ class SPSimulator:
 
     def _build_layer_constraint(self):
         for i in range(self._pp_size):
-            # self._solver.add(
-            #     self._layers[i] >= 1,
-            #     self._layers[i] <= self._model_size
-            # )
             self._solver.add(
-                self._layers[i] == self._model_size // self._pp_size
+                self._layers[i] >= 1,
+                self._layers[i] <= self._model_size
             )
+            # self._solver.add(
+            #     self._layers[i] == self._model_size // self._pp_size
+            # )
         self._solver.add(sum(self._layers) == self._model_size)
     
     def _update_fbw_length(self):

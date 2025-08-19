@@ -391,6 +391,7 @@ class Device:
                 workload_type_order = [WorkloadType.W,WorkloadType.F,WorkloadType.B]
             if self.last_wtype == WorkloadType.W:
                 workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
+        if SAVE_MEMORY:
             head_ce_workloads = []
             for workload_type in [WorkloadType.W]:
                 for mid in range(self.nmb):
