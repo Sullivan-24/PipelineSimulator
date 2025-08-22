@@ -83,7 +83,7 @@ class PipelineScheduler:
                 if DEVICE_NUM == 4:
                     self.layer_assignment=[10,9,8,5]
                 if DEVICE_NUM == 8:
-                    self.layer_assignment=[10, 9, 9, 9, 8, 8, 8, 3]
+                    self.layer_assignment=[9, 9, 9, 9, 8, 8, 8, 4]
                     if LAYER_NUM == 128:
                         self.layer_assignment=[18, 17, 17, 17, 17, 17, 17, 8]
                 if DEVICE_NUM == 16:
@@ -91,23 +91,18 @@ class PipelineScheduler:
                     self.layer_assignment=[1, 5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5]
                     self.layer_assignment=[9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 1]
         if DEEPSEEK:
+
             if DEVICE_NUM == 4:
                 self.layer_assignment=[5,4,4,3]
                 if SEQ_LEN == 4*K:
                     self.layer_assignment=[6,4,4,2]
             if DEVICE_NUM == 8:
-                if VOCAB_SIZE // DEEPSEEK_VOC == 4 and LAYER_NUM == 64:
+                if LAYER_NUM == 64:
                     self.layer_assignment=[12,8,8,8,8,8,8,4]
-                    assert sum(self.layer_assignment) == LAYER_NUM, "Wrong layer assignment."
-                elif VOCAB_SIZE // DEEPSEEK_VOC == 2 and LAYER_NUM == 32:
-                    self.layer_assignment=[6,4,4,4,4,4,4,2]
+                elif LAYER_NUM == 32:
+                    self.layer_assignment=[6,3,4,4,4,4,4,3]
                 else:
                     self.layer_assignment=[6,4,4,4,4,4,4,2]
-            if DS_SCALE == 2:
-                self.layer_assignment=[6,5,4,4,4,4,4,1]
-            if DS_SCALE == 4:
-                self.layer_assignment=[13,9,8,8,8,8,8,2]
-                self.layer_assignment=[12,9,9,8,8,8,8,2]
 
         if NEMOTRONH:
             if DEVICE_NUM == 4:
@@ -115,6 +110,8 @@ class PipelineScheduler:
                 if SEQ_LEN == 2*K:
                     self.layer_assignment=[8,7,8,5]
                 if SEQ_LEN == 4*K:
+                    self.layer_assignment=[8,8,8,4]
+                else:
                     self.layer_assignment=[8,8,8,4]
             if DEVICE_NUM == 8:
                 if LAYER_NUM == 56:
@@ -153,13 +150,40 @@ class PipelineScheduler:
 
         if SCHEDULE_METHOD != Schedule.UnifiedPP:
             self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
+    
+        # self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
 
-        
+        if SCHEDULE_METHOD == Schedule.Mist:
+            if GEMMA:
+                mist_layer_assignments = {
+                    32 : { 4 : [8, 9, 9, 6], },
+                    64 : { 8 : [6, 9, 9, 9, 9, 9, 9, 4], },
+                    128 : { 16 : [12, 18, 18, 18, 18, 18, 18, 8], },
+                }
+            if DEEPSEEK:
+                mist_layer_assignments = {
+                    16 : { 4 : [5, 4, 4, 3], },
+                    32 : { 8 : [6, 4, 4, 4, 4, 4, 4, 2], },
+                    64 : { 8 : [7, 9, 9, 9, 9, 9, 9, 3], },
+                }
+            if NEMOTRONH:
+                mist_layer_assignments = {
+                    28 : { 4 : [8, 8, 8, 4], },
+                    56 : { 8 : [3, 9, 7, 8, 9, 7, 8, 5], },
+                    112 : {
+                        8 : [13, 14, 16, 16, 14, 14, 16, 9],
+                        16 : [6, 7, 7, 7, 9, 7, 7, 9, 7, 7, 7, 7, 9, 7, 7, 2],
+                    },
+                }
+            self.layer_assignment = mist_layer_assignments[self.layer_num][self.device_num]
+            assert sum(self.layer_assignment) == LAYER_NUM, f"Mist {sum(self.layer_assignment)} != {LAYER_NUM}"
+            gpc["SCHEDULE_METHOD"] = Schedule.STANDARD_1F1B
         self.placement = [
             [1 for _ in range(layer_num)] for layer_num in self.layer_assignment
         ]
 
-        # self.placement = []
+        if SCHEDULE_METHOD == Schedule.UnifiedPP and CHUNK_NUM > 1:
+            self.placement = []
         with open("partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))
             f.flush()
@@ -290,7 +314,7 @@ class PipelineScheduler:
             dev_compute_power.append(comp_power)
             self.devices.append(device)
         self.set_recomp()
-        if gpc["HETER_DEVICE"] and not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH1):
+        if not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH1):
             layer_computation_cost = [F_TIMES[i]+B_TIMES[i]+W_TIMES[i] for i in range(self.layer_num)]
             head_total = gpc["HEAD_F_TIME"] + gpc["HEAD_B_TIME"] + gpc["HEAD_W_TIME"]
             ce_total = gpc["CE_F_TIME"] + gpc["CE_B_TIME"] + gpc["CE_W_TIME"]
@@ -300,25 +324,31 @@ class PipelineScheduler:
                 layer_num=total_layer,
                 layer_computation_cost=layer_computation_cost,
                 layer_para=[1 for _ in range(total_layer)],
+                chunk_num=gpc["CHUNK_NUM"],
                 dev_num=self.device_num,
                 dev_max_memory=[100000 for _ in range(total_layer)],
                 dev_compute_power=dev_compute_power,
             )
             if not self.placement:
                 self.placement = self.pipeline_placement_solver.get_placements()
-        if self.placement and self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH1, Schedule.STANDARD_AFAB):
+        if self.placement and self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH1, Schedule.STANDARD_AFAB, Schedule.Mist):
             assert self.placement is not None
             layer_idx_start = 0
             for did in range(self.device_num):
                 self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
                 layer_idx_start += len(self.placement[did])
-            print("Alpa")
+            # print("Mist")
         elif self.placement and self.schedule_method == Schedule.UnifiedPP and CHUNK_NUM == 1:
             layer_idx_start = 0
             for did in range(self.device_num):
                 self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
                 layer_idx_start += len(self.placement[did])
             # print("S1F1B + model partition + workload scheduling")
+        elif self.schedule_method == Schedule.STANDARD_INTERLEAVED:
+            layer_idx_start = 0
+            for pid in range(self.stage_num):
+                self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start, layer_num = layer_num)
+                layer_idx_start += layer_num
         elif self.placement:
             layer_idx_start = 0
             for did in range(self.device_num):
@@ -370,12 +400,23 @@ class PipelineScheduler:
                 self.devices[0].add_stage(self.layer_num+1, layer_num = layer_num)
                 self.devices[1].add_stage(self.layer_num+2, layer_num = layer_num)
         else:
-            if self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED):
+            layer_idx_start = 0
+            if self.schedule_method == Schedule.STANDARD_INTERLEAVED:
                 for pid in range(self.stage_num):
-                    self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
+                    self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start, layer_num = layer_num)
+                    layer_idx_start += layer_num
+            elif self.schedule_method == Schedule.STANDARD_ZBH1:
+                layer_num = self.layer_num // self.device_num
+                assert layer_num == int(layer_num)
+                for pid in range(self.device_num):
+                    self.devices[did].add_stage(pid, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start, layer_num = layer_num)
+                    layer_idx_start += layer_num
+            elif self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED):
+                for pid in range(self.stage_num):
+                    self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start, layer_num = layer_num)
+                    layer_idx_start += layer_num
             elif gpc["STAGE_PLACEMENT"] == Placement.SEARCHED:
                 print("Use Searched placement")
-
                 for pid in range(self.device_num):
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
                 for pid in range(self.device_num, self.device_num * 2):
@@ -410,7 +451,6 @@ class PipelineScheduler:
 
         self.placement = []
         for did in range(self.device_num):
-            # print(list(self.devices[did].stages.keys()))
             self.placement.append(list(self.devices[did].stages.keys()))
 
         save_to_file(gpc["TEMP_PLA_PATH"], str(self.placement), 'w')
@@ -429,19 +469,19 @@ class PipelineScheduler:
     def generate_schedule(self):
         if self.schedule_method == Schedule.STANDARD_1F1B:
             self.generate_1f1b_schedule()
-            print("Generate STANDARD_1F1B Schedule.")
+            # print("Generate STANDARD_1F1B Schedule.")
 
         elif self.schedule_method == Schedule.STANDARD_AFAB:
             self.generate_afab_schedule()
-            print("Generate STANDARD_AFAB Schedule.")
+            # print("Generate STANDARD_AFAB Schedule.")
 
         elif self.schedule_method == Schedule.STANDARD_ZBH1:
             self.generate_zbh1_schedule()
-            print("Generate STANDARD_ZBH1 Schedule.")
+            # print("Generate STANDARD_ZBH1 Schedule.")
 
         elif self.schedule_method == Schedule.STANDARD_INTERLEAVED and not self.layer_wise:
             self.generate_interleaved_1f1b_schedule()
-            print("Generate STANDARD_INTERLEAVED Schedule.")
+            # print("Generate STANDARD_INTERLEAVED Schedule.")
         # else:
         #     print("Using UPP Schedule.")
 

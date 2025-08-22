@@ -386,6 +386,12 @@ class Device:
     def get_executable_overlap_aware_workload(self, time)->list[Workload]:
         executable_workoads = []
         workload_type_order = [WorkloadType.B,WorkloadType.F,WorkloadType.W]
+        if SWITCH_WORKLOAD_TYPE:
+            if self.last_wtype == WorkloadType.B:
+                workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
+            if self.last_wtype == WorkloadType.F:
+                workload_type_order = [WorkloadType.B,WorkloadType.F,WorkloadType.W]
+
         if SAVE_MEMORY and self.get_max_mem_did() == self.did and self.current_mem_usage > self.peak_memory_usage / 5 * 4:
             if self.last_wtype == WorkloadType.B:
                 workload_type_order = [WorkloadType.W,WorkloadType.F,WorkloadType.B]

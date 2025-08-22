@@ -37,12 +37,14 @@ class PipelinePlacement:
                 layer_num:int, 
                 layer_computation_cost:list[float], 
                 layer_para: list[float],
+                chunk_num:int,
                 dev_num:int, 
                 dev_max_memory:list[float], 
                 dev_compute_power:list[float]):
         self.layer_num = layer_num
         self.layer_computation_cost = layer_computation_cost
         self.layer_para = layer_para
+        self.chunk_num = chunk_num
         self.dev_num = dev_num
         self.dev_max_memory = dev_max_memory
         self.dev_compute_power = dev_compute_power

@@ -29,7 +29,8 @@ class Schedule(Enum):
     Layerwise = 8
     Chimera = 9
     UnifiedPP = 15
-
+    Mist = 16
+    
     STANDARD_1F1B = 10
     STANDARD_INTERLEAVED = 11
     STANDARD_ZBH1 = 12
