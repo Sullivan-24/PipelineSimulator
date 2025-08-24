@@ -11,13 +11,13 @@ RUN_MODE = RunMode.SIM_SOLVE
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
 SCHEDULE_METHOD = Schedule.UnifiedPP
-# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH1
 # SCHEDULE_METHOD = Schedule.ZBV
-STAGE_PLACEMENT = Placement.STANDARD_1F1B
-# STAGE_PLACEMENT = Placement.INTERLEAVED
+# STAGE_PLACEMENT = Placement.STANDARD_1F1B
+STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.SEARCHED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
@@ -41,7 +41,7 @@ OVERLAP_DEGREE = None
 MEMORY_CONSTRAIN = 0.9
 MEMORY_REDUCATION = 0.0
 TERMINAL_FLAG = False
-IDEAL_SITUATION = True
+IDEAL_SITUATION = False
 
 # Gemma
 EMB_F_TIME = 0
@@ -56,9 +56,9 @@ CE_W_TIME = 0
 F_TIME = 0
 B_TIME = 0
 W_TIME = 0
-COMM_TIME = [0 for _ in range(PP_SIZE)]
-COMM_TIME[3] = 30
-
+COMM_TIME = [[0 for __ in range(PP_SIZE) ] for _ in range(PP_SIZE)]
+# COMM_TIME[3][2] = 30
+# COMM_TIME[2][3] = 30
 if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.ZBV):
     SPLIT_BACKPROP = True
     if SCHEDULE_METHOD == Schedule.ZBV:
@@ -104,7 +104,7 @@ if DEEPSEEK + GEMMA + NEMOTRONH > 1:
 SAVE_MEMORY = False
 CONSTRAIN_WARMUP=False
 
-F_TIME = 2.5
+F_TIME = 10
 # B_TIME = 16
 # W_TIME = 4
 F_TIMES = [F_TIME] * LAYER_NUM
@@ -123,7 +123,7 @@ if GEMMA:
         HEAD_B_TIME = F_TIME * (HEAD_RATIO[VOCAB_SIZE][1] + HEAD_RATIO[VOCAB_SIZE][2])
         if SPLIT_BACKPROP:
             B_TIMES = [t*1.6 for i,t in enumerate(F_TIMES)]
-            W_TIMES = [t*0.2 for i,t in enumerate(F_TIMES)]
+            W_TIMES = [t*0.4 for i,t in enumerate(F_TIMES)]
             HEAD_B_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][1]
             HEAD_W_TIME = F_TIME * HEAD_RATIO[VOCAB_SIZE][2]
     if SEQ_LEN == 4*K:
@@ -306,7 +306,7 @@ class Gradient:
 PIXEL_BASE = 1
 PP_HEIGHT = 25
 PP_ALIGN = 5
-SHOW_WORKLOAD_TEXT = True
+SHOW_WORKLOAD_TEXT = False
 if CHUNK_NUM > PP_SIZE:
     SHOW_WORKLOAD_TEXT = False
 # --------------------- Painter Config ---------------------

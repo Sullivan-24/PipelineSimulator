@@ -64,7 +64,8 @@ class PipelineScheduler:
         if GEMMA:
             if SEQ_LEN == 2*K:
                 if DEVICE_NUM == 4:
-                    self.layer_assignment=[9,9,8,6]
+                    #self.layer_assignment=[9,9,8,6]
+                    self.layer_assignment=[8,8,8,8]
                 if DEVICE_NUM == 8:
                     if LAYER_NUM == 64:
                         # Mist 256
@@ -135,11 +136,13 @@ class PipelineScheduler:
         if SCHEDULE_METHOD != Schedule.UnifiedPP:
             self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
 
+
         
         self.placement = [
             [1 for _ in range(layer_num)] for layer_num in self.layer_assignment
         ]
-
+        if SCHEDULE_METHOD == Schedule.UnifiedPP and CHUNK_NUM >1 :
+            self.placement = []
         with open("partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))
             f.flush()
@@ -270,7 +273,7 @@ class PipelineScheduler:
             dev_compute_power.append(comp_power)
             self.devices.append(device)
         self.set_recomp()
-        if gpc["HETER_DEVICE"] and not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH1):
+        if not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH1):
             layer_computation_cost = [F_TIMES[i]+B_TIMES[i]+W_TIMES[i] for i in range(self.layer_num)]
             head_total = gpc["HEAD_F_TIME"] + gpc["HEAD_B_TIME"] + gpc["HEAD_W_TIME"]
             ce_total = gpc["CE_F_TIME"] + gpc["CE_B_TIME"] + gpc["CE_W_TIME"]
@@ -280,25 +283,31 @@ class PipelineScheduler:
                 layer_num=total_layer,
                 layer_computation_cost=layer_computation_cost,
                 layer_para=[1 for _ in range(total_layer)],
+                chunk_num=gpc["CHUNK_NUM"],
                 dev_num=self.device_num,
                 dev_max_memory=[100000 for _ in range(total_layer)],
                 dev_compute_power=dev_compute_power,
             )
             if not self.placement:
                 self.placement = self.pipeline_placement_solver.get_placements()
-        if self.placement and self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH1, Schedule.STANDARD_AFAB):
+        if self.placement and self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH1, Schedule.STANDARD_AFAB, Schedule.Mist):
             assert self.placement is not None
             layer_idx_start = 0
             for did in range(self.device_num):
                 self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
                 layer_idx_start += len(self.placement[did])
-            print("Alpa")
+            # print("Mist")
         elif self.placement and self.schedule_method == Schedule.UnifiedPP and CHUNK_NUM == 1:
             layer_idx_start = 0
             for did in range(self.device_num):
                 self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
                 layer_idx_start += len(self.placement[did])
-            print("S1F1B + model partition + workload scheduling")
+            # print("S1F1B + model partition + workload scheduling")
+        elif self.schedule_method == Schedule.STANDARD_INTERLEAVED:
+            layer_idx_start = 0
+            for pid in range(self.stage_num):
+                self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start, layer_num = layer_num)
+                layer_idx_start += layer_num
         elif self.placement:
             layer_idx_start = 0
             for did in range(self.device_num):
@@ -350,12 +359,23 @@ class PipelineScheduler:
                 self.devices[0].add_stage(self.layer_num+1, layer_num = layer_num)
                 self.devices[1].add_stage(self.layer_num+2, layer_num = layer_num)
         else:
-            if self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED):
+            layer_idx_start = 0
+            if self.schedule_method == Schedule.STANDARD_INTERLEAVED:
                 for pid in range(self.stage_num):
-                    self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
+                    self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start, layer_num = layer_num)
+                    layer_idx_start += layer_num
+            elif self.schedule_method == Schedule.STANDARD_ZBH1:
+                layer_num = self.layer_num // self.device_num
+                assert layer_num == int(layer_num)
+                for pid in range(self.device_num):
+                    self.devices[did].add_stage(pid, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start, layer_num = layer_num)
+                    layer_idx_start += layer_num
+            elif self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED):
+                for pid in range(self.stage_num):
+                    self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start, layer_num = layer_num)
+                    layer_idx_start += layer_num
             elif gpc["STAGE_PLACEMENT"] == Placement.SEARCHED:
                 print("Use Searched placement")
-
                 for pid in range(self.device_num):
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid], layer_num = layer_num)
                 for pid in range(self.device_num, self.device_num * 2):

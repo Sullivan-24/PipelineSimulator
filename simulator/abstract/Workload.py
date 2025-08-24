@@ -78,7 +78,7 @@ class Workload:
 
     def _generate_communication(self, time, constraint: WorkloadConstraint):
         if constraint.did != self.did:
-            self.ready_time = max(self.ready_time, time + gpc["COMM_TIME"][self.did])
+            self.ready_time = max(self.ready_time, time + gpc["COMM_TIME"][constraint.did][self.did])
         else:
             self.ready_time = max(self.ready_time, time)
 
