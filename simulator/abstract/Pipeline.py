@@ -119,6 +119,8 @@ class PipelineScheduler:
                         self.layer_assignment=[9,8,7,8,7,7,7,3]
                     if SEQ_LEN == 4*K:
                         self.layer_assignment=[9,8,7,8,8,7,7,2]
+                    if SEQ_LEN == 8*K:
+                        self.layer_assignment=[8,8,8,8,8,8,7,1]
                 if LAYER_NUM == 112:
                     self.layer_assignment=[16, 16, 15, 15, 16, 16, 15, 3]
             if DEVICE_NUM == 16:
@@ -169,7 +171,8 @@ class PipelineScheduler:
             if NEMOTRONH:
                 mist_layer_assignments = {
                     28 : { 4 : [8, 8, 8, 4], },
-                    56 : { 8 : [3, 9, 7, 8, 9, 7, 8, 5], },
+                    # 56 : { 8 : [3, 9, 7, 8, 9, 7, 8, 5], },
+                    56 : { 8 : [6, 7, 8, 7, 8, 7, 8, 5], },
                     112 : {
                         8 : [13, 14, 16, 16, 14, 14, 16, 9],
                         16 : [6, 7, 7, 7, 9, 7, 7, 9, 7, 7, 7, 7, 9, 7, 7, 2],

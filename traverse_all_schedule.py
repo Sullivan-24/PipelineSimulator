@@ -97,7 +97,7 @@ def run_schedule(draw=True, show_mem=True, show_utilization=True, show_success=T
         simulator.draw()
     # print(simulator.workload_execute_record)
     if show_res:
-        print("Time:{}.".format(simulator.last_workload.end_time))
+        print("Time: {} .".format(simulator.last_workload.end_time))
     return simulator.last_workload.end_time, simulator.finish_flag
 
 def main():
@@ -169,3 +169,7 @@ if __name__ == "__main__":
     #     end_time = time.time()
     #     print(f"{gpc["MICRO_BATCH_NUM"]} : {end_time-start_time},")
 
+    # for sch in [Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_ZBH1, Schedule.UnifiedPP]:
+    #     gpc["SCHEDULE_METHOD"] = sch
+    #     print(sch)
+    #     run_schedule(draw=False, show_mem=False, show_res=True, show_utilization=False, show_success=False)
