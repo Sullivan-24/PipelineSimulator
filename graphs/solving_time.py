@@ -55,8 +55,8 @@ def draw_solving_time():
         plt.xticks(np.log2(x_ticks), x_ticks, fontsize=ticksize)
         plt.xlabel("Micro-batch#", fontsize=labelsize)
         plt.yticks(fontsize=ticksize)
-        plt.ylabel("Time (seconds, log scale)", fontsize=labelsize)
-        plt.title("Pipeline Generation Time Across Configurations", fontsize=titlesize, y=1.00)
+        plt.ylabel("Time (Seconds)", fontsize=labelsize)
+        # plt.title("Pipeline Generation Time Across Configurations", fontsize=titlesize, y=1.00)
         plt.grid(True, which="both", ls="--", alpha=0.25)
 
         ax = plt.gca()

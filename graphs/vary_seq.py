@@ -4,25 +4,28 @@ import seaborn as sns
 from e2e_data import *
 fontsize=6
 titlesize=20 + fontsize
-labelsize= 20 + fontsize
+labelsize= 18 + fontsize
 ticksize= 16 + fontsize
-legendsize= 20 + fontsize - 1
+legendsize= 16 + fontsize - 1
 def varyseq():
 
     x = list(vary_length_seqence.keys())
     methods = list(next(iter(vary_length_seqence.values())).keys())
 
     # 画折线图
-    plt.figure(figsize=(10, 6))
+    baseline = vary_length_seqence["1K"]["OctoPipe"]
+    plt.figure(figsize=(10, 5))
     for method in methods:
-        y = [vary_length_seqence[seq][method] for seq in x]
+        y = [vary_length_seqence[seq][method]/baseline for seq in x]
+        speedup = [vary_length_seqence[seq]["OctoPipe"] / vary_length_seqence[seq][method] for seq in x]
+        print(speedup, sum(speedup)/len(speedup))
         plt.plot(x, y, marker=markers[method],markersize=14, linewidth=2.5, color=line_colors[method], label=method)
 
     plt.xlabel("Sequence Length",fontsize=labelsize)
     plt.xticks(fontsize=ticksize)
-    plt.ylabel("Throughput (TGS)",fontsize=labelsize)
+    plt.ylabel("Throughput (Normalized)",fontsize=labelsize)
     plt.yticks(fontsize=ticksize)
-    plt.title("Throughput across varying sequence lengths",fontsize=titlesize)
+    # plt.title("Throughput across varying sequence lengths",fontsize=titlesize)
     plt.legend(fontsize=legendsize, frameon=True)
     plt.grid(True)
     plt.tight_layout()

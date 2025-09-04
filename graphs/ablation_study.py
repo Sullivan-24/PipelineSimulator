@@ -148,8 +148,8 @@ def draw_ablation():
         plt.ylim((ylim_min,ylim_max))
         plt.yticks(ylim_range, fontsize=ticksize)
         plt.grid(axis='y', linestyle='--', alpha=0.3)
-        plt.ylabel('Normalized Performance', fontsize=labelsize-1)
-        plt.title('Ablation Study Across Models', fontsize=titlesize, pad=20, y=0.98)
+        plt.ylabel('Throughput (Normalized)', fontsize=labelsize-1)
+        # plt.title('Ablation Study Across Models', fontsize=titlesize, pad=20, y=0.98)
         # plt.legend(fontsize=11, frameon=False, bbox_to_anchor=(1, 1))
         # plt.legend(fontsize=11, frameon=False)
         plt.legend(legend_handles, models, 

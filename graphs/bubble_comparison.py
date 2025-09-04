@@ -15,54 +15,48 @@ def bubble_comparison():
     def sinplot():
         # 方法名称
         methods = ['S-1F1B', 'I-1F1B', 'ZB', 'Mist', 'OctoPipe']
-        colors = ['#ffde82','#4A90E2','#48BEA3','#E1D5E7','#E54C5E']
-        # 每个方法在 S1 到 S4 和 Avg 的百分比
-        # data = np.array([
-        #     [45.95, 48.11, 48.11, 20.0, 40.5425],
-        #     [35.48, 38.06, 38.06, 4.52, 29.03],
-        #     [37.69, 40.19, 40.19, 7.79, 31.465],
-        #     [27.04, 29.64, 29.64, 27.04, 28.34],
-        #     # [2.82, 6.29, 6.29, 2.82, 4.55],
-        # ])   
+        methods = ['S-1F1B', 'I-1F1B', 'ZB', 'Mist']
+        
         data = np.array([
-        # ['Ideal', 'LLaMA3', 'Gemma', 'DeepSeek']
-            [27.55,   35.4025, 40.5425, 47.6925],
-            [4.95,    20.61,   29.03,   22.2675],
-            [11.52,   22.265,  31.465,  41.55],
-            [27.55,   28.77,   28.34,   31.3425],
-            [2.04, 5.9375, 7.175, 5.455],
+        # small ['Ideal', 'Gemma', 'DeepSeek', 'Nemotron-H', 'OctoPipe']
+            [17.97,   28.35, 34.3025, 31.135],
+            [2.7,    20.4275,   27.60,   30.2575],
+            [11.52,   26.7825,  33.355,  30.21],
+            [6.82,   18.2,   22.315,   19.7475],
+            # [0.93, 5.9375, 7.175, 9.71],
         ])   
-        # Ideal [27.55, 4.95, 11.52, 27.55]
-        # GPT3 [29.785, 10.81, 19.2, 31.25, 6.2175]
-        # llama3 [35.4025, 20.61, 22.265, 28.77]
-        # gemma [40.5425, 29.03, 31.465, 28.34]
-        # DeepSeek [47.6925, 22.2675, 41.55, 31.3425]
-
+        
+        data = np.array([
+        # medium ['Ideal', 'Gemma', 'DeepSeek', 'Nemotron-H', 'OctoPipe']
+            [17.97,   36.211, 44.7475, 47.86375],
+            [2.7,    30.3287,   39.4674,   51.13375],
+            [11.52,   34.8662,  43.845,  47.19],
+            [6.82,   20.7325,   25.57125,   41.48625],
+            # [0.93, 5.9375, 7.175, 9.71],
+        ])   
+        
         # X轴标签（stage）
-        labels = ['S1', 'S2', 'S3', 'S4', 'Avg.']
-        labels = ['Ideal', 'LLaMA3', 'Gemma', 'DeepSeek']
-
-        # labels = ['S1', 'S2', 'S3', 'S4']
+        labels = ['LLaMA-2', 'Gemma', 'DeepSeek', 'Nemotron-H']
 
         x = np.arange(len(labels))  # [0, 1, 2, 3, 4]
-        bar_width = 0.15
+        bar_width = 0.2
 
         # 创建图形
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(12, 5))
 
         # 每种方法一个 bar group
         for i in range(len(methods)):
             method = methods[i]
-            ax.bar(x + i * bar_width, data[i], width=bar_width, color=colors[i], alpha=0.8, edgecolor='black', hatch=hatches[method], label=methods[i])
+            ax.bar(x + i * bar_width, data[i], width=bar_width-0.00, color=colors[method], alpha=0.8, edgecolor='black', hatch=hatches[method], label=methods[i])
 
-        ax.set_ylim(0, 59)
+        ax.set_ylim(0, 62)
         ax.yaxis.set_major_locator(MultipleLocator(10))
 
         # 设置标签和刻度
         center_offset = (len(methods) - 1) * bar_width / 2
         ax.set_xticks(x + center_offset)
         ax.set_xticklabels(labels, fontsize=labelsize)
-        ax.set_ylabel("Average Bubble Ratio (%)", fontsize=labelsize)
+        ax.set_ylabel("Bubble Ratio (%)", fontsize=labelsize)
         ax.grid(axis='y', linestyle='--', alpha=0.4)
         ax.tick_params(axis='y', which='both', length=5, labelsize=ticksize)
         
@@ -88,7 +82,7 @@ def bubble_comparison():
             labels=label,
             fontsize=legendsize,
             loc='upper center',
-            bbox_to_anchor=(0.54, 1.075),
+            bbox_to_anchor=(0.54, 1.095),
             ncol=len(methods),
             frameon=False,
             handlelength=1.5,

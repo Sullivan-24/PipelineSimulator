@@ -10,10 +10,11 @@ def calculate_avg_speedup(data):
             
             for config in seq_data:
                 octopipe = seq_data[config]["OctoPipe"]
+                # octopipe = seq_data[config]["Mist"]
                 for method in methods:
                     if method in seq_data[config]:
                         speedups[method].append(octopipe / seq_data[config][method])
-            
+            print(seq, speedups)
             avg_speedup = {method: sum(values)/len(values) for method, values in speedups.items()}
             model_results[seq] = avg_speedup
         results[model] = model_results
@@ -25,4 +26,4 @@ for model, seq_data in calculate_avg_speedup(h200_data).items():
     for seq, methods in seq_data.items():
         print(f"{seq}:")
         for method, ratio in methods.items():
-            print(f"  vs {method}: {ratio:.4f}")
+            print(f"  vs {method}: {ratio:.2f}")

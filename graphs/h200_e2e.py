@@ -67,7 +67,7 @@ def draw_h200_e2e_seq(seqlen=2):
 
 def draw_h200_e2e():
     def sinplot():
-        fig, axes = plt.subplots(2, 3, figsize=(32, 16))  # Increased height to accommodate both rows
+        fig, axes = plt.subplots(2, 3, figsize=(32, 14))  # Increased height to accommodate both rows
         standard_method = "S-1F1B"
         normalized = True
         models = list(data.keys())
@@ -78,7 +78,8 @@ def draw_h200_e2e():
             seq_2k = seq_data["Seq_2k"]
             configs = list(seq_2k.keys())
             methods = list(next(iter(seq_2k.values())).keys())
-            configs_sorted = sorted(configs, key=lambda x: (int(x.split(",")[0]), int(x.split(",")[1])))
+            # configs_sorted = sorted(configs, key=lambda x: (int(x.split(",")[0]), int(x.split(",")[1])))
+            configs_sorted = configs
             x = range(len(configs_sorted))
             bar_width = 0.15
 
@@ -103,7 +104,7 @@ def draw_h200_e2e():
                     )
             # ax.set_title(f"{model} (Seqlen = 2k)", fontsize=titlesize, y=1.025)
             ax.set_title(" ", color="#FFFFFF", fontsize=titlesize, y=1.025)
-            ax.text(0.5, -0.15, f"{model} (Seqlen = 2k)", fontsize=titlesize, ha='center', va='center', transform=ax.transAxes)
+            ax.text(0.5, -0.175, f"{model} (Seqlen = 2k)", fontsize=titlesize, ha='center', va='center', transform=ax.transAxes)
             ax.set_xticks([pos + bar_width * (len(methods) / 2) for pos in x])
             ax.set_xticklabels(configs_sorted, fontsize=labelsize)
             if col == 0:
@@ -119,7 +120,8 @@ def draw_h200_e2e():
             seq_4k = seq_data["Seq_4k"]
             configs = list(seq_4k.keys())
             methods = list(next(iter(seq_4k.values())).keys())
-            configs_sorted = sorted(configs, key=lambda x: (int(x.split(",")[0]), int(x.split(",")[1])))
+            # configs_sorted = sorted(configs, key=lambda x: (int(x.split(",")[0]), int(x.split(",")[1])))
+            configs_sorted = configs
             x = range(len(configs_sorted))
             bar_width = 0.15
 
@@ -144,7 +146,7 @@ def draw_h200_e2e():
                     )
 
             # ax.set_title(f"{model} (Seqlen = 4k)", fontsize=titlesize, y=1.025)
-            ax.text(0.5, -0.15, f"{model} (Seqlen = 4k)", fontsize=titlesize, ha='center', va='center', transform=ax.transAxes)
+            ax.text(0.5, -0.175, f"{model} (Seqlen = 4k)", fontsize=titlesize, ha='center', va='center', transform=ax.transAxes)
             ax.set_xticks([pos + bar_width * (len(methods) / 2) for pos in x])
             ax.set_xticklabels(configs_sorted, fontsize=labelsize)
             if col == 0:

@@ -4,7 +4,6 @@ import seaborn as sns
 from matplotlib.pyplot import MultipleLocator
 from matplotlib.ticker import ScalarFormatter
 from matplotlib.ticker import FuncFormatter
-
 def calculate_total_variable_partitions(L: int, D: int) -> int:
     """
     计算一个 L 层的模型，在可以切分为 N 块 ( N 在 D 到 L 的范围内 )
@@ -132,10 +131,11 @@ offset = 5
 fontsize=20
 titlesize=26 + offset + 8
 labelsize=26 + offset + 8
-ticksize=24 + offset
+ticksize=28 + offset
 legendsize=24 + offset
 markersize=10 + offset
 def searching_space():
+    markers = ["o", "^", "*", "D"]
     def sinplot():
         # ==============================================================================
         # 3. 创建图表和子图
@@ -146,20 +146,19 @@ def searching_space():
 
         # --- 子图 1: calculate_total_variable_partitions ---
         ax1 = axes[0]
-        for d in D_values:
+        for i, d in enumerate(D_values):
             # 筛选出有效的L值 (L必须大于等于D)
             valid_L = [l for l in L_values if l >= d]
             if not valid_L:
                 continue
             results = [calculate_total_variable_partitions(l, d) for l in valid_L]
-            print(results)
-            ax1.plot(valid_L, results, marker='o', markersize=markersize, linestyle='--', label=f'P={d}')
+            ax1.plot(valid_L, results, marker=markers[i], markersize=markersize, linestyle='--', label=r'$\it{P}$'+f"={d}")
 
         ax1.set_title('Model Partition', fontsize=titlesize)
         ax1.set_xlabel('Layers#', fontsize=labelsize)
         ax1.set_ylabel('Cases# (log scale)', fontsize=labelsize)
         ax1.tick_params(axis='y', which='both', length=5, labelsize=ticksize)
-        ax1.tick_params(axis='x', which='both', length=5, labelsize=ticksize)
+        ax1.tick_params(axis='x', which='both', length=5, labelsize=ticksize-3)
         ax1.set_yscale('log') # 使用对数尺度
         ax1.grid(True, which="both", ls="--")
         ax1.legend(
@@ -177,29 +176,30 @@ def searching_space():
         ax2 = axes[1]
         # 注意：这里我们将 L 视为 N (块的数量)
         max_y2 = -1
-        for d in D_values:
+        # for d in D_values:
+        for i, d in enumerate(D_values):
             # 筛选出有效的N值 (N必须大于等于D)
             valid_N = [n for n in L_values if n >= d]
             if not valid_N:
                 continue
             results = [count_surjective_distributions(n, d) for n in valid_N]
-            ax2.plot(valid_N, results, marker='o', markersize=markersize, linestyle='--', label=f'P={d}')
+            ax2.plot(valid_N, results, marker=markers[i], markersize=markersize, linestyle='--', label=r'$\it{P}$'+f"={d}")
             max_y2 = max(max_y2, max(results))
         
         ax2.set_title('Model Placement', fontsize=labelsize)
         ax2.set_xlabel('Stages#', fontsize=labelsize)
         ax2.tick_params(axis='y', which='both', length=5, labelsize=ticksize)
-        ax2.tick_params(axis='x', which='both', length=5, labelsize=ticksize)
+        ax2.tick_params(axis='x', which='both', length=5, labelsize=ticksize-3)
         ax2.set_yscale('log') # 使用对数尺度
         ax2.grid(True, which="both", ls="--")
-        # ax2.legend(
-        #     fontsize=legendsize,
-        #     labelspacing=0.25,   # 控制行间距（可调）
-        #     columnspacing=0.25,  # 控制列间距（可调）
-        #     handletextpad=0.25,  # 控制图例中图标与文字的间距
-        #     borderaxespad=0.1,  # 控制图例与图像边缘的距离
-        #     handlelength=1.25,      # 控制图例中图标的长度
-        # )
+        ax2.legend(
+            fontsize=legendsize,
+            labelspacing=0.25,   # 控制行间距（可调）
+            columnspacing=0.25,  # 控制列间距（可调）
+            handletextpad=0.25,  # 控制图例中图标与文字的间距
+            borderaxespad=0.1,  # 控制图例与图像边缘的距离
+            handlelength=1.25,      # 控制图例中图标的长度
+        )
         x_major_locator=MultipleLocator(10)
         ax2.xaxis.set_major_locator(x_major_locator)
 
@@ -216,12 +216,12 @@ def searching_space():
                 print(f"Warning: Calculation for M={m} in calculate_task_sequences overflowed and will not be plotted.")
 
         if valid_M:
-            ax3.plot(valid_M, results, marker='^', linestyle='-.', markersize=markersize, color='purple', label=f'P=1')
+            ax3.plot(valid_M, results, marker='s', linestyle='--', markersize=markersize, color='purple', label=r'$\it{P}$'+f"=1")
 
         ax3.set_title('Workload Scheduling', fontsize=titlesize)
         ax3.set_xlabel('Micro-batches#', fontsize=labelsize)
         ax3.tick_params(axis='y', which='both', length=5, labelsize=ticksize)
-        ax3.tick_params(axis='x', which='both', length=5, labelsize=ticksize)
+        ax3.tick_params(axis='x', which='both', length=5, labelsize=ticksize-3)
         ax3.set_yscale('log') # 使用对数尺度
         ax3.grid(True, which="both", ls="--")
         x_major_locator=MultipleLocator(5)
