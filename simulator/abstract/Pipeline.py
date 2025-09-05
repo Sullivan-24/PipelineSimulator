@@ -19,9 +19,9 @@ workload_type_mapping = {
 
 class PipelineScheduler:
 
-    def __init__(self, pipeline_idx, placement=None, run_schedule=False) -> None:
+    def __init__(self, pipeline_idx, time=0, placement=None, run_schedule=False) -> None:
         
-        self.time = 0
+        self.time = time
         self.pipeline_idx = pipeline_idx # A flag for identifying each pipeline
         self.results = {}
         self.device_num = gpc["DEVICE_NUM"]
@@ -59,7 +59,6 @@ class PipelineScheduler:
                     self.layer_assignment=[1, 5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5]
                     self.layer_assignment=[9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 1]
         if DEEPSEEK:
-
             if DEVICE_NUM == 4:
                 self.layer_assignment=[5,4,4,3]
                 if SEQ_LEN == 4*K:
@@ -159,6 +158,7 @@ class PipelineScheduler:
             f.write(str(self.layer_assignment))
             f.flush()
         self.nmb = gpc["MICRO_BATCH_NUM"]
+        self.mid_offset = pipeline_idx * self.nmb
         self.stage_num = gpc["STAGE_NUM"]
         self.schedule_method = gpc["SCHEDULE_METHOD"]
         self.layer_wise = gpc["LAYERWISE"]
@@ -276,6 +276,7 @@ class PipelineScheduler:
                         device_id = did, 
                         max_activation_counts=gpc["MAX_ACTIVATION_COUNTS"], 
                         nmb=self.nmb,
+                        mid_offset=self.mid_offset,
                         memory_usage_constrain_rate=0.85,
                         max_mem=max_mem,
                         comp_power=comp_power,
@@ -466,7 +467,7 @@ class PipelineScheduler:
         for did in range(self.device_num):
             mids = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
             for i in range(gpc["WORKLOAD_TYPE_NUM"]):
-                while mids[i] < self.nmb:
+                while mids[i] < self.mid_offset + self.nmb:
                     self.schedule[did].append((workload_type_order[i], mids[i], did))
                     mids[i]+=1
 
@@ -486,7 +487,7 @@ class PipelineScheduler:
             while sum(finish_flag) < gpc["WORKLOAD_TYPE_NUM"]:
                 next_workload_type = workload_type_order[iter % gpc["WORKLOAD_TYPE_NUM"]]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
-                if next_mid < self.nmb:
+                if next_mid < self.mid_offset + self.nmb:
                     self.schedule[did].append((next_workload_type, next_mid, did))
                     mids[workload_idx_in_mids[next_workload_type]] += 1
                 else:
@@ -513,7 +514,7 @@ class PipelineScheduler:
                 comm_delay = (self.device_num - did - 1) * 2 * gpc["COMM_TIME"]
                 compute_delay = (self.device_num - did - 1) * gpc["B_TIME"]
                 additional_f_num = min(gpc["MAX_ACTIVATION_COUNTS"] - mids[0] - did, (comm_delay + compute_delay) // gpc["F_TIME"])
-                while mids[0] < min(gpc["MAX_ACTIVATION_COUNTS"], self.nmb) and additional_f_num:
+                while mids[0] < min(gpc["MAX_ACTIVATION_COUNTS"], self.mid_offset + self.nmb) and additional_f_num:
                     self.schedule[did].append((WorkloadType.F ,mids[0], did))
                     mids[0] += 1
                     additional_f_num -= 1
@@ -524,11 +525,11 @@ class PipelineScheduler:
             while sum(finish_flag) < gpc["WORKLOAD_TYPE_NUM"]:
                 next_workload_type = workload_type_order[iter % gpc["WORKLOAD_TYPE_NUM"]]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
-                if mids[0] < min(self.nmb, gpc["MAX_ACTIVATION_COUNTS"]):
+                if mids[0] < min(self.mid_offset + self.nmb, gpc["MAX_ACTIVATION_COUNTS"]):
                     if next_workload_type == WorkloadType.W:
                         iter += 1
                         continue 
-                if next_mid < self.nmb:
+                if next_mid < self.mid_offset + self.nmb:
                     self.schedule[did].append((next_workload_type, next_mid, did))
                     mids[workload_idx_in_mids[next_workload_type]] += 1
                 else:
@@ -549,7 +550,7 @@ class PipelineScheduler:
         
             # warmup, inject as much microbatches as possible
             warmup_f_num = (gpc["CHUNK_NUM"] - 1) * self.device_num + (self.device_num - did - 1) * 2
-            while mids[idx_in_f_mids] < self.nmb and f_mid_count < warmup_f_num:
+            while mids[idx_in_f_mids] < self.mid_offset + self.nmb and f_mid_count < warmup_f_num:
                 self.schedule[did].append((WorkloadType.F ,mids[idx_in_f_mids], f_next_sid))
                 mids[idx_in_f_mids] += 1
                 f_mid_count += 1
@@ -566,9 +567,9 @@ class PipelineScheduler:
 
             # Start 1f1b with F operation
             operation_flag = 'f'
-            while b_mid_count + f_mid_count < self.nmb * gpc["CHUNK_NUM"] * workload_type_num:
+            while b_mid_count + f_mid_count < self.mid_offset + self.nmb * gpc["CHUNK_NUM"] * workload_type_num:
                 if operation_flag == 'f':
-                    if mids[idx_in_f_mids] < self.nmb:
+                    if mids[idx_in_f_mids] < self.mid_offset + self.nmb:
                         self.schedule[did].append((WorkloadType.F ,mids[idx_in_f_mids], f_next_sid))
                         mids[idx_in_f_mids] += 1
                         f_mid_count += 1
@@ -578,7 +579,7 @@ class PipelineScheduler:
                             idx_in_f_mids = f_next_sid_idx * workload_type_num
                     operation_flag = 'b'
                 elif operation_flag == 'b':
-                    if mids[idx_in_b_mids] < self.nmb:
+                    if mids[idx_in_b_mids] < self.mid_offset + self.nmb:
                         if gpc["RECOMP"]:
                             self.schedule[did].append((WorkloadType.R ,mids[idx_in_b_mids], b_next_sid))
                         self.schedule[did].append((WorkloadType.B ,mids[idx_in_b_mids], b_next_sid))
@@ -668,7 +669,7 @@ class PipelineScheduler:
 
         if self.num_finished_microbatch == (1 + self.layer_num) * len(self.microbatch_schedule_range):
             self.num_finished_microbatch = 0
-            self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < self.nmb]
+            self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < (self.mid_offset + self.nmb)]
             self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
 
     def execute_workload(self, time):
@@ -868,13 +869,32 @@ class PipelineScheduler:
             print(peak_mem_usages)
         return not oom
     
+    def pop_workload_by_mid(self, mid):
+        workloads = []
+        for device in self.devices:
+            for sid, stage in device.stages.items():
+                for wid, workload in stage.workloads.items():
+                    if wid == mid:
+                        workloads.append(workload)
+                stage.workloads.pop(mid)
+        print(workloads)
+        return workloads
+    
+    def insert_workload(self, workloads:list[Workload]):
+        self.nmb += 1
+        for idx, workload in enumerate(workloads):
+            for wtype in [WorkloadType.F,WorkloadType.B,WorkloadType.W]:
+                device = self.devices[workload[wtype].did]
+                stage = device.stages[workload[wtype].sid]
+                stage.workloads[workload[wtype].mid] = workload
+
     def get_workloadload_duration(self):
         fwd_time = [gpc["F_TIME"] for _ in range(self.layer_num+3)]
         iwd_time = [gpc["B_TIME"] for _ in range(self.layer_num+3)]
         pwd_time = [gpc["W_TIME"] for _ in range(self.layer_num+3)]
         for device in self.devices:
             for sid in device.stages:
-                for mid in range(self.nmb):
+                for mid in range(self.mid_offset, self.mid_offset + self.nmb):
                     if mid not in device.stages[sid].workloads: continue
                     fwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.F].duration
                     if WorkloadType.B in device.stages[sid].workloads[mid]:
@@ -882,55 +902,9 @@ class PipelineScheduler:
                     if WorkloadType.W in device.stages[sid].workloads[mid]:
                         pwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.W].duration
         return fwd_time, iwd_time, pwd_time
-    
-    def get_workload_len(self, key):
-        workload_type, mid, lid = key.split("_")
-        mid = int(mid)
-        lid = int(lid)
-        if self.layer_wise:
-            layers = 1
-        else:
-            layers = self.layer_num // self.stage_num
-
-        if workload_type == "f":
-            workload_len = gpc["F_TIME"] * layers
-            if self.layer_wise:
-                if lid == 0:
-                    workload_len = gpc["EMB_F_TIME"]
-                elif lid == self.layer_num - 1:
-                    workload_len = gpc["CE_F_TIME"]
-                elif lid == self.layer_num - 2:
-                    workload_len = gpc["HEAD_F_TIME"]
-            else:
-                if lid == 0:
-                    workload_len += gpc["EMB_F_TIME"]
-                elif lid == self.stage_num - 1:
-                    workload_len += gpc["CE_F_TIME"] + gpc["HEAD_F_TIME"]
-        elif workload_type == "b":
-            workload_len = gpc["B_TIME"] * layers
-            if self.layer_wise:
-                if lid == self.layer_num - 1:
-                    workload_len = gpc["CE_B_TIME"]
-                elif lid == self.layer_num - 2:
-                    workload_len = gpc["HEAD_B_TIME"]
-            else:
-                if lid == self.stage_num - 1:
-                    workload_len += gpc["CE_B_TIME"] + gpc["HEAD_B_TIME"]
-        elif workload_type == "w":
-            workload_len = gpc["W_TIME"] * layers
-            if self.layer_wise:
-                if lid == self.layer_num - 1:
-                    workload_len = gpc["CE_W_TIME"]
-                elif lid == self.layer_num - 2:
-                    workload_len = gpc["HEAD_W_TIME"]
-            else:
-                if lid == self.stage_num - 1:
-                    workload_len += gpc["CE_W_TIME"] + gpc["HEAD_W_TIME"]
-        return workload_len 
          
     def draw(self) -> None:
         # 绘制结果的逻辑
-        # self.resort_w()
         fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
         if self.layer_wise:
             painter_conf = {
@@ -942,6 +916,7 @@ class PipelineScheduler:
                 "pp_align": gpc["PP_ALIGN"],
                 "pixel_base": gpc["PIXEL_BASE"],
                 "nmb": self.nmb,
+                "mid_offset": self.mid_offset,
                 "forward_length": fwd_time,
                 "backward_length": iwd_time,
                 "backward_length2": pwd_time,
@@ -961,6 +936,7 @@ class PipelineScheduler:
                 "pp_align": gpc["PP_ALIGN"],
                 "pixel_base": gpc["PIXEL_BASE"],
                 "nmb": self.nmb,
+                "mid_offset": self.mid_offset,
                 "forward_length": fwd_time,
                 "backward_length": iwd_time,
                 "backward_length2": pwd_time,

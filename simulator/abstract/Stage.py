@@ -129,10 +129,11 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, microbatch_num:int, layer_num: int, layer_idx_start: int, layerwise:bool = False, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
+    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, nmb:int, mid_offset:int, layer_num: int, layer_idx_start: int, layerwise:bool = False, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
         self.did: int = device_id
         self.sid: int = stage_id
-        self.nmb: int = microbatch_num
+        self.nmb: int = nmb
+        self.mid_offset: int = mid_offset
         self.para_num: int = para_num / gpc["G"]
         self.model_memory_usage = self.para_num * gpc["FP16"] / gpc["TP_SIZE"]
         self.grad_memory_usage = 0
@@ -161,7 +162,7 @@ class Stage:
         total_stages = gpc["LAYER_NUM"]+3 if self.layerwise else gpc["STAGE_NUM"]
         if gpc["HEAD_DP"]:
             total_stages = gpc["STAGE_NUM"] + 1
-        for mid in range(self.nmb):
+        for mid in range(self.mid_offset, self.mid_offset + self.nmb):
             if gpc["HEAD_DP"]:
                 if self.sid == gpc["STAGE_NUM"] and self.did == 0:
                     # pass

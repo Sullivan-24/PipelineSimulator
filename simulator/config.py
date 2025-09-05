@@ -37,7 +37,7 @@ OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = False
-TIME_LIMIT = 180000
+TIME_LIMIT = 3000
 HEAD_DP = False if test_upp else False
 # [1, 2, 100, None]
 OVERLAP_DEGREE = None
@@ -275,7 +275,7 @@ class Gradient:
 PIXEL_BASE = 1
 PP_HEIGHT = 25
 PP_ALIGN = 5
-SHOW_WORKLOAD_TEXT = False
+SHOW_WORKLOAD_TEXT = True
 if CHUNK_NUM > PP_SIZE:
     SHOW_WORKLOAD_TEXT = False
 # --------------------- Painter Config ---------------------
