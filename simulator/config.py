@@ -32,7 +32,9 @@ if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.STANDARD_1F1B, Schedule.
 Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
 HETER_DEVICE = True
-HETER_RATIO = 1
+HETER_RATIO = 2
+HETER_PP_ID = [2]
+HETER_DP_ID = [0]
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True
 # --------------------- Simulator config ---------------------

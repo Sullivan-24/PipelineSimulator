@@ -269,7 +269,8 @@ class PipelineScheduler:
             max_mem = gpc["GPU_MAX_MEM"]
             comp_power = 2
             if gpc["HETER_DEVICE"]:
-                if did >= self.device_num // 2:
+                #if did >= self.device_num // 2:
+                if did in gpc["HETER_PP_ID"] and self.pipeline_idx in gpc["HETER_DP_ID"]:
                     max_mem = gpc["GPU_MAX_MEM"] / gpc["HETER_RATIO"]
                     comp_power = comp_power / gpc["HETER_RATIO"]
             device = Device(
