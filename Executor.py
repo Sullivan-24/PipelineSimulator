@@ -9,7 +9,7 @@ class Executor:
         self.time = 0
         self.finish_flag = False
         self.dp_size = dp_size
-        self.pipelines = [PipelineScheduler(pipeline_idx=dp_idx, time=0*dp_idx) for dp_idx in range(dp_size)]
+        self.pipelines = [PipelineScheduler(pipeline_idx=dp_idx, time=0*dp_idx, executor=self) for dp_idx in range(dp_size)]
     
     def update_time(self):
         self.time += 1
@@ -19,12 +19,14 @@ class Executor:
 
     def get_time(self):
         return self.time
-
-    def move_mb(self, send_pid, recieve_pid):
-        send_pipeline = self.pipelines[send_pid]
-        recieve_pipeline = self.pipelines[recieve_pid]
-
-
+    
+    def update_constraints(self, time):
+        for pipeline in self.pipelines:
+            for device in pipeline.devices:
+                if device._finish_proc_workload(time=time):
+                    for p in self.pipelines:
+                        for d in p.devices:
+                            d.update_constraints(time, constraint=device.proc_workload)
 
     def run_all_dp(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         self.reset_time()
@@ -33,16 +35,22 @@ class Executor:
             success_count = 0
             for pipeline in self.pipelines:
                 pipeline.check_workload_status(time=self.time)
+                self.update_constraints(time=self.time)
                 pipeline.execute_workload(time=self.time)
                 pipeline.check_device_states()
                 success_count += pipeline.finish_flag
                 if self.get_time() == 250:
                     if pipeline.pipeline_idx == 2:
-                        workloads = pipeline.pop_workload_by_mid(2+pipeline.mid_offset)
-                if self.get_time() == 740:
+                        workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
+                if self.get_time() == 250:
                     if pipeline.pipeline_idx == 3:
                         pipeline.insert_workload(workloads=workloads)
-
+                if self.get_time() == 666:
+                    if pipeline.pipeline_idx == 3:
+                        workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
+                if self.get_time() == 666:
+                    if pipeline.pipeline_idx == 2:
+                        pipeline.insert_workload(workloads=workloads)
             self.finish_flag = True if success_count == self.dp_size else False
             self.update_time()
         if show_success:

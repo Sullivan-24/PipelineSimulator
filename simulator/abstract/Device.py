@@ -22,14 +22,14 @@ def get_required_memory(stage_id, layer_num, wtype, recomp):
     return required_memory
 
 class MemoryMonitor:
-    def __init__(self, nmb:int, mid_offset:int, stages:dict, device_id:int, max_memory:float):
+    def __init__(self, nmb:int, mid_offset:int, stages:dict, device_id:int, max_memory:float, gbs: int):
         self.did = device_id
         self.nmb = nmb
         self.mid_offset = mid_offset
         self.stages:dict[int,Stage] = stages
         self.max_memory = max_memory
         self.tracing_workloads:list[Workload] = []
-        self.workloads_reserved_mem:list[int] = [0 for _ in range(self.nmb*4)]
+        self.workloads_reserved_mem:list[int] = [0 for _ in range(gbs)]
         self.safe_workload_mids = []
 
     def init_monitor(self):
@@ -166,7 +166,7 @@ class Device:
         self.wait_for_schedule = 0
 
         self.situations = 1
-        self.mid_priority = [3 * gpc["CHUNK_NUM"] for _ in range(self.nmb*4)]
+        self.mid_priority = [3 * gpc["CHUNK_NUM"] for _ in range(self.nmb*self.pipeline.executor.dp_size)]
         self.max_memory = max_mem
         self.comp_power = comp_power
         if layer_density is None:
@@ -190,7 +190,7 @@ class Device:
         return self.stages[workload.sid].update_memory_usage(workload=workload, sim=True)
     
     def init_memory_monitor(self):
-        self.memory_monitor = MemoryMonitor(self.nmb, self.mid_offset, self.stages, self.did, max_memory=self.max_memory * gpc["MEMORY_CONSTRAIN"])
+        self.memory_monitor = MemoryMonitor(self.nmb, self.mid_offset, self.stages, self.did, max_memory=self.max_memory * gpc["MEMORY_CONSTRAIN"], gbs=self.pipeline.executor.dp_size * self.nmb)
         self.memory_monitor.init_monitor()
 
     def get_executable_workload(self, time)->list[Workload]:
@@ -402,7 +402,7 @@ class Device:
         delayed_workload = []
         canceled_workload = []
         for workload_type in workload_type_order:
-            for mid in range(4 * self.nmb):
+            for mid in range(self.pipeline.executor.dp_size * self.nmb):
                 for stage_id in self.stages:
                     workloads = self.stages[stage_id].workloads
                     if mid in workloads and workload_type in workloads[mid] and workloads[mid][workload_type].is_executable(time=time):
