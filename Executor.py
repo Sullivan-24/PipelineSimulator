@@ -23,7 +23,7 @@ class Executor:
     def update_constraints(self, time):
         for pipeline in self.pipelines:
             for device in pipeline.devices:
-                if device._finish_proc_workload(time=time):
+                if device.proc_workload and time >= device.proc_workload.end_time:
                     for p in self.pipelines:
                         for d in p.devices:
                             d.update_constraints(time, constraint=device.proc_workload)
