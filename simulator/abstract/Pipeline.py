@@ -677,7 +677,7 @@ class PipelineScheduler:
         for device in self.devices:
             processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
             self.record_workload(processing_workload)
-            
+
     def reduce_recomp_degree(self):
         
         self.manual_recomp_set = self.recomp_set
@@ -754,9 +754,20 @@ class PipelineScheduler:
         return self.time
 
     def check_device_states(self):
+        latest_workloads = [None for _ in range(self.device_num)]
+        exec_f_num_ = [0 for _ in range(self.device_num)]
         for device in self.devices:
             if device.state == Device.IDLE:
+                # if device.exe_num_w != device.nmb * len(device.stages):
+        #     print(device.state, end=" ")
+        # print()
                 device.idle_time += 1
+                if len(self.workload_execute_record[device.did])>0:
+                    latest_workloads[device.did] = self.workload_execute_record[device.did][-1]
+            else:
+                latest_workloads[device.did] = device.proc_workload
+            exec_f_num_[device.did] = device.exe_num_f
+        return latest_workloads, exec_f_num_ 
 
     def print_device_utilization(self):
         avg_bubble = 0
@@ -883,16 +894,18 @@ class PipelineScheduler:
                     stage.workloads.pop(mid)
         return workloads
 
-    def insert_workload(self, workloads:list[Workload]):
+    def insert_workload(self, workloads:list[Workload],did_group=None ):
+        assert did_group is None or type(did_group) is list
         self.nmb += 1
         for workload in workloads:
             wtype = workload.wtype
             device = self.devices[workload.did]
-            stage = device.stages[workload.sid]
-            mid = workload.mid
-            if mid not in stage.workloads:
-                stage.workloads[mid] = {}
-            stage.workloads[mid][wtype] = workload
+            if device.did in did_group:
+                stage = device.stages[workload.sid]
+                mid = workload.mid
+                if mid not in stage.workloads:
+                    stage.workloads[mid] = {}
+                stage.workloads[mid][wtype] = workload
 
     def get_workloadload_duration(self):
         fwd_time = [gpc["F_TIME"] for _ in range(self.layer_num+3)]
