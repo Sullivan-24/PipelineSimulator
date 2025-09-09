@@ -19,8 +19,8 @@ workload_type_mapping = {
 
 class PipelineScheduler:
 
-    def __init__(self, pipeline_idx, time=0, placement=None, run_schedule=False) -> None:
-        
+    def __init__(self, pipeline_idx, time=0, placement=None, run_schedule=False, executor=None) -> None:
+        self.executor = executor
         self.time = time
         self.pipeline_idx = pipeline_idx # A flag for identifying each pipeline
         self.results = {}
@@ -755,10 +755,7 @@ class PipelineScheduler:
     def check_device_states(self):
         for device in self.devices:
             if device.state == Device.IDLE:
-                # if device.exe_num_w != device.nmb * len(device.stages):
                 device.idle_time += 1
-        #     print(device.state, end=" ")
-        # print()
 
     def print_device_utilization(self):
         avg_bubble = 0
@@ -869,24 +866,32 @@ class PipelineScheduler:
             print(peak_mem_usages)
         return not oom
     
-    def pop_workload_by_mid(self, mid):
+    def pop_workload(self, mid_group = None, did_group = None, pop_wtypes = [WorkloadType.F, WorkloadType.B, WorkloadType.W]):
         workloads = []
-        for device in self.devices:
+        assert mid_group is None or type(mid_group) is list
+        assert did_group is None or type(did_group) is list
+        did_group = range(self.device_num) if did_group is None else did_group
+        for did in did_group:
+            device = self.devices[did]
             for sid, stage in device.stages.items():
                 for wid, workload in stage.workloads.items():
-                    if wid == mid:
-                        workloads.append(workload)
-                stage.workloads.pop(mid)
-        print(workloads)
+                    if wid in mid_group:
+                        for wtype in pop_wtypes:
+                            workloads.append(workload[wtype])
+                for mid in mid_group:
+                    stage.workloads.pop(mid)
         return workloads
-    
+
     def insert_workload(self, workloads:list[Workload]):
         self.nmb += 1
-        for idx, workload in enumerate(workloads):
-            for wtype in [WorkloadType.F,WorkloadType.B,WorkloadType.W]:
-                device = self.devices[workload[wtype].did]
-                stage = device.stages[workload[wtype].sid]
-                stage.workloads[workload[wtype].mid] = workload
+        for workload in workloads:
+            wtype = workload.wtype
+            device = self.devices[workload.did]
+            stage = device.stages[workload.sid]
+            mid = workload.mid
+            if mid not in stage.workloads:
+                stage.workloads[mid] = {}
+            stage.workloads[mid][wtype] = workload
 
     def get_workloadload_duration(self):
         fwd_time = [gpc["F_TIME"] for _ in range(self.layer_num+3)]
