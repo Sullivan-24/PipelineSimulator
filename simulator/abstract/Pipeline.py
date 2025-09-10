@@ -894,7 +894,7 @@ class PipelineScheduler:
                     stage.workloads.pop(mid)
         return workloads
 
-    def insert_workload(self, workloads:list[Workload],did_group=None ):
+    def insert_workload(self, workloads:list[Workload], did_group=None):
         assert did_group is None or type(did_group) is list
         self.nmb += 1
         for workload in workloads:
@@ -906,6 +906,15 @@ class PipelineScheduler:
                 if mid not in stage.workloads:
                     stage.workloads[mid] = {}
                 stage.workloads[mid][wtype] = workload
+                workload.duration = get_workload_duration(
+                    sid=workload.sid,
+                    layer_wise=False,
+                    layer_num=False,
+                    wtype=workload.wtype,
+                    recomp=workload.recomp,
+                    layer_idxs=workload.layer_idxs,
+                    comp_power=device.comp_power,
+                )
 
     def get_workloadload_duration(self):
         fwd_time = [gpc["F_TIME"] for _ in range(self.layer_num+3)]
