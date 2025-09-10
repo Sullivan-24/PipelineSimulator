@@ -195,6 +195,7 @@ class Stage:
                 recomp=self.recomp,
                 total_stages=total_stages,
                 layer_idxs=self.layer_idxs,
+                comp_power=self.comp_power,
             )
             self.workloads[mid][WorkloadType.F] = fpw
             if self.sid == 0 and self.layerwise: # Embedding layer only has F
@@ -217,6 +218,7 @@ class Stage:
                 recomp=self.recomp,
                 total_stages=total_stages,
                 layer_idxs=self.layer_idxs,
+                comp_power=self.comp_power,
             )
             self.workloads[mid][WorkloadType.B] = igw
             if self.recomp:
@@ -237,6 +239,7 @@ class Stage:
                     recomp=self.recomp,
                     total_stages=total_stages,
                     layer_idxs=self.layer_idxs,
+                    comp_power=self.comp_power,
                 )
                 self.workloads[mid][WorkloadType.R] = rfw
 
@@ -258,6 +261,7 @@ class Stage:
                     recomp=self.recomp,
                     total_stages=total_stages,
                     layer_idxs=self.layer_idxs,
+                    comp_power=self.comp_power,
                 )
                 if self.stage_type == StageType.CE: # Cross-entropy layer has no W for parameter training
                     continue

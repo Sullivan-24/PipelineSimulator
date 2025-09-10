@@ -894,15 +894,7 @@ class PipelineScheduler:
                 if mid not in stage.workloads:
                     stage.workloads[mid] = {}
                 stage.workloads[mid][wtype] = workload
-                workload.duration = get_workload_duration(
-                    sid=workload.sid,
-                    layer_wise=False,
-                    layer_num=False,
-                    wtype=workload.wtype,
-                    recomp=workload.recomp,
-                    layer_idxs=workload.layer_idxs,
-                    comp_power=device.comp_power,
-                )
+                workload.duration = workload.duration * workload.comp_power / device.comp_power
 
     def get_workloadload_duration(self):
         fwd_time = [gpc["F_TIME"] for _ in range(self.layer_num+3)]

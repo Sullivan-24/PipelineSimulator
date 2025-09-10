@@ -44,13 +44,13 @@ class Executor:
                         workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
                 if self.get_time() == 250:
                     if pipeline.pipeline_idx == 3:
-                        pipeline.insert_workload(workloads=workloads)
+                        pipeline.insert_workload(workloads=workloads,did_group=[2])
                 if self.get_time() == 666:
                     if pipeline.pipeline_idx == 3:
                         workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
                 if self.get_time() == 666:
                     if pipeline.pipeline_idx == 2:
-                        pipeline.insert_workload(workloads=workloads)
+                        pipeline.insert_workload(workloads=workloads,did_group=[2])
             self.finish_flag = True if success_count == self.dp_size else False
             self.update_time()
         if show_success:
