@@ -7,7 +7,7 @@ class Workload:
     IN_PROGRESS = 2
     COMPLETED = 3
 
-    def __init__(self, device_id:int, microbatch_id: int, stage_id: int, duration: int, total_stages:int, wtype: WorkloadType, recomp:bool, layer_idxs:list):
+    def __init__(self, device_id:int, microbatch_id: int, stage_id: int, duration: int, total_stages:int, wtype: WorkloadType, recomp:bool, layer_idxs:list, comp_power:float):
         self.did = device_id
         self.mid: int = microbatch_id  # 微批次编号
         self.sid: int = stage_id              # 阶段编号
@@ -19,6 +19,7 @@ class Workload:
         self.total_stages: int = total_stages
         self.recomp:bool = recomp
         self.layer_idxs:list = layer_idxs
+        self.comp_power = comp_power
         if self.mid == 0 and self.sid == 0:
             self.ready_time = 0
         self.wtype: WorkloadType = wtype  # 工作负载类型

@@ -78,7 +78,7 @@ class Executor:
                     latest_exec_f_num[dp_rank] = exec_f_num_dp[dp_rank][slow_did_]
                 min_f_num = min(latest_exec_f_num)
                 max_f_num = max(latest_exec_f_num)
-                if min_f_num+pop_num >= max_f_num:
+                if min_f_num+pop_num >= max_f_num-1:
                     continue
                 elif min_f_num+pop_num < MICRO_BATCH_NUM:
                     print("diff")

@@ -175,68 +175,6 @@ class SchedulingPainter:
         main_canvas = tk.Canvas(self._tk_root, bg='#FFFFFF', width=canvas_width, height=canvas_height+5)
         main_canvas.pack()
 
-        # width_scale = 100 / max(canvas_width, 1)
-        # fig, ax = plt.subplots(figsize=(12 * width_scale,6))
-        # _pp_align = 0
-        # _pp_height = 10
-        # # 画每个 device 的 timeline 背景
-        # for pid in range(self._device_size):
-        #     y0 = (_pp_height + _pp_align) * pid + 5
-        #     y1 = y0 + _pp_height
-        #     rect = patches.Rectangle((_pp_align, y0), canvas_width-2*self._pp_align, _pp_height,
-        #                             linewidth=0.25, edgecolor='black', facecolor='white')
-        #     ax.add_patch(rect)
-
-        # # 画每个 microbatch block
-        # for microbatch_key, offset in data.items():
-        #     k, pid, mid, did = parse_microbatch_key(microbatch_key)
-
-        #     x0 = _pp_align + offset
-        #     y0 = (_pp_height + _pp_align) * did + 5
-
-        #     if k == 'f' or k == 'r':
-        #         width = self._forward_length[pid]
-        #     elif k == 'b':
-        #         width = self._backward_b_length[pid]
-        #     elif k == 'w':
-        #         width = self._backward_w_length[pid]
-        #     else:
-        #         width = 10
-
-        #     x1 = x0 + width
-        #     y1 = y0 + _pp_height
-
-        #     color = set_color(pid, k, self._device_size)
-        #     block = patches.Rectangle((x0, y0), width, _pp_height,
-        #                             linewidth=0.25, edgecolor='black', facecolor=color)
-        #     ax.add_patch(block)
-
-        #     if SHOW_WORKLOAD_TEXT:
-        #         ax.text(x0 + width / 2, y0 + _pp_height / 2,
-        #                 str(mid),
-        #                 ha='center', va='center', fontsize=8)
-
-        # # 图形美化
-        # ax.set_xlim(0, canvas_width)
-        # ax.set_ylim(0, canvas_height)
-        # ax.axis('off')
-        # ax.invert_yaxis()
-
-
-        # # 保存为 PDF
-        # with PdfPages(f'/Users/hanayukino/pipeline_schedule_{SCHEDULE_METHOD.name}.pdf') as pdf:
-        #     pdf.savefig(fig, pad_inches=0)
-
-        # plt.show()
-
-        # plt.close(fig)
-        # print("Saved to pipeline_schedule.pdf")
-        
-        # return
-        
-        # 2. Add timeline for each pipeline
-        # for pid in range(self._pp_size):
-        # 按照 Device 画示意图
         pad = 0
         for pid in range(self._device_size):
             x0 = self._pp_align
@@ -549,6 +487,8 @@ class MultiPipelinePainter:
                 self._item2step[block] = data_step_idx[microbatch_key]
                 # 求余考虑virtual stage的情况
                 self._item2mid[block] = mid
+
+            save_to_file(f"schedule_results/MultiPipeline/DP{dp_idx}/result.txt", schedule_res_content, 'w')
 
         # Register hook for highlighting execution block of this microbatch
         def _trigger_hook(event):
