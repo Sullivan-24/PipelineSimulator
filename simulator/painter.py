@@ -352,6 +352,7 @@ class MultiPipelinePainter:
     def draw(self, all_dp_data: dict) -> None:
         """draw with tkinter"""
         # find longest time
+        schedule_res_content = ""
         for dp_idx, data in all_dp_data.items():
             self.set_para_by_dp_idx(config=self.all_dp_config[dp_idx])
             data = {key: val * self._pixel_base for key, val in data.items()}
@@ -449,7 +450,7 @@ class MultiPipelinePainter:
                 main_canvas.create_rectangle(x0, y0, x1, y1, fill="#FFFFFF", outline="black")
 
             # 3. Draw execution block for each microbatch according to start and end time
-            schedule_res_content = ""
+            
             for microbatch_key, offset in data.items():
                 k, pid, mid, did = parse_microbatch_key(microbatch_key)
 
@@ -463,7 +464,7 @@ class MultiPipelinePainter:
                 if HEAD_DP:
                     schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,did,offset,offset+block_width)
                 else:
-                    schedule_res_content += "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width)
+                    schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,dp_idx,offset,offset+block_width)
 
                 tag = f"p_{pid}_m_{mid}_{k}"
                 color = set_color(pid,workload_type=k,layer_num=self._pp_size)
@@ -488,7 +489,7 @@ class MultiPipelinePainter:
                 # 求余考虑virtual stage的情况
                 self._item2mid[block] = mid
 
-            save_to_file(f"schedule_results/MultiPipeline/DP{dp_idx}/result.txt", schedule_res_content, 'w')
+        save_to_file(f"schedule_results/result.txt", schedule_res_content, 'w')
 
         # Register hook for highlighting execution block of this microbatch
         def _trigger_hook(event):
