@@ -463,23 +463,24 @@ class PipelineScheduler:
         workload_type_order = [WorkloadType.F, WorkloadType.B]
         if gpc["SPLIT_BACKPROP"]:
             workload_type_order.append(WorkloadType.W)
-
+        mid_offset = self.mid_offset
         for did in range(self.device_num):
             mids = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
             for i in range(gpc["WORKLOAD_TYPE_NUM"]):
-                while mids[i] < self.mid_offset + self.nmb:
-                    self.schedule[did].append((workload_type_order[i], mids[i], did))
+                while mids[i] < self.nmb:
+                    self.schedule[did].append((workload_type_order[i], mids[i] + mid_offset, did))
                     mids[i]+=1
 
     def generate_1f1b_schedule(self):
         assert gpc["CHUNK_NUM"] == 1
         workload_type_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F] if SPLIT_BACKPROP else [WorkloadType.B, WorkloadType.F]
         workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1, WorkloadType.W : 2}
+        mid_offset = self.mid_offset
         for did in range(self.device_num):
             mids = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
             # warmup
             while mids[0] < self.device_num - did:
-                self.schedule[did].append((WorkloadType.F, mids[0], did))
+                self.schedule[did].append((WorkloadType.F, mids[0] + mid_offset, did))
                 mids[0] += 1
             
             iter = 0
@@ -487,37 +488,25 @@ class PipelineScheduler:
             while sum(finish_flag) < gpc["WORKLOAD_TYPE_NUM"]:
                 next_workload_type = workload_type_order[iter % gpc["WORKLOAD_TYPE_NUM"]]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
-                if next_mid < self.mid_offset + self.nmb:
-                    self.schedule[did].append((next_workload_type, next_mid, did))
+                if next_mid < self.nmb:
+                    self.schedule[did].append((next_workload_type, next_mid + mid_offset, did))
                     mids[workload_idx_in_mids[next_workload_type]] += 1
                 else:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                 iter+=1
-        # for schedule in self.schedule:
-        #     for w in schedule:
-        #         print(w[0].name, end="")
-        #     print()
 
     def generate_zbh1_schedule(self):
         assert gpc["WORKLOAD_TYPE_NUM"] == 3
 
         workload_type_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F]
         workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1, WorkloadType.W : 2}
+        mid_offset = self.mid_offset
         for did in range(self.device_num):
             mids = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
             # warmup, should not be simplified
             while mids[0] < self.device_num - did:
-                self.schedule[did].append((WorkloadType.F, mids[0], did))
+                self.schedule[did].append((WorkloadType.F, mids[0]+mid_offset, did))
                 mids[0] += 1
-            # Inject as much as possible F with limited max activation counts
-            if gpc["MAX_ACTIVATION_COUNTS"] > self.stage_num * gpc["CHUNK_NUM"]:
-                comm_delay = (self.device_num - did - 1) * 2 * gpc["COMM_TIME"]
-                compute_delay = (self.device_num - did - 1) * gpc["B_TIME"]
-                additional_f_num = min(gpc["MAX_ACTIVATION_COUNTS"] - mids[0] - did, (comm_delay + compute_delay) // gpc["F_TIME"])
-                while mids[0] < min(gpc["MAX_ACTIVATION_COUNTS"], self.mid_offset + self.nmb) and additional_f_num:
-                    self.schedule[did].append((WorkloadType.F ,mids[0], did))
-                    mids[0] += 1
-                    additional_f_num -= 1
 
             # steady + cooldown
             iter = 0
@@ -525,12 +514,12 @@ class PipelineScheduler:
             while sum(finish_flag) < gpc["WORKLOAD_TYPE_NUM"]:
                 next_workload_type = workload_type_order[iter % gpc["WORKLOAD_TYPE_NUM"]]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
-                if mids[0] < min(self.mid_offset + self.nmb, gpc["MAX_ACTIVATION_COUNTS"]):
+                if mids[0] < min(self.nmb, gpc["MAX_ACTIVATION_COUNTS"]):
                     if next_workload_type == WorkloadType.W:
                         iter += 1
                         continue 
-                if next_mid < self.mid_offset + self.nmb:
-                    self.schedule[did].append((next_workload_type, next_mid, did))
+                if next_mid < self.nmb:
+                    self.schedule[did].append((next_workload_type, next_mid+mid_offset, did))
                     mids[workload_idx_in_mids[next_workload_type]] += 1
                 else:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
@@ -538,6 +527,7 @@ class PipelineScheduler:
 
     def generate_interleaved_1f1b_schedule(self):
         workload_type_num = 2
+        mid_offset = self.mid_offset
         for did in range(self.device_num):
             sids = list(self.placement[did])
             
@@ -550,8 +540,8 @@ class PipelineScheduler:
         
             # warmup, inject as much microbatches as possible
             warmup_f_num = (gpc["CHUNK_NUM"] - 1) * self.device_num + (self.device_num - did - 1) * 2
-            while mids[idx_in_f_mids] < self.mid_offset + self.nmb and f_mid_count < warmup_f_num:
-                self.schedule[did].append((WorkloadType.F ,mids[idx_in_f_mids], f_next_sid))
+            while mids[idx_in_f_mids] < self.nmb and f_mid_count < warmup_f_num:
+                self.schedule[did].append((WorkloadType.F ,mids[idx_in_f_mids] + mid_offset, f_next_sid))
                 mids[idx_in_f_mids] += 1
                 f_mid_count += 1
                 if f_mid_count % self.device_num == 0:
@@ -567,10 +557,10 @@ class PipelineScheduler:
 
             # Start 1f1b with F operation
             operation_flag = 'f'
-            while b_mid_count + f_mid_count < self.mid_offset + self.nmb * gpc["CHUNK_NUM"] * workload_type_num:
+            while b_mid_count + f_mid_count < self.nmb * gpc["CHUNK_NUM"] * workload_type_num:
                 if operation_flag == 'f':
-                    if mids[idx_in_f_mids] < self.mid_offset + self.nmb:
-                        self.schedule[did].append((WorkloadType.F ,mids[idx_in_f_mids], f_next_sid))
+                    if mids[idx_in_f_mids] < self.nmb:
+                        self.schedule[did].append((WorkloadType.F ,mids[idx_in_f_mids] + mid_offset, f_next_sid))
                         mids[idx_in_f_mids] += 1
                         f_mid_count += 1
                         if f_mid_count % self.device_num == 0:
@@ -579,12 +569,12 @@ class PipelineScheduler:
                             idx_in_f_mids = f_next_sid_idx * workload_type_num
                     operation_flag = 'b'
                 elif operation_flag == 'b':
-                    if mids[idx_in_b_mids] < self.mid_offset + self.nmb:
+                    if mids[idx_in_b_mids] < self.nmb:
                         if gpc["RECOMP"]:
-                            self.schedule[did].append((WorkloadType.R ,mids[idx_in_b_mids], b_next_sid))
-                        self.schedule[did].append((WorkloadType.B ,mids[idx_in_b_mids], b_next_sid))
+                            self.schedule[did].append((WorkloadType.R ,mids[idx_in_b_mids] + mid_offset, b_next_sid))
+                        self.schedule[did].append((WorkloadType.B ,mids[idx_in_b_mids] + mid_offset, b_next_sid))
                         if gpc["WORKLOAD_TYPE_NUM"] == 3:
-                            self.schedule[did].append((WorkloadType.W ,mids[idx_in_b_mids], b_next_sid))
+                            self.schedule[did].append((WorkloadType.W ,mids[idx_in_b_mids] + mid_offset, b_next_sid))
                         mids[idx_in_b_mids] += 1
                         b_mid_count += 1
                         if b_mid_count % self.device_num == 0:

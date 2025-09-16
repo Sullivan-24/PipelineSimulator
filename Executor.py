@@ -39,18 +39,18 @@ class Executor:
                 pipeline.execute_workload(time=self.time)
                 pipeline.check_device_states()
                 success_count += pipeline.finish_flag
-                if self.get_time() == 250:
-                    if pipeline.pipeline_idx == 2:
-                        workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
-                if self.get_time() == 250:
-                    if pipeline.pipeline_idx == 3:
-                        pipeline.insert_workload(workloads=workloads,did_group=[2])
-                if self.get_time() == 666:
-                    if pipeline.pipeline_idx == 3:
-                        workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
-                if self.get_time() == 666:
-                    if pipeline.pipeline_idx == 2:
-                        pipeline.insert_workload(workloads=workloads,did_group=[2])
+                # if self.get_time() == 250:
+                #     if pipeline.pipeline_idx == 2:
+                #         workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
+                # if self.get_time() == 250:
+                #     if pipeline.pipeline_idx == 3:
+                #         pipeline.insert_workload(workloads=workloads,did_group=[2])
+                # if self.get_time() == 666:
+                #     if pipeline.pipeline_idx == 3:
+                #         workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
+                # if self.get_time() == 666:
+                #     if pipeline.pipeline_idx == 2:
+                #         pipeline.insert_workload(workloads=workloads,did_group=[2])
             self.finish_flag = True if success_count == self.dp_size else False
             self.update_time()
         if show_success:
@@ -89,7 +89,7 @@ class Executor:
         MPP(res_all_dp["painter_conf"]).draw(res_all_dp["res"])
 
 if __name__ == "__main__":
-    executor = Executor(dp_size=4)
+    executor = Executor(dp_size=2)
     executor.run_all_dp()
     executor.draw()
     

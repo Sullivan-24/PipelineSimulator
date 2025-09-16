@@ -423,16 +423,6 @@ class MultiPipelinePainter:
                     ),
                 )
 
-                # coords_label_1 = label_canvas.create_text(
-                #     canvas_width * 0.15, y_label, text="BlockCoords:(start,end)"
-                # )
-                # coords_label_2 = label_canvas.create_text(
-                #     canvas_width * 0.35, y_label, text="BlockCoords:(start,end)"
-                # )
-                # coords_label_3 = label_canvas.create_text(
-                #     canvas_width * 0.55, y_label, text="BlockCoords:(start,end)"
-                # )
-
                 coords_label = label_canvas.create_text(
                     canvas_width - self._pp_align - 120, y_label, text="BlockCoords:(start,end)"
                 )
@@ -510,15 +500,6 @@ class MultiPipelinePainter:
             label_canvas.itemconfig(
                 coords_label, text=f"Step {step} ({current_start},{current_end})"
             )
-            # label_canvas.itemconfig(
-            #     coords_label_1, text=f"Step {step} ({current_start},{current_end})"
-            # )
-            # label_canvas.itemconfig(
-            #     coords_label_2, text=f"Step {step} ({current_start},{current_end})"
-            # )
-            # label_canvas.itemconfig(
-            #     coords_label_3, text=f"Step {step} ({current_start},{current_end})"
-            # )
 
             tags = [
                 f"p_{pid}_m_{self._item2mid[current_item]}_{fb}"
