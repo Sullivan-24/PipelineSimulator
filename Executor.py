@@ -22,7 +22,7 @@ class Executor:
     def get_time(self):
         return self.time
     
-    def update_constraints(self, time):
+    def update_constraints_across_pipelines(self, time):
         for pipeline in self.pipelines:
             for device in pipeline.devices:
                 if device.proc_workload and time >= device.proc_workload.end_time:
@@ -30,7 +30,7 @@ class Executor:
                     for p in self.pipelines:
                         for d in p.devices:
                             if d.did != device.did and finished_mid in d.received_mids:
-                                d.update_constraints(time, constraint=device.proc_workload)
+                                d.update_constraints_within_device(time, constraint=device.proc_workload)
 
     def run_all_dp(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         self.reset_time()
@@ -39,7 +39,7 @@ class Executor:
             success_count = 0
             for pipeline in self.pipelines:
                 pipeline.check_workload_status(time=self.time)
-                self.update_constraints(time=self.time)
+                self.update_constraints_across_pipelines(time=self.time)
                 pipeline.execute_workload(time=self.time)
                 pipeline.check_device_states()
                 success_count += pipeline.finish_flag

@@ -592,7 +592,7 @@ class PipelineScheduler:
 
     def update_constraints(self, time, constraint):
         for device in self.devices:
-            device.update_constraints(time, constraint=constraint)
+            device.update_constraints_within_device(time, constraint=constraint)
 
     def record_workload(self, workload: Workload):
         if workload:

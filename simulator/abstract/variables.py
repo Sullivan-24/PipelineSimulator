@@ -62,6 +62,8 @@ class WorkloadConstraint:
         self.sid: int = stage_id              # 阶段编号
         self.workload_type: WorkloadType = workload_type  # 工作负载类型
 
+        self._hash = hash((self.mid, self.sid, self.workload_type))
+
     def __eq__(self, other):
         if not isinstance(other, WorkloadConstraint):
             return NotImplemented
@@ -72,7 +74,7 @@ class WorkloadConstraint:
         )
     
     def __hash__(self):
-        return hash((self.mid, self.sid, self.workload_type))
+        return self._hash
     
     def __repr__(self):
         return (f"did={self.did}, mid={self.mid}, sid={self.sid}, wtype={self.workload_type.name})")

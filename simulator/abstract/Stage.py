@@ -267,7 +267,7 @@ class Stage:
                     continue
                 self.workloads[mid][WorkloadType.W] = pgw
 
-    def update_constraints(self, time, constraint: Workload):
+    def update_constraints_within_stage(self, time, constraint: Workload):
         for mid in self.workloads:
             for wlt in self.workloads[mid]:
                 self.workloads[mid][wlt].update_constraints(

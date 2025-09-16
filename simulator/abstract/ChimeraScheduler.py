@@ -97,7 +97,7 @@ class ChimeraPipelineScheduler:
         for device in self.devices:
             # NOTE only update constraints within the same Chimera stream
             if constraint.did // DEVICE_NUM == device.did // DEVICE_NUM:
-                device.update_constraints(constraint=constraint)
+                device.update_constraints_within_device(constraint=constraint)
         
     def record_workload(self, workload: Workload):
         if workload:

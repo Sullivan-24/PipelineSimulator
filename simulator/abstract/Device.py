@@ -510,9 +510,9 @@ class Device:
             count += 1 if w.wtype == wtype else 0
         return count
 
-    def update_constraints(self, time, constraint):
+    def update_constraints_within_device(self, time, constraint):
         for sid in self.stages:
-            self.stages[sid].update_constraints(time, constraint=constraint)
+            self.stages[sid].update_constraints_within_stage(time, constraint=constraint)
     
     def update_mid_traverse_order(self,mid=None):
         if type(self.mid_traverse_order) is not list:
