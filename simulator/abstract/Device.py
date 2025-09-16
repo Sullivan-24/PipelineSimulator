@@ -132,6 +132,7 @@ class Device:
         self.peak_memory_usage: int = 0
         self.nmb: int = nmb
         self.mid_offset: int = mid_offset
+        self.received_mids: set = set()
         self.max_activation_counts: int = max_activation_counts
         self.mem_usage_record: dict[int, int] = {}
         self.peak_mem_usage_record: dict[int, int] = {}
