@@ -50,43 +50,43 @@ class Executor:
                 latest_workloads, exec_f_num_ = pipeline.check_device_states()
                 latest_workloads_dp[pipeline.pipeline_idx] = latest_workloads
                 exec_f_num_dp[pipeline.pipeline_idx] = exec_f_num_
+            if gpc["DP_Transfer"]:
+                # for did in range(DEVICE_NUM):
+                slow_did = HETER_PP_ID
+                slow_dp = []#HETER_DP_ID
+                fast_dp = []
 
-            # for did in range(DEVICE_NUM):
-            slow_did = HETER_PP_ID
-            slow_dp = []#HETER_DP_ID
-            fast_dp = []
-
-            for slow_did_ in slow_did:
-                latest_exec_f_num = [0 for _ in range(self.dp_size)]
-                latest_workloads_endtime = [None for _ in range(self.dp_size)]
-                for dp_rank in range(self.dp_size):
-                    if latest_workloads_dp[dp_rank][slow_did_] is not None:
-                        latest_workloads_endtime[dp_rank] = latest_workloads_dp[dp_rank][slow_did_].end_time
-                    latest_exec_f_num[dp_rank] = exec_f_num_dp[dp_rank][slow_did_]
-                min_f_num = min(latest_exec_f_num)
-                max_f_num = max(latest_exec_f_num)
-                if min_f_num+pop_num >= max_f_num-1:
-                    continue
-                elif min_f_num+pop_num < MICRO_BATCH_NUM:
-                    print("diff")
-                    for dp_rank_, did_exec_f_num in enumerate(latest_exec_f_num):
-                        if did_exec_f_num == min_f_num:
-                            slow_dp.append(dp_rank_)
-                        elif did_exec_f_num == max_f_num:
-                            fast_dp.append(dp_rank_)
-                # pop_time = latest_workloads_endtime[slow_dp[0]]
-                # insert_time = latest_workloads_endtime[fast_dp[0]]
-                    for pipeline in self.pipelines:
-                        if pipeline.pipeline_idx == slow_dp[0] :#and self.get_time() == pop_time:
-                            workloads = pipeline.pop_workload(mid_group=[min_f_num+pop_num+pipeline.mid_offset],did_group=[slow_did_])#pop 下一个f
-                            # pop_time = None
-                            pop_num += 1
-                    for pipeline in self.pipelines:
-                        if pipeline.pipeline_idx == fast_dp[0] :#and self.get_time == insert_time:
-                            if workloads is not None:
-                                pipeline.insert_workload(workloads=workloads, did_group=[slow_did_])
-                                workloads = None
-                                # insert_time = None
+                for slow_did_ in slow_did:
+                    latest_exec_f_num = [0 for _ in range(self.dp_size)]
+                    latest_workloads_endtime = [None for _ in range(self.dp_size)]
+                    for dp_rank in range(self.dp_size):
+                        if latest_workloads_dp[dp_rank][slow_did_] is not None:
+                            latest_workloads_endtime[dp_rank] = latest_workloads_dp[dp_rank][slow_did_].end_time
+                        latest_exec_f_num[dp_rank] = exec_f_num_dp[dp_rank][slow_did_]
+                    min_f_num = min(latest_exec_f_num)
+                    max_f_num = max(latest_exec_f_num)
+                    if min_f_num+pop_num >= max_f_num-1:
+                        continue
+                    elif min_f_num+pop_num < MICRO_BATCH_NUM:
+                        print("diff")
+                        for dp_rank_, did_exec_f_num in enumerate(latest_exec_f_num):
+                            if did_exec_f_num == min_f_num:
+                                slow_dp.append(dp_rank_)
+                            elif did_exec_f_num == max_f_num:
+                                fast_dp.append(dp_rank_)
+                    # pop_time = latest_workloads_endtime[slow_dp[0]]
+                    # insert_time = latest_workloads_endtime[fast_dp[0]]
+                        for pipeline in self.pipelines:
+                            if pipeline.pipeline_idx == slow_dp[0] :#and self.get_time() == pop_time:
+                                workloads = pipeline.pop_workload(mid_group=[min_f_num+pop_num+pipeline.mid_offset],did_group=[slow_did_])#pop 下一个f
+                                # pop_time = None
+                                pop_num += 1
+                        for pipeline in self.pipelines:
+                            if pipeline.pipeline_idx == fast_dp[0] :#and self.get_time == insert_time:
+                                if workloads is not None:
+                                    pipeline.insert_workload(workloads=workloads, did_group=[slow_did_])
+                                    workloads = None
+                                    # insert_time = None
 
             # print(f"did:{did}, {latest_workloads_exec_f_num}")
             self.finish_flag = True if success_count == self.dp_size else False

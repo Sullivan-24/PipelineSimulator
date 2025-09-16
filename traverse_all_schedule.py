@@ -113,9 +113,9 @@ def main():
             for model_layer in [48, 64, 80]:
                 for schedule in schedules:
                     fbw = False
-                    if schedule in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH1):
+                    if schedule in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH):
                         chunks = [1]
-                        if schedule == Schedule.STANDARD_ZBH1:
+                        if schedule == Schedule.STANDARD_ZBH:
                             fbw = True
                     elif schedule == Schedule.STANDARD_INTERLEAVED:
                         chunks = [model_layer // pp]

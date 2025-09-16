@@ -33,7 +33,7 @@ class Schedule(Enum):
     
     STANDARD_1F1B = 10
     STANDARD_INTERLEAVED = 11
-    STANDARD_ZBH1 = 12
+    STANDARD_ZBH = 12
     STANDARD_ZBV = 13
     STANDARD_AFAB = 14
 
