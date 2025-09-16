@@ -6,7 +6,7 @@ if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
 
 if SCHEDULE_METHOD in (Schedule.STANDARD_INTERLEAVED, Schedule.INTERLEAVED):
     assert CHUNK_NUM > 1, "Interleaved: CHUNK_NUM should be larger than 1"
-elif SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.ZBH1):
+elif SCHEDULE_METHOD in (Schedule.STANDARD_ZBH, Schedule.ZBH1):
     assert CHUNK_NUM == 1, "ZBH1: CHUNK_NUM should be 1"
     assert SPLIT_BACKPROP, "Zerobubble needs bwd split"
 elif SCHEDULE_METHOD in (Schedule.ONE_F_ONE_B, Schedule.STANDARD_1F1B):

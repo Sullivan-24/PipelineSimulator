@@ -40,16 +40,16 @@ class Executor:
                 pipeline.check_device_states()
                 success_count += pipeline.finish_flag
                 # if self.get_time() == 250:
-                #     if pipeline.pipeline_idx == 2:
-                #         workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
+                #     if pipeline.pipeline_idx == 0:
+                #         workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
                 # if self.get_time() == 250:
-                #     if pipeline.pipeline_idx == 3:
+                #     if pipeline.pipeline_idx == 1:
                 #         pipeline.insert_workload(workloads=workloads,did_group=[2])
                 # if self.get_time() == 666:
-                #     if pipeline.pipeline_idx == 3:
-                #         workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
+                #     if pipeline.pipeline_idx == 1:
+                #         workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
                 # if self.get_time() == 666:
-                #     if pipeline.pipeline_idx == 2:
+                #     if pipeline.pipeline_idx == 0:
                 #         pipeline.insert_workload(workloads=workloads,did_group=[2])
             self.finish_flag = True if success_count == self.dp_size else False
             self.update_time()

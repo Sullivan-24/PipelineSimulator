@@ -813,7 +813,7 @@ class Device:
                         raise Exception("Error workload type.")
                     self.next_workload_idx += 1
                     return proc_workload
-            elif run_schedule or gpc["SCHEDULE_METHOD"] in (Schedule.STANDARD_AFAB, Schedule.STANDARD_ZBH1):
+            elif run_schedule or gpc["SCHEDULE_METHOD"] in (Schedule.STANDARD_AFAB, Schedule.STANDARD_ZBH):
                 if self.next_workload_idx == len(self.stages) * self.nmb * gpc["WORKLOAD_TYPE_NUM"]:
                     return None
                 if self.next_workload_idx == len(self.static_schedule):

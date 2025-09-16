@@ -286,7 +286,7 @@ class PipelineScheduler:
             dev_compute_power.append(comp_power)
             self.devices.append(device)
         self.set_recomp()
-        if not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH1):
+        if not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH):
             layer_computation_cost = [F_TIMES[i]+B_TIMES[i]+W_TIMES[i] for i in range(self.layer_num)]
             head_total = gpc["HEAD_F_TIME"] + gpc["HEAD_B_TIME"] + gpc["HEAD_W_TIME"]
             ce_total = gpc["CE_F_TIME"] + gpc["CE_B_TIME"] + gpc["CE_W_TIME"]
@@ -303,7 +303,7 @@ class PipelineScheduler:
             )
             if not self.placement:
                 self.placement = self.pipeline_placement_solver.get_placements()
-        if self.placement and self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH1, Schedule.STANDARD_AFAB, Schedule.Mist):
+        if self.placement and self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH, Schedule.STANDARD_AFAB, Schedule.Mist):
             assert self.placement is not None
             layer_idx_start = 0
             for did in range(self.device_num):
@@ -377,7 +377,7 @@ class PipelineScheduler:
                 for pid in range(self.stage_num):
                     self.devices[pid % self.device_num].add_stage(pid, recomp=self.recomp_set[pid],layer_idx_start=layer_idx_start, layer_num = layer_num)
                     layer_idx_start += layer_num
-            elif self.schedule_method == Schedule.STANDARD_ZBH1:
+            elif self.schedule_method == Schedule.STANDARD_ZBH:
                 layer_num = self.layer_num // self.device_num
                 assert layer_num == int(layer_num)
                 for pid in range(self.device_num):
@@ -447,8 +447,8 @@ class PipelineScheduler:
             self.generate_afab_schedule()
             # print("Generate STANDARD_AFAB Schedule.")
 
-        elif self.schedule_method == Schedule.STANDARD_ZBH1:
-            self.generate_zbh1_schedule()
+        elif self.schedule_method == Schedule.STANDARD_ZBH:
+            self.generate_zbh_schedule()
             # print("Generate STANDARD_ZBH1 Schedule.")
 
         elif self.schedule_method == Schedule.STANDARD_INTERLEAVED and not self.layer_wise:
@@ -495,26 +495,27 @@ class PipelineScheduler:
                     finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                 iter+=1
 
-    def generate_zbh1_schedule(self):
+    def generate_zbh_schedule(self):
         assert gpc["WORKLOAD_TYPE_NUM"] == 3
 
         workload_type_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F]
         workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1, WorkloadType.W : 2}
         mid_offset = self.mid_offset
         for did in range(self.device_num):
+            accumulated_act_num = min(self.nmb, (self.device_num - did - 1) * gpc["MAX_ACT"] + 1)
             mids = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
             # warmup, should not be simplified
-            while mids[0] < self.device_num - did:
-                self.schedule[did].append((WorkloadType.F, mids[0]+mid_offset, did))
+            while mids[0] < accumulated_act_num:
+                self.schedule[did].append((WorkloadType.F, mids[0] + mid_offset, did))
                 mids[0] += 1
-
+            
             # steady + cooldown
             iter = 0
             finish_flag = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
             while sum(finish_flag) < gpc["WORKLOAD_TYPE_NUM"]:
                 next_workload_type = workload_type_order[iter % gpc["WORKLOAD_TYPE_NUM"]]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
-                if mids[0] < min(self.nmb, gpc["MAX_ACTIVATION_COUNTS"]):
+                if mids[0] < min(self.nmb, gpc["STAGE_NUM"] * gpc["MAX_ACT"]):
                     if next_workload_type == WorkloadType.W:
                         iter += 1
                         continue 
