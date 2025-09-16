@@ -2,6 +2,8 @@ from simulator.abstract.Device import *
 from simulator.abstract.mutils import *
 from simulator.painter import MultiPipelinePainter as MPP
 from simulator.abstract.Pipeline import PipelineScheduler
+import cProfile
+import pstats
 
 class Executor:
 
@@ -24,9 +26,11 @@ class Executor:
         for pipeline in self.pipelines:
             for device in pipeline.devices:
                 if device.proc_workload and time >= device.proc_workload.end_time:
+                    finished_mid = device.proc_workload.mid
                     for p in self.pipelines:
                         for d in p.devices:
-                            d.update_constraints(time, constraint=device.proc_workload)
+                            if d.did != device.did and finished_mid in d.received_mids:
+                                d.update_constraints(time, constraint=device.proc_workload)
 
     def run_all_dp(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         self.reset_time()
@@ -39,18 +43,18 @@ class Executor:
                 pipeline.execute_workload(time=self.time)
                 pipeline.check_device_states()
                 success_count += pipeline.finish_flag
-                # if self.get_time() == 250:
-                #     if pipeline.pipeline_idx == 0:
-                #         workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
-                # if self.get_time() == 250:
-                #     if pipeline.pipeline_idx == 1:
-                #         pipeline.insert_workload(workloads=workloads,did_group=[2])
-                # if self.get_time() == 666:
-                #     if pipeline.pipeline_idx == 1:
-                #         workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
-                # if self.get_time() == 666:
-                #     if pipeline.pipeline_idx == 0:
-                #         pipeline.insert_workload(workloads=workloads,did_group=[2])
+                if self.get_time() == 250:
+                    if pipeline.pipeline_idx == 0:
+                        workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
+                if self.get_time() == 250:
+                    if pipeline.pipeline_idx == 1:
+                        pipeline.insert_workload(workloads=workloads,did_group=[2])
+                if self.get_time() == 666:
+                    if pipeline.pipeline_idx == 1:
+                        workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
+                if self.get_time() == 666:
+                    if pipeline.pipeline_idx == 0:
+                        pipeline.insert_workload(workloads=workloads,did_group=[2])
             self.finish_flag = True if success_count == self.dp_size else False
             self.update_time()
         if show_success:
@@ -89,7 +93,17 @@ class Executor:
         MPP(res_all_dp["painter_conf"]).draw(res_all_dp["res"])
 
 if __name__ == "__main__":
-    executor = Executor(dp_size=2)
-    executor.run_all_dp()
-    executor.draw()
+    executor = Executor(dp_size=4)
     
+    if gpc["PROFILE_GENERATION"]:
+        profiler = cProfile.Profile()
+        profiler.enable()
+        executor.run_all_dp()
+        profiler.disable()
+
+        stats = pstats.Stats(profiler).sort_stats("cumtime")
+        stats.print_stats(20)  # 打印前 10 个耗时函数
+    else:
+        executor.run_all_dp()
+
+    executor.draw()

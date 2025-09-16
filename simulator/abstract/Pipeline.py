@@ -871,6 +871,7 @@ class PipelineScheduler:
                             workloads.append(workload[wtype])
                 for mid in mid_group:
                     stage.workloads.pop(mid)
+            device.received_mids.discard(mid)
         return workloads
 
     def insert_workload(self, workloads:list[Workload], did_group=None):
@@ -886,6 +887,7 @@ class PipelineScheduler:
                     stage.workloads[mid] = {}
                 stage.workloads[mid][wtype] = workload
                 workload.duration = workload.duration * workload.comp_power / device.comp_power
+                device.received_mids.add(mid)
 
     def get_workloadload_duration(self):
         fwd_time = [gpc["F_TIME"] for _ in range(self.layer_num+3)]

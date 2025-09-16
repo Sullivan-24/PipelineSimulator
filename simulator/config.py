@@ -14,7 +14,7 @@ SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
-# SCHEDULE_METHOD = Schedule.UnifiedPP
+SCHEDULE_METHOD = Schedule.UnifiedPP
 
 # SCHEDULE_METHOD = Schedule.ZBV
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
@@ -126,7 +126,6 @@ if not IDEAL_SITUATION:
             from graphs.e2e_data import profiled_data
             ratios = profiled_data["GEMMA"][HIDDEN_SIZE][SEQ_LEN][VOCAB_SIZE]
             [tf_tf, tb_tf, tw_tf, _, _, _, hf_tf, hb_tf, hw_tf] = [round(r, 1) for r in ratios]
-            print(tf_tf,tb_tf,tw_tf,hf_tf,hb_tf,hw_tf)
             B_TIMES = [t*(tb_tf+tw_tf) for i,t in enumerate(F_TIMES)]
             HEAD_F_TIME = F_TIME * hf_tf
             HEAD_B_TIME = F_TIME * (hb_tf + hw_tf)
@@ -296,4 +295,5 @@ if not SPLIT_BACKPROP:
     WORKLOAD_TYPE_NUM = 2
 
 MAX_ACTIVATION_COUNTS = int(STAGE_NUM * 2)
-MAX_ACT = 2
+MAX_ACT = 1
+PROFILE_GENERATION = True
