@@ -183,7 +183,7 @@ class PipelineScheduler:
         self._init_stage()
         self.schedule = [[] for _ in range(self.device_num)]
         self.generate_workload_schedule()
-        self.set_schedule()
+        self.set_workload_schedule()
         self.temp_results = {}
         self.last_workload: Workload = None
         self.workload_execute_record: list[list[Workload]] = [[] for _ in range(self.device_num)]
@@ -191,9 +191,9 @@ class PipelineScheduler:
             print("Read schedule generated before...")
             self.file2result()
             self.result2schedule()
-            self.set_schedule()
+            self.set_workload_schedule()
 
-    def _sid2did(self, sid):
+    def sid2did(self, sid):
         for did, sids in enumerate(self.placement):
             if sid in sids:
                 return did
@@ -205,7 +205,7 @@ class PipelineScheduler:
             k, mid, sid = key.split("_")[:3]
             sid = int(sid)
             mid = int(mid)
-            did = self._sid2did(sid=sid)
+            did = self.sid2did(sid=sid)
             t = self.results[key]
             self.schedule[did].append((workload_type_mapping[k], mid, sid, t))
         print("Result to schedule successfully.")
@@ -245,13 +245,13 @@ class PipelineScheduler:
                 self.results[w_key] = w_times_in_sid[mid]
 
 
-    def show_detail_info(self):
+    def print_stages(self):
         for device in self.devices:
             print("Device ID:{}".format(device.did))
             if device.did == 7:
                 device.show_stages(detail_info=True)
 
-    def record_recomp_set(self):
+    def record_recomputation_config(self):
         for idx, r in enumerate(self.recomp_set):
             self.recomp_set[idx] = 1 if r else 0
             self.results[f"theta_{idx}"] = r
@@ -428,7 +428,7 @@ class PipelineScheduler:
             print("Use provided recomputation config.")
             self.recomp_set = self.manual_recomp_set
         
-    def set_schedule(self):
+    def set_workload_schedule(self):
         for did in range(self.device_num):
             self.devices[did].static_schedule = self.schedule[did]
 
@@ -578,7 +578,7 @@ class PipelineScheduler:
                 else:
                     raise("UNKOWN OPERATION FLAG")
     
-    def show_record(self):
+    def print_workload_schedule(self):
         for k in self.results:
             print(k, self.results[k])
 
@@ -685,7 +685,7 @@ class PipelineScheduler:
                 print("Success")
             if show_utilization:
                 self.print_device_utilization()
-            self.record_recomp_set()
+            self.record_recomputation_config()
             if not self.print_memory_footprint(show_mem=show_mem):
                 if show_mem:
                     print("Fail due to OOM")
