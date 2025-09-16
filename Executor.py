@@ -29,7 +29,7 @@ class Executor:
                     finished_mid = device.proc_workload.mid
                     for p in self.pipelines:
                         for d in p.devices:
-                            if d.did != device.did and finished_mid in d.received_mids:
+                            if finished_mid in d.held_mids:
                                 d.update_constraints_within_device(time, constraint=device.proc_workload)
 
     def run_all_dp(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
