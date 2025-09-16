@@ -22,17 +22,23 @@ class Executor:
     def get_time(self):
         return self.time
     
+    def get_total_workload_count(self):
+        count = 0
+        for pipeline in self.pipelines:
+            count += pipeline.total_workload
+        return count
+
     def update_constraints_across_dp(self, time):
         for pipeline in self.pipelines:
             for device in pipeline.devices:
-                if device.proc_workload and time >= device.proc_workload.end_time:
-                    finished_mid = device.proc_workload.mid
+                if device.current_workload and time >= device.current_workload.end_time:
+                    finished_mid = device.current_workload.mid
                     for p in self.pipelines:
                         for d in p.devices:
                             if d.did == device.did or p.pipeline_idx == pipeline.pipeline_idx:
                                 continue # only update constraints on other devices or pipelines
                             if finished_mid in d.held_mids:
-                                d.update_constraints_within_device(time, constraint=device.proc_workload)
+                                d.update_constraints_within_device(time, constraint=device.current_workload)
 
     def run_all_dp(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         self.reset_time()
@@ -44,7 +50,7 @@ class Executor:
                 self.update_constraints_across_dp(time=self.time)
                 pipeline.execute_workload(time=self.time)
                 pipeline.check_device_status()
-                success_count += pipeline.finish_flag
+                success_count += pipeline.get_completed_workload_count()
                 if self.get_time() == 250:
                     if pipeline.pipeline_idx == 0:
                         workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
@@ -57,7 +63,7 @@ class Executor:
                 if self.get_time() == 666:
                     if pipeline.pipeline_idx == 0:
                         pipeline.insert_workload(workloads=workloads,did_group=[2])
-            self.finish_flag = True if success_count == self.dp_size else False
+            self.finish_flag = True if success_count == self.get_total_workload_count() else False
             self.update_time()
         if show_success:
             if self.finish_flag:

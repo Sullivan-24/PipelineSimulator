@@ -160,6 +160,7 @@ class PipelineScheduler:
         self.nmb = gpc["MICRO_BATCH_NUM"]
         self.mid_offset = pipeline_idx * self.nmb
         self.stage_num = gpc["STAGE_NUM"]
+        self.total_workload = self.stage_num * self.device_num * self.nmb
         self.schedule_method = gpc["SCHEDULE_METHOD"]
         self.layer_wise = gpc["LAYERWISE"]
         self.head_dp = gpc["HEAD_DP"]
@@ -243,13 +244,6 @@ class PipelineScheduler:
             for mid in range(len(w_times_in_sid)):
                 w_key = f"w_{mid}_{sid}"
                 self.results[w_key] = w_times_in_sid[mid]
-
-
-    def print_stages(self):
-        for device in self.devices:
-            print("Device ID:{}".format(device.did))
-            if device.did == 7:
-                device.show_stages(detail_info=True)
 
     def record_recomputation_config(self):
         for idx, r in enumerate(self.recomp_set):
@@ -578,10 +572,48 @@ class PipelineScheduler:
                 else:
                     raise("UNKOWN OPERATION FLAG")
     
+    def print_stages(self):
+        for device in self.devices:
+            print("Device ID:{}".format(device.did))
+            if device.did == 7:
+                device.show_stages(detail_info=True)
+
     def print_workload_schedule(self):
         for k in self.results:
             print(k, self.results[k])
 
+    def print_device_utilization(self):
+        avg_bubble = 0
+        for device in self.devices:
+            bubble_ratio = round(device.idle_time / self.get_time(), 4)
+            print(f"Device {device.did} idle time : {device.idle_time}, idle ratio: {bubble_ratio*100}")
+            avg_bubble += bubble_ratio
+        print(f"Avg bubble ratio: {avg_bubble/len(self.devices)*100}")
+
+    def print_memory_footprint(self, device_id=(0,), show_mem=True):
+        peak_mem_usages = [0 for _ in range(len(self.devices))]
+        for device in self.devices:
+            aim_file_path = "schedule_results/memory/device{}.txt".format(device.did)
+            save_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did), mode='w')
+            last_mem_record = 0
+            for t, mem_record in device.mem_usage_record.items():
+                (peak_mem, wtype, sid, mid) = device.peak_mem_usage_record[t]
+                oom_flag = "" if mem_record <= device.max_memory else "OOM"
+                save_to_file(aim_file_path, "Time {} {}, mem = {}, {}, peak = {}, {}.\n".format(t, (wtype, sid, mid), round(mem_record,2), round((mem_record - last_mem_record), 2), round(peak_mem, 2), oom_flag), 'a')
+                last_mem_record = mem_record
+                peak_mem_usages[device.did] = round(max(peak_mem_usages[device.did], peak_mem), 3)
+        
+        oom = False
+        for did, device in enumerate(self.devices):
+            if device.max_memory < peak_mem_usages[did]:
+                if show_mem:
+                    print(f"Out of Memory in Device {device.did}. ({peak_mem_usages[did]} > {device.max_memory})")
+                oom = True
+
+        if show_mem:
+            print(peak_mem_usages)
+        return not oom
+    
     def update_constraints_within_pipeline(self, time, constraint):
         for device in self.devices:
             device.update_constraints_within_device(time, constraint=constraint)
@@ -614,8 +646,8 @@ class PipelineScheduler:
 
     def check_workload_status(self, time):
         for device in self.devices:
-            if device._finish_proc_workload(time=time):
-                if device.proc_workload.wtype == WorkloadType.W:
+            if device.is_current_workload_completed(time=time):
+                if device.current_workload.wtype == WorkloadType.W:
                     self.num_finished_microbatch += 1
                     self.acc_finished_mb += 1
                     if self.layer_wise:
@@ -627,8 +659,8 @@ class PipelineScheduler:
                     else:
                         if self.acc_finished_mb == self.stage_num * self.nmb:
                             self.finish_flag = True
-                if not gpc["SPLIT_BACKPROP"] and device.proc_workload.wtype == WorkloadType.B:
-                    if device.proc_workload.duration > 0:
+                if not gpc["SPLIT_BACKPROP"] and device.current_workload.wtype == WorkloadType.B:
+                    if device.current_workload.duration > 0:
                         self.num_finished_microbatch += 1
                         self.acc_finished_mb += 1
                     if self.layer_wise:
@@ -637,11 +669,11 @@ class PipelineScheduler:
                     else:
                         if self.acc_finished_mb == self.stage_num * self.nmb:
                             self.finish_flag = True 
-                self.workload_execute_record[device.proc_workload.did].append(device.proc_workload)
+                self.workload_execute_record[device.current_workload.did].append(device.current_workload)
                 self.update_workload_execution_record()
 
-                device.proc_workload.complete(time=time)
-                self.update_constraints_within_pipeline(time=time, constraint=device.proc_workload)
+                device.current_workload.complete(time=time)
+                self.update_constraints_within_pipeline(time=time, constraint=device.current_workload)
                 device.update_memory_usage()
                 device.state = Device.IDLE
 
@@ -663,14 +695,6 @@ class PipelineScheduler:
         for device in self.devices:
             if device.state == Device.IDLE:
                 device.idle_time += 1
-
-    def print_device_utilization(self):
-        avg_bubble = 0
-        for device in self.devices:
-            bubble_ratio = round(device.idle_time / self.get_time(), 4)
-            print(f"Device {device.did} idle time : {device.idle_time}, idle ratio: {bubble_ratio*100}")
-            avg_bubble += bubble_ratio
-        print(f"Avg bubble ratio: {avg_bubble/len(self.devices)*100}")
 
     def run_pipeline_parallelism(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         # self.run_schedule = False
@@ -697,30 +721,6 @@ class PipelineScheduler:
 
         return self.last_workload.end_time
 
-    def print_memory_footprint(self, device_id=(0,), show_mem=True):
-        peak_mem_usages = [0 for _ in range(len(self.devices))]
-        for device in self.devices:
-            aim_file_path = "schedule_results/memory/device{}.txt".format(device.did)
-            save_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did), mode='w')
-            last_mem_record = 0
-            for t, mem_record in device.mem_usage_record.items():
-                (peak_mem, wtype, sid, mid) = device.peak_mem_usage_record[t]
-                oom_flag = "" if mem_record <= device.max_memory else "OOM"
-                save_to_file(aim_file_path, "Time {} {}, mem = {}, {}, peak = {}, {}.\n".format(t, (wtype, sid, mid), round(mem_record,2), round((mem_record - last_mem_record), 2), round(peak_mem, 2), oom_flag), 'a')
-                last_mem_record = mem_record
-                peak_mem_usages[device.did] = round(max(peak_mem_usages[device.did], peak_mem), 3)
-        
-        oom = False
-        for did, device in enumerate(self.devices):
-            if device.max_memory < peak_mem_usages[did]:
-                if show_mem:
-                    print(f"Out of Memory in Device {device.did}. ({peak_mem_usages[did]} > {device.max_memory})")
-                oom = True
-
-        if show_mem:
-            print(peak_mem_usages)
-        return not oom
-    
     def pop_workload(self, mid_group = None, did_group = None, pop_wtypes = [WorkloadType.F, WorkloadType.B, WorkloadType.W]):
         workloads = []
         assert mid_group is None or type(mid_group) is list
@@ -753,6 +753,12 @@ class PipelineScheduler:
                 stage.workloads[mid][wtype] = workload
                 workload.duration = workload.duration * workload.comp_power / device.comp_power
                 device.held_mids.add(mid)
+
+    def get_completed_workload_count(self):
+        count = 0
+        for device in self.devices:
+            count += device.get_completed_workload_count_by_type(wtype=WorkloadType.W)
+        return count
 
     def get_workloadload_duration(self):
         fwd_time = [gpc["F_TIME"] for _ in range(self.layer_num+3)]

@@ -127,7 +127,7 @@ class Device:
         self.steady_start_flag = False
         self.stages: dict[int, Stage] = {}  # 存放各阶段的字典
         self.state: int = Device.IDLE
-        self.proc_workload: Workload = None
+        self.current_workload: Workload = None
         self.current_mem_usage: int = 0
         self.peak_memory_usage: int = 0
         self.nmb: int = nmb
@@ -522,7 +522,7 @@ class Device:
             self.mid_traverse_order.remove(mid)
             self.mid_traverse_order.append(mid)
     
-    def get_finished_workload_num_by_type(self, wtype:WorkloadType):
+    def get_completed_workload_count_by_type(self, wtype:WorkloadType):
         workload_num = 0
         for workloads in self.workload_execute_record:
             for workload in workloads:
@@ -573,7 +573,7 @@ class Device:
                                 self.exe_num_w += 1
                         
                         self.mid_priority[proc_workload.mid] -= 1
-                        self.proc_workload = proc_workload
+                        self.current_workload = proc_workload
                         self.update_memory_usage()
                         self.state = Device.BUSY
                         self.memory_monitor.trace_workload(workload=self.stages[sid].workloads[mid][wtype])
@@ -604,7 +604,7 @@ class Device:
                                         self.exe_num_w += 1
                                 
                                 self.mid_priority[proc_workload.mid] -= 1
-                                self.proc_workload = proc_workload
+                                self.current_workload = proc_workload
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
                                 self.memory_monitor.trace_workload(workload=stage.workloads[mid][wtype])
@@ -635,7 +635,7 @@ class Device:
                             if workload_type != WorkloadType.F:
                                 continue
                         else:
-                            if self.get_finished_workload_num_by_type(wtype=WorkloadType.B) == 0:
+                            if self.get_completed_workload_count_by_type(wtype=WorkloadType.B) == 0:
                                 if workload.sid != gpc["STAGE_NUM"]:
                                     continue
                             else:
@@ -677,7 +677,7 @@ class Device:
                             raise Exception("Error workload type.")
                         
                         self.mid_priority[proc_workload.mid] -= 1
-                        self.proc_workload = proc_workload
+                        self.current_workload = proc_workload
                         self.update_memory_usage()
                         self.state = Device.BUSY
                         self.memory_monitor.trace_workload(workload=workload)
@@ -749,7 +749,7 @@ class Device:
                             raise Exception("Error workload type.")
                         
                         self.mid_priority[proc_workload.mid] -= 1
-                        self.proc_workload = proc_workload
+                        self.current_workload = proc_workload
                         self.update_memory_usage()
                         self.state = Device.BUSY
                         self.memory_monitor.trace_workload(workload=workload)
@@ -763,7 +763,7 @@ class Device:
                 proc_workload = self.stages[workload_sid].execute_workload(time=time, mid=workload_mid,workload_type=workload_type)
                 
                 if proc_workload:
-                    self.proc_workload = proc_workload
+                    self.current_workload = proc_workload
                     self.update_memory_usage()
                     self.state = Device.BUSY
                     self.last_wtype = workload_type
@@ -798,7 +798,7 @@ class Device:
                     proc_workload = self.stages[workload_sid].execute_workload(time=time, mid=workload_mid,workload_type=workload_type)
                 
                 if proc_workload:
-                    self.proc_workload = proc_workload
+                    self.current_workload = proc_workload
                     self.update_memory_usage()
                     self.state = Device.BUSY
                     self.last_wtype = workload_type
@@ -826,7 +826,7 @@ class Device:
                     input()
                 proc_workload = self.stages[workload_sid].execute_workload(time=time, mid=workload_mid,workload_type=workload_type)
                 if proc_workload:
-                    self.proc_workload = proc_workload
+                    self.current_workload = proc_workload
                     self.update_memory_usage()
                     self.state = Device.BUSY
                     self.next_workload_idx += 1
@@ -859,7 +859,7 @@ class Device:
                     elif wtype == WorkloadType.W:
                         if self.stages[sid].stage_type in (StageType.LAYER, StageType.LAYERS):
                             self.exe_num_w += 1
-                    self.proc_workload = proc_workload
+                    self.current_workload = proc_workload
                     self.update_memory_usage()
                     self.state = Device.BUSY
                     self.next_workload_idx += 1
@@ -908,7 +908,7 @@ class Device:
                             elif workload_type == WorkloadType.W:
                                 self.warmup_num_w += 1
                             self.last_wtype = workload_type
-                            self.proc_workload = proc_workload
+                            self.current_workload = proc_workload
                             self.update_memory_usage()
                             self.state = Device.BUSY
                             return proc_workload
@@ -926,7 +926,7 @@ class Device:
                                 elif workload_type == WorkloadType.W:
                                     self.warmup_num_w += 1
                                 self.last_wtype = workload_type
-                                self.proc_workload = proc_workload
+                                self.current_workload = proc_workload
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
                                 return proc_workload             
@@ -945,23 +945,23 @@ class Device:
         return workload_type
 
 
-    def _finish_proc_workload(self,time) -> bool: 
+    def is_current_workload_completed(self,time) -> bool: 
         if self.state == Device.BUSY:
-            if self.proc_workload and time >= self.proc_workload.end_time:
+            if self.current_workload and time >= self.current_workload.end_time:
                 return True
         return False
 
     def update_memory_usage(self) -> int:
-        if self.proc_workload.state == Workload.IN_PROGRESS and self.proc_workload.wtype in (WorkloadType.F, WorkloadType.R, WorkloadType.B):
-            self.stages[self.proc_workload.sid].update_memory_usage(workload=self.proc_workload)
-        elif self.proc_workload.state == Workload.COMPLETED and self.proc_workload.wtype == WorkloadType.W:
-            self.stages[self.proc_workload.sid].update_memory_usage(workload=self.proc_workload)
+        if self.current_workload.state == Workload.IN_PROGRESS and self.current_workload.wtype in (WorkloadType.F, WorkloadType.R, WorkloadType.B):
+            self.stages[self.current_workload.sid].update_memory_usage(workload=self.current_workload)
+        elif self.current_workload.state == Workload.COMPLETED and self.current_workload.wtype == WorkloadType.W:
+            self.stages[self.current_workload.sid].update_memory_usage(workload=self.current_workload)
         self.peak_memory_usage = sum(stage.peak_memory_usage for stage in self.stages.values())    
         self.current_mem_usage = sum(stage.memory_usage for stage in self.stages.values())
-        self.mem_usage_record[(self.proc_workload.start_time,self.proc_workload.end_time)] = self.current_mem_usage
-        self.peak_mem_usage_record[(self.proc_workload.start_time,self.proc_workload.end_time)] = (self.peak_memory_usage, self.proc_workload.wtype.name, self.proc_workload.sid, self.proc_workload.mid)
+        self.mem_usage_record[(self.current_workload.start_time,self.current_workload.end_time)] = self.current_mem_usage
+        self.peak_mem_usage_record[(self.current_workload.start_time,self.current_workload.end_time)] = (self.peak_memory_usage, self.current_workload.wtype.name, self.current_workload.sid, self.current_workload.mid)
         for stage in self.stages.values(): # recover peak memory usage to current memory usage
-            if stage.sid != self.proc_workload.sid:
+            if stage.sid != self.current_workload.sid:
                 stage.peak_memory_usage = stage.memory_usage
 
     def get_memory_usage(self) -> int:

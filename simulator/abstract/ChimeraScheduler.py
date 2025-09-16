@@ -119,11 +119,11 @@ class ChimeraPipelineScheduler:
 
     def check_workload_status(self):
         for device in self.devices:
-            if device._finish_proc_workload():
-                if device.proc_workload.wtype == WorkloadType.W:
+            if device.is_current_workload_completed():
+                if device.current_workload.wtype == WorkloadType.W:
                     self.num_finished_microbatch += 1
-                device.proc_workload.complete()
-                self.update_constraints(constraint=device.proc_workload)
+                device.current_workload.complete()
+                self.update_constraints(constraint=device.current_workload)
                 device.update_memory_usage()
                 device.state = Device.IDLE
                 # 0 1 2 3      4 5 6 7
@@ -165,7 +165,7 @@ class ChimeraPipelineScheduler:
                         proc_workload = device.stages[sid].execute_workload(mid=mid,workload_type=workload_type)
                         if proc_workload:
                             device.last_wtype = workload_type
-                            device.proc_workload = proc_workload
+                            device.current_workload = proc_workload
                             device.update_memory_usage()
                             device.state = Device.BUSY
                             real_device_num = self.device_num // self.chimera_stream_num
