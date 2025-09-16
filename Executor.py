@@ -47,22 +47,9 @@ class Executor:
                 self.update_constraints(time=self.time)
                 pipeline.execute_workload(time=self.time)
                 success_count += pipeline.finish_flag
-                # if self.get_time() == 250:
-                #     if pipeline.pipeline_idx == 2:
-                #         workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
-                # if self.get_time() == 250:
-                #     if pipeline.pipeline_idx == 3:
-                #         pipeline.insert_workload(workloads=workloads)
-                # if self.get_time() == 666:
-                #     if pipeline.pipeline_idx == 3:
-                #         workloads = pipeline.pop_workload(mid_group=[18],did_group=[2])
-                # if self.get_time() == 666:
-                #     if pipeline.pipeline_idx == 2:
-                #         pipeline.insert_workload(workloads=workloads)
                 latest_workloads, exec_f_num_ = pipeline.check_device_states()
                 latest_workloads_dp[pipeline.pipeline_idx] = latest_workloads
                 exec_f_num_dp[pipeline.pipeline_idx] = exec_f_num_
-
 
             # for did in range(DEVICE_NUM):
             slow_did = HETER_PP_ID
@@ -94,9 +81,12 @@ class Executor:
                             workloads = pipeline.pop_workload(mid_group=[min_f_num+pop_num+pipeline.mid_offset],did_group=[slow_did_])#pop 下一个f
                             # pop_time = None
                             pop_num += 1
-                        elif pipeline.pipeline_idx == fast_dp[0] :#and self.get_time == insert_time:
-                            pipeline.insert_workload(workloads=workloads, did_group=[slow_did_])
-                            # insert_time = None
+                    for pipeline in self.pipelines:
+                        if pipeline.pipeline_idx == fast_dp[0] :#and self.get_time == insert_time:
+                            if workloads is not None:
+                                pipeline.insert_workload(workloads=workloads, did_group=[slow_did_])
+                                workloads = None
+                                # insert_time = None
 
             # print(f"did:{did}, {latest_workloads_exec_f_num}")
             self.finish_flag = True if success_count == self.dp_size else False
