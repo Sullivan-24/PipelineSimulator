@@ -699,7 +699,7 @@ class PipelineScheduler:
     def run_pipeline_parallelism(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         # self.run_schedule = False
         self.reset_time()
-        while self.get_time() <= time_limit and not self.finish_flag and not gpc["TERMINAL_FLAG"]:
+        while self.get_time() <= time_limit and not self.finish_flag:
             self.check_workload_status(time=self.time)
             self.execute_workload(time=self.time)
             self.check_device_status()

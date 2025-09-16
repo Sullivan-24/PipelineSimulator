@@ -43,7 +43,7 @@ class Executor:
     def run_all_dp(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         self.reset_time()
         workloads = {}
-        while self.get_time() <= time_limit and not self.finish_flag and not gpc["TERMINAL_FLAG"]:
+        while self.get_time() <= time_limit and not self.finish_flag:
             success_count = 0
             for pipeline in self.pipelines:
                 pipeline.check_workload_status(time=self.time)

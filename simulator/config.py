@@ -37,13 +37,12 @@ OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True
 # --------------------- Simulator config ---------------------
 FIND_OPTIMAL_RECOMP = False
-TIME_LIMIT = 3000
+TIME_LIMIT = 15000
 HEAD_DP = False if test_upp else False
 # [1, 2, 100, None]
 OVERLAP_DEGREE = None
 MEMORY_CONSTRAIN = 0.9
 MEMORY_REDUCATION = 0.0
-TERMINAL_FLAG = False
 IDEAL_SITUATION = False
 
 # Gemma
