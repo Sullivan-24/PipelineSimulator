@@ -540,7 +540,7 @@ class Device:
     def execute_workload(self, time, run_schedule=False) -> None:
         assert time >= 0, f"Time should be non-negative (but got {time})."
         if self.state == Device.IDLE:
-            if gpc["SCHEDULE_METHOD"] == Schedule.UnifiedPP:
+            if gpc["SCHEDULE_METHOD"] == Schedule.OctoPipe:
                 workload_list = self.get_executable_overlap_aware_workload(time=time)
 
                 for workload in workload_list:
@@ -578,7 +578,7 @@ class Device:
                         self.state = Device.BUSY
                         self.memory_monitor.trace_workload(workload=self.stages[sid].workloads[mid][wtype])
                         return proc_workload
-            elif gpc["SCHEDULE_METHOD"] == Schedule.UnifiedPP and gpc["Hierarchical"]:
+            elif gpc["SCHEDULE_METHOD"] == Schedule.OctoPipe and gpc["Hierarchical"]:
                 for mid in range(self.mid_offset, self.mid_offset + self.nmb):
                     for wtype in [WorkloadType.B,WorkloadType.F,WorkloadType.W,WorkloadType.R]:
                         if wtype == WorkloadType.R:
@@ -611,7 +611,7 @@ class Device:
                                 # if self.did == 0:
                                 #     print(self.memory_monitor.workloads_reserved_mem)
                                 return proc_workload
-            elif gpc["SCHEDULE_METHOD"] == Schedule.UnifiedPP and gpc["HEAD_DP"]:
+            elif gpc["SCHEDULE_METHOD"] == Schedule.OctoPipe and gpc["HEAD_DP"]:
                 self.executable_workloads = self.get_executable_workload(time=time)
                 save_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n", 'a')
                 
@@ -684,7 +684,7 @@ class Device:
                         # if self.did == 0:
                         #     print(self.memory_monitor.workloads_reserved_mem)
                         return proc_workload
-            elif gpc["SCHEDULE_METHOD"] == Schedule.UnifiedPP and not gpc["HEAD_DP"]:
+            elif gpc["SCHEDULE_METHOD"] == Schedule.OctoPipe and not gpc["HEAD_DP"]:
                 self.executable_workloads = self.get_executable_workload(time=time)
                 save_to_file(f"schedule_results/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n", 'a')
                 

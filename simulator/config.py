@@ -11,10 +11,10 @@ RUN_MODE = RunMode.SIM_SOLVE
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
 SCHEDULE_METHOD = Schedule.STANDARD_1F1B
-SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
-SCHEDULE_METHOD = Schedule.STANDARD_ZBH
+# SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
+# SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
-SCHEDULE_METHOD = Schedule.UnifiedPP
+SCHEDULE_METHOD = Schedule.OctoPipe
 
 # SCHEDULE_METHOD = Schedule.ZBV
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
@@ -30,7 +30,7 @@ if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH, Schedule.STANDARD_1F1B, Schedule.S
     CHUNK_NUM = 1
 # --------------------- Solver config ---------------------
 Hierarchical = True
-test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
+test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 HETER_DEVICE = True
 HETER_RATIO = 1
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False

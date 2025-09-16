@@ -117,7 +117,7 @@ class PipelineScheduler:
 
         assert sum(self.layer_assignment) == LAYER_NUM, f"{sum(self.layer_assignment)} != {LAYER_NUM}"
 
-        if SCHEDULE_METHOD != Schedule.UnifiedPP:
+        if SCHEDULE_METHOD != Schedule.OctoPipe:
             self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
     
         # self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
@@ -152,7 +152,7 @@ class PipelineScheduler:
             [1 for _ in range(layer_num)] for layer_num in self.layer_assignment
         ]
 
-        if SCHEDULE_METHOD == Schedule.UnifiedPP and CHUNK_NUM > 1:
+        if SCHEDULE_METHOD == Schedule.OctoPipe and CHUNK_NUM > 1:
             self.placement = []
         with open("partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))
@@ -181,12 +181,10 @@ class PipelineScheduler:
             for value in list(reversed(range(self.layer_num)))
         ]
         self._init_stage()
-        self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
         self.schedule = [[] for _ in range(self.device_num)]
-        self.generate_schedule()
+        self.generate_workload_schedule()
         self.set_schedule()
         self.temp_results = {}
-        self.recomp_set_traverser = self.generate_binary_combinations()
         self.last_workload: Workload = None
         self.workload_execute_record: list[list[Workload]] = [[] for _ in range(self.device_num)]
         if run_schedule:
@@ -253,10 +251,6 @@ class PipelineScheduler:
             if device.did == 7:
                 device.show_stages(detail_info=True)
 
-    def set_microbatch_schedule_range(self, microbatch_schedule_range):
-        for device in self.devices:
-            device.mid_traverse_order = microbatch_schedule_range
-
     def record_recomp_set(self):
         for idx, r in enumerate(self.recomp_set):
             self.recomp_set[idx] = 1 if r else 0
@@ -285,7 +279,7 @@ class PipelineScheduler:
                     )
             dev_compute_power.append(comp_power)
             self.devices.append(device)
-        self.set_recomp()
+        self.set_recomputation_config()
         if not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH):
             layer_computation_cost = [F_TIMES[i]+B_TIMES[i]+W_TIMES[i] for i in range(self.layer_num)]
             head_total = gpc["HEAD_F_TIME"] + gpc["HEAD_B_TIME"] + gpc["HEAD_W_TIME"]
@@ -310,7 +304,7 @@ class PipelineScheduler:
                 self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
                 layer_idx_start += len(self.placement[did])
             # print("Mist")
-        elif self.placement and self.schedule_method == Schedule.UnifiedPP and CHUNK_NUM == 1:
+        elif self.placement and self.schedule_method == Schedule.OctoPipe and CHUNK_NUM == 1:
             layer_idx_start = 0
             for did in range(self.device_num):
                 self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
@@ -428,65 +422,63 @@ class PipelineScheduler:
         save_to_file(gpc["TEMP_PLA_PATH"], str(self.placement), 'w')
         save_to_file(gpc["PLA_FILE_PATH"], str(self.placement), 'w')
 
-    def set_recomp(self):
+    def set_recomputation_config(self):
         self.recomp_set = [1 if gpc["RECOMP"] else 0 for _ in range(self.stage_num)]
         if self.manual_recomp_set:
-            print("Use manual recomp set")
+            print("Use provided recomputation config.")
             self.recomp_set = self.manual_recomp_set
-            return
+        
     def set_schedule(self):
         for did in range(self.device_num):
             self.devices[did].static_schedule = self.schedule[did]
 
-    def generate_schedule(self):
+    def generate_workload_schedule(self):
         if self.schedule_method == Schedule.STANDARD_1F1B:
             self.generate_1f1b_schedule()
-            # print("Generate STANDARD_1F1B Schedule.")
-
+            print("Generate 1F1B Schedule.")
         elif self.schedule_method == Schedule.STANDARD_AFAB:
             self.generate_afab_schedule()
-            # print("Generate STANDARD_AFAB Schedule.")
-
+            print("Generate AFAB Schedule.")
         elif self.schedule_method == Schedule.STANDARD_ZBH:
             self.generate_zbh_schedule()
-            # print("Generate STANDARD_ZBH1 Schedule.")
-
-        elif self.schedule_method == Schedule.STANDARD_INTERLEAVED and not self.layer_wise:
+            print("Generate ZBH Schedule.")
+        elif self.schedule_method == Schedule.STANDARD_INTERLEAVED:
             self.generate_interleaved_1f1b_schedule()
-            # print("Generate STANDARD_INTERLEAVED Schedule.")
-        # else:
-        #     print("Using UPP Schedule.")
+            print("Generate I-1F1B Schedule.")
+        else:
+            print(f"Generate {SCHEDULE_METHOD.name} Schedule.")
 
     def generate_afab_schedule(self):
         assert gpc["CHUNK_NUM"] == 1
-        print("Generate standard AFAB schedule...")
         workload_type_order = [WorkloadType.F, WorkloadType.B]
         if gpc["SPLIT_BACKPROP"]:
             workload_type_order.append(WorkloadType.W)
+        workload_type_num = len(workload_type_order)
         mid_offset = self.mid_offset
         for did in range(self.device_num):
-            mids = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
-            for i in range(gpc["WORKLOAD_TYPE_NUM"]):
+            mids = [0 for _ in range(workload_type_num)]
+            for i in range(workload_type_num):
                 while mids[i] < self.nmb:
                     self.schedule[did].append((workload_type_order[i], mids[i] + mid_offset, did))
                     mids[i]+=1
 
     def generate_1f1b_schedule(self):
         assert gpc["CHUNK_NUM"] == 1
-        workload_type_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F] if SPLIT_BACKPROP else [WorkloadType.B, WorkloadType.F]
+        workload_type_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F] if gpc["SPLIT_BACKPROP"] else [WorkloadType.B, WorkloadType.F]
+        workload_type_num = len(workload_type_order)
         workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1, WorkloadType.W : 2}
         mid_offset = self.mid_offset
         for did in range(self.device_num):
-            mids = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
+            mids = [0 for _ in range(workload_type_num)]
             # warmup
             while mids[0] < self.device_num - did:
                 self.schedule[did].append((WorkloadType.F, mids[0] + mid_offset, did))
                 mids[0] += 1
             
             iter = 0
-            finish_flag = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
-            while sum(finish_flag) < gpc["WORKLOAD_TYPE_NUM"]:
-                next_workload_type = workload_type_order[iter % gpc["WORKLOAD_TYPE_NUM"]]
+            finish_flag = [0 for _ in range(workload_type_num)]
+            while sum(finish_flag) < workload_type_num:
+                next_workload_type = workload_type_order[iter % workload_type_num]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
                 if next_mid < self.nmb:
                     self.schedule[did].append((next_workload_type, next_mid + mid_offset, did))
@@ -496,14 +488,15 @@ class PipelineScheduler:
                 iter+=1
 
     def generate_zbh_schedule(self):
-        assert gpc["WORKLOAD_TYPE_NUM"] == 3
+        assert gpc["SPLIT_BACKPROP"]
 
         workload_type_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F]
+        workload_type_num = len(workload_type_order)
         workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1, WorkloadType.W : 2}
         mid_offset = self.mid_offset
         for did in range(self.device_num):
             accumulated_act_num = min(self.nmb, (self.device_num - did - 1) * gpc["MAX_ACT"] + 1)
-            mids = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
+            mids = [0 for _ in range(workload_type_num)]
             # warmup, should not be simplified
             while mids[0] < accumulated_act_num:
                 self.schedule[did].append((WorkloadType.F, mids[0] + mid_offset, did))
@@ -511,9 +504,9 @@ class PipelineScheduler:
             
             # steady + cooldown
             iter = 0
-            finish_flag = [0 for _ in range(gpc["WORKLOAD_TYPE_NUM"])]
-            while sum(finish_flag) < gpc["WORKLOAD_TYPE_NUM"]:
-                next_workload_type = workload_type_order[iter % gpc["WORKLOAD_TYPE_NUM"]]
+            finish_flag = [0 for _ in range(workload_type_num)]
+            while sum(finish_flag) < workload_type_num:
+                next_workload_type = workload_type_order[iter % workload_type_num]
                 next_mid = mids[workload_idx_in_mids[next_workload_type]]
                 if mids[0] < min(self.nmb, gpc["STAGE_NUM"] * gpc["MAX_ACT"]):
                     if next_workload_type == WorkloadType.W:
@@ -539,7 +532,6 @@ class PipelineScheduler:
             f_next_sid = sids[f_next_sid_idx]
             idx_in_f_mids = f_next_sid_idx * workload_type_num
         
-            # warmup, inject as much microbatches as possible
             warmup_f_num = (gpc["CHUNK_NUM"] - 1) * self.device_num + (self.device_num - did - 1) * 2
             while mids[idx_in_f_mids] < self.nmb and f_mid_count < warmup_f_num:
                 self.schedule[did].append((WorkloadType.F ,mids[idx_in_f_mids] + mid_offset, f_next_sid))
@@ -574,7 +566,7 @@ class PipelineScheduler:
                         if gpc["RECOMP"]:
                             self.schedule[did].append((WorkloadType.R ,mids[idx_in_b_mids] + mid_offset, b_next_sid))
                         self.schedule[did].append((WorkloadType.B ,mids[idx_in_b_mids] + mid_offset, b_next_sid))
-                        if gpc["WORKLOAD_TYPE_NUM"] == 3:
+                        if gpc["SPLIT_BACKPROP"]:
                             self.schedule[did].append((WorkloadType.W ,mids[idx_in_b_mids] + mid_offset, b_next_sid))
                         mids[idx_in_b_mids] += 1
                         b_mid_count += 1
@@ -590,7 +582,7 @@ class PipelineScheduler:
         for k in self.results:
             print(k, self.results[k])
 
-    def update_constraints(self, time, constraint):
+    def update_constraints_within_pipeline(self, time, constraint):
         for device in self.devices:
             device.update_constraints_within_device(time, constraint=constraint)
 
@@ -618,12 +610,7 @@ class PipelineScheduler:
 
     def update_workload_execution_record(self):
         for device in self.devices:
-            device.workload_execute_record = self.workload_execute_record
-
-    def change_mid_traverse_order(self, workload: Workload):
-        if workload:
-            for device in self.devices:
-                device.overlap_aware_executable_workload_reorder(workload=workload)         
+            device.workload_execute_record = self.workload_execute_record 
 
     def check_workload_status(self, time):
         for device in self.devices:
@@ -654,85 +641,14 @@ class PipelineScheduler:
                 self.update_workload_execution_record()
 
                 device.proc_workload.complete(time=time)
-                self.update_constraints(time=time, constraint=device.proc_workload)
+                self.update_constraints_within_pipeline(time=time, constraint=device.proc_workload)
                 device.update_memory_usage()
                 device.state = Device.IDLE
-
-        if self.num_finished_microbatch == (1 + self.layer_num) * len(self.microbatch_schedule_range):
-            self.num_finished_microbatch = 0
-            self.microbatch_schedule_range = [n + len(self.microbatch_schedule_range) for n in self.microbatch_schedule_range if n + len(self.microbatch_schedule_range) < (self.mid_offset + self.nmb)]
-            self.set_microbatch_schedule_range(microbatch_schedule_range=self.microbatch_schedule_range)
 
     def execute_workload(self, time):
         for device in self.devices:
             processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
             self.record_workload(processing_workload)
-            
-    def reduce_recomp_degree(self):
-        
-        self.manual_recomp_set = self.recomp_set
-        for index, value in reversed(list(enumerate(self.manual_recomp_set))):
-            if value:
-                if index not in self.fail_indexes:
-                    self.manual_recomp_set[index] = 0
-                    print("Index {}".format(index))
-                    return index
-        print("Already the best recomp config.")
-        return -1
-    
-    def add_recomp_degree(self):
-        recomp_set = self.recomp_set
-        for index, value in list(enumerate(recomp_set)):
-            if not value:
-                self.recomp_set[index] = 1
-                print("Try the added the recomp degree.")
-                return True
-        print("Set all stage to recomputing.")
-        return False
-    
-    def reset_run_para(self):
-        self.results = {}
-        self.devices: list[Device] = []
-        self.placement = []
-        self.acc_finished_mb = 0
-        self.finish_flag = False
-        self.num_finished_microbatch = 0
-        self._init_stage()
-        self.reset_time()
-    
-    def generate_binary_combinations(self):
-        """
-        生成所有长度为 layer_num 的二进制组合0 或 1。
-        每次调用 next() 返回一个未返回过的情况。
-        """
-        # 使用 itertools.product 生成所有可能的组合
-        combinations = itertools.product([1, 0], repeat=self.layer_num)
-        return combinations
-
-    def recomp_set_check(self, recomp_set:list):
-        # [43.37751770019531, 43.25251770019531, 43.12751770019531, 43.00251770019531, 42.87751770019531, 42.75251770019531, 42.62751770019531, 72.66658020019531]
-        # Activation Layer=6.0625,Activation Input=0.0625,Activation Loss=4.640625
-        # Gradient Input=1.5001983642578125,Gradient Parameters=1.5001983642578125,Gradient Head=2.3203125
-        # LOSS=4.640625,VOC=152064
-        # LAYER_MEM:1.5001983642578125
-        # MODEL MEM:15.0
-        # OPT MEM:11.0
-        if self.schedule_method == Schedule.STANDARD_INTERLEAVED:
-            if sum(recomp_set[self.device_num-1::self.device_num]) < 8:
-                return False
-            # cut branch for 1st device
-            if sum(recomp_set[0::self.device_num]) != 7 and recomp_set[0] != 1:
-                return False
-            
-            last_recomp_num = self.layer_num + 1
-            for did in range(self.device_num):
-                layer_num_wo_recomp = recomp_set[did::self.device_num]
-                if sum(layer_num_wo_recomp) <= 7:
-                    return False
-                if sum(layer_num_wo_recomp) > last_recomp_num:
-                    return False
-                last_recomp_num = sum(layer_num_wo_recomp)
-        return True
 
     def update_time(self):
         self.time += 1
@@ -743,7 +659,7 @@ class PipelineScheduler:
     def get_time(self):
         return self.time
 
-    def check_device_states(self):
+    def check_device_status(self):
         for device in self.devices:
             if device.state == Device.IDLE:
                 device.idle_time += 1
@@ -762,7 +678,7 @@ class PipelineScheduler:
         while self.get_time() <= time_limit and not self.finish_flag and not gpc["TERMINAL_FLAG"]:
             self.check_workload_status(time=self.time)
             self.execute_workload(time=self.time)
-            self.check_device_states()
+            self.check_device_status()
             self.update_time()
         if self.finish_flag:
             if show_success:
@@ -770,7 +686,7 @@ class PipelineScheduler:
             if show_utilization:
                 self.print_device_utilization()
             self.record_recomp_set()
-            if not self.show_mem_usage(show_mem=show_mem):
+            if not self.print_memory_footprint(show_mem=show_mem):
                 if show_mem:
                     print("Fail due to OOM")
             else:
@@ -779,61 +695,9 @@ class PipelineScheduler:
             if show_success:
                 print("Fail")
 
-        if AUTO_RECOMP_SEARCH:
-            # self.record_recomp_set()
-            # self.result2file()
-            self.run_schedule = True
-            fail_times = 0
-            while fail_times < self.device_num:
-                idx = self.reduce_recomp_degree()
-                if idx == -1:
-                    break
-                self.reset_run_para()
-                print("Read schedule generated before...")
-                # self.file2result()
-                # self.result2schedule()
-                self.set_schedule()
-
-                print(self.recomp_set)
-                
-                while self.get_time() <= time_limit and not self.finish_flag:
-                    self.check_workload_status(time=self.time)
-                    self.execute_workload(time=self.time)
-                    self.update_time()
-                if self.finish_flag:
-                    self.record_recomp_set()
-                    if not self.show_mem_usage():
-                        print("Fail OOM")
-                        fail_times += 1
-                        self.fail_indexes.add(idx)
-                        self.recomp_set[idx] = 1
-                    else:
-                        print("Success")
-                        self.temp_results = copy.deepcopy(self.results)
-                        print("Reset fail times to 0.")
-                        fail_times = 0
-                else:
-                    print("Fail")
-                    self.results = self.temp_results
-                    break
-            
-            self.reset_run_para()
-            self.results = self.temp_results
-            # self.result2schedule()
-            self.set_schedule()
-            while self.get_time() <= time_limit and not self.finish_flag:
-                self.check_workload_status(time=self.time)
-                self.execute_workload(time=self.time)
-                self.update_time()
-            if self.finish_flag:
-                print("Success")
-                self.record_recomp_set()
-                self.result2file()
-            else:
-                print("Wrong answer!")
         return self.last_workload.end_time
 
-    def show_mem_usage(self, device_id=(0,), show_mem=True):
+    def print_memory_footprint(self, device_id=(0,), show_mem=True):
         peak_mem_usages = [0 for _ in range(len(self.devices))]
         for device in self.devices:
             aim_file_path = "schedule_results/memory/device{}.txt".format(device.did)
@@ -908,40 +772,22 @@ class PipelineScheduler:
     def draw(self) -> None:
         # 绘制结果的逻辑
         fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
-        if self.layer_wise:
-            painter_conf = {
-                "device_num": self.device_num,
-                "devices": self.placement,
-                "num_layer": self.layer_num+3,
-                "stage_num": self.layer_num+3,
-                "pp_height": gpc["PP_HEIGHT"],
-                "pp_align": gpc["PP_ALIGN"],
-                "pixel_base": gpc["PIXEL_BASE"],
-                "nmb": self.nmb,
-                "mid_offset": self.mid_offset,
-                "forward_length": fwd_time,
-                "backward_length": iwd_time,
-                "backward_length2": pwd_time,
-                "comm_length": [gpc["COMM_TIME"] for _ in range(self.stage_num)],
-            }
-            LSP(painter_conf).draw(self.results)
-        else:
-            res = {}
-            for key in self.results:
-                if key.startswith(("f_","b_","w_","r_")):
-                    res[key] = self.results[key]
-            painter_conf = {
-                "device_num": self.device_num,
-                "devices": self.placement,
-                "stage_num": self.stage_num if not gpc["HEAD_DP"] else self.stage_num + 1,
-                "pp_height": gpc["PP_HEIGHT"],
-                "pp_align": gpc["PP_ALIGN"],
-                "pixel_base": gpc["PIXEL_BASE"],
-                "nmb": self.nmb,
-                "mid_offset": self.mid_offset,
-                "forward_length": fwd_time,
-                "backward_length": iwd_time,
-                "backward_length2": pwd_time,
-                "comm_length": [gpc["COMM_TIME"] for _ in range(self.stage_num)],
-            }
-            SP(painter_conf).draw(res)
+        res = {}
+        for key in self.results:
+            if str(key).startswith(("f_","b_","w_","r_")):
+                res[key] = self.results[key]
+        painter_conf = {
+            "device_num": self.device_num,
+            "devices": self.placement,
+            "stage_num": self.stage_num if not gpc["HEAD_DP"] else self.stage_num + 1,
+            "pp_height": gpc["PP_HEIGHT"],
+            "pp_align": gpc["PP_ALIGN"],
+            "pixel_base": gpc["PIXEL_BASE"],
+            "nmb": self.nmb,
+            "mid_offset": self.mid_offset,
+            "forward_length": fwd_time,
+            "backward_length": iwd_time,
+            "backward_length2": pwd_time,
+            "comm_length": [gpc["COMM_TIME"] for _ in range(self.stage_num)],
+        }
+        SP(painter_conf).draw(res)

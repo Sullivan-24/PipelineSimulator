@@ -22,7 +22,7 @@ class Executor:
     def get_time(self):
         return self.time
     
-    def update_constraints_within_pipelines(self, time):
+    def update_constraints_across_dp(self, time):
         for pipeline in self.pipelines:
             for device in pipeline.devices:
                 if device.proc_workload and time >= device.proc_workload.end_time:
@@ -41,9 +41,9 @@ class Executor:
             success_count = 0
             for pipeline in self.pipelines:
                 pipeline.check_workload_status(time=self.time)
-                self.update_constraints_within_pipelines(time=self.time)
+                self.update_constraints_across_dp(time=self.time)
                 pipeline.execute_workload(time=self.time)
-                pipeline.check_device_states()
+                pipeline.check_device_status()
                 success_count += pipeline.finish_flag
                 if self.get_time() == 250:
                     if pipeline.pipeline_idx == 0:

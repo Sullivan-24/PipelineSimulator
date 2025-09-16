@@ -28,7 +28,7 @@ class Schedule(Enum):
     GREEDY_v2 = 7
     Layerwise = 8
     Chimera = 9
-    UnifiedPP = 15
+    OctoPipe = 15
     Mist = 16
     
     STANDARD_1F1B = 10

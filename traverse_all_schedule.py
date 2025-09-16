@@ -92,7 +92,7 @@ def run_schedule(draw=True, show_mem=True, show_utilization=True, show_success=T
             print("ZBV F=B=W Schedule saved to data.txt.")
             return -1, True
     simulator.run_pipeline_parallelism(show_mem=show_mem,show_utilization=show_utilization, show_success=show_success)
-    simulator.show_mem_usage(show_mem=show_mem)
+    simulator.print_memory_footprint(show_mem=show_mem)
     if draw:
         simulator.draw()
     # print(simulator.workload_execute_record)
