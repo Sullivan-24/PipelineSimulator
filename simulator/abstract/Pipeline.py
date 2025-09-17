@@ -675,6 +675,8 @@ class PipelineScheduler:
 
     def execute_workload(self, time):
         for device in self.devices:
+            if gpc["Recycle"] and self.pipeline_idx in HETER_DP_ID and device.did in HETER_PP_ID:
+                continue
             processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
             self.record_workload(processing_workload)
 

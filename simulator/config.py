@@ -31,10 +31,13 @@ if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.STANDARD_1F1B, Schedule.
 # --------------------- Solver config ---------------------
 Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
+DP_Transfer = True
+Recycle = False
 HETER_DEVICE = True
 HETER_RATIO = 2
 HETER_PP_ID = [2]
 HETER_DP_ID = [0]
+NORM_DP_ID = [1]
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True
 # --------------------- Simulator config ---------------------
