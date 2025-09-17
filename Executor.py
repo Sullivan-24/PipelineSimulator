@@ -51,18 +51,18 @@ class Executor:
                 pipeline.execute_workload(time=self.time)
                 pipeline.check_device_status()
                 success_count += pipeline.get_completed_workload_count()
-                if self.get_time() == 250:
+                if self.get_time() == 0:
                     if pipeline.pipeline_idx == 0:
-                        workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
-                if self.get_time() == 250:
+                        workloads = pipeline.pop_workload(mid_group=list(range(MICRO_BATCH_NUM)),did_group=[2])
+                if self.get_time() == 0:
                     if pipeline.pipeline_idx == 1:
                         pipeline.insert_workload(workloads=workloads,did_group=[2])
-                if self.get_time() == 666:
-                    if pipeline.pipeline_idx == 1:
-                        workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
-                if self.get_time() == 666:
-                    if pipeline.pipeline_idx == 0:
-                        pipeline.insert_workload(workloads=workloads,did_group=[2])
+                # if self.get_time() == 666:
+                #     if pipeline.pipeline_idx == 1:
+                #         workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
+                # if self.get_time() == 666:
+                #     if pipeline.pipeline_idx == 0:
+                #         pipeline.insert_workload(workloads=workloads,did_group=[2])
             self.finish_flag = True if success_count == self.get_total_workload_count() else False
             self.update_time()
         if show_success:

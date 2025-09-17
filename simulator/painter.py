@@ -352,10 +352,10 @@ class MultiPipelinePainter:
     def draw(self, all_dp_data: dict) -> None:
         """draw with tkinter"""
         # find longest time
+        canvas_width = -1
         for dp_idx, data in all_dp_data.items():
             self.set_para_by_dp_idx(config=self.all_dp_config[dp_idx])
             data = {key: val * self._pixel_base for key, val in data.items()}
-            canvas_width = -1
             for k,v in data.items():
                 kid, pid, mid, did = parse_microbatch_key(k)
                 length = 0
@@ -370,7 +370,6 @@ class MultiPipelinePainter:
                 if data[k] + length + 2 * self._pp_align > canvas_width:
                     max_key = k
                     canvas_width = data[k] + length + 2 * self._pp_align
-
         canvas_height = (self._pp_height + self._pp_align) * self._device_size * len(all_dp_data)
         # 1. Create main canvas
         main_canvas = tk.Canvas(self._tk_root, bg='#FFFFFF', width=canvas_width, height=canvas_height+5)

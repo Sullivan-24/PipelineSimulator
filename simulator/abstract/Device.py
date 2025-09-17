@@ -167,7 +167,6 @@ class Device:
         self.wait_for_schedule = 0
 
         self.situations = 1
-        self.mid_priority = [3 * gpc["CHUNK_NUM"] for _ in range(self.nmb*self.pipeline.executor.dp_size)]
         self.max_memory = max_mem
         self.comp_power = comp_power
         if layer_density is None:
@@ -572,7 +571,6 @@ class Device:
                             if self.stages[sid].stage_type in (StageType.LAYER, StageType.LAYERS):
                                 self.exe_num_w += 1
                         
-                        self.mid_priority[proc_workload.mid] -= 1
                         self.current_workload = proc_workload
                         self.update_memory_usage()
                         self.state = Device.BUSY
@@ -603,7 +601,6 @@ class Device:
                                     if self.stages[sid].stage_type in (StageType.LAYER, StageType.LAYERS):
                                         self.exe_num_w += 1
                                 
-                                self.mid_priority[proc_workload.mid] -= 1
                                 self.current_workload = proc_workload
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
@@ -676,7 +673,6 @@ class Device:
                         else:
                             raise Exception("Error workload type.")
                         
-                        self.mid_priority[proc_workload.mid] -= 1
                         self.current_workload = proc_workload
                         self.update_memory_usage()
                         self.state = Device.BUSY
@@ -748,7 +744,6 @@ class Device:
                         else:
                             raise Exception("Error workload type.")
                         
-                        self.mid_priority[proc_workload.mid] -= 1
                         self.current_workload = proc_workload
                         self.update_memory_usage()
                         self.state = Device.BUSY
