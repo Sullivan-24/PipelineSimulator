@@ -49,7 +49,7 @@ class Executor:
                 pipeline.check_workload_status(time=self.time)
                 self.update_constraints_across_dp(time=self.time)
                 pipeline.execute_workload(time=self.time)
-                pipeline.check_device_status()
+                pipeline.check_device_status(time=self.time)
                 success_count += pipeline.get_completed_workload_count()
                 if self.get_time() == 0:
                     if pipeline.pipeline_idx == 0:

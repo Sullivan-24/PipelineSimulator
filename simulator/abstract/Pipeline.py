@@ -691,10 +691,17 @@ class PipelineScheduler:
     def get_time(self):
         return self.time
 
-    def check_device_status(self):
+    def check_device_status(self, time):
+        idle_num = 0
         for device in self.devices:
             if device.state == Device.IDLE:
                 device.idle_time += 1
+                idle_num += 1
+        
+        # NOTE: Add missed finished cases caused by transferring micro-batches to other pipelines
+        if time > 0 and not self.finish_flag and idle_num == len(self.devices):
+            self.finish_flag = True
+            print(f"{time}: All devices are idle, set pipeline {self.pipeline_idx} as finished.")
 
     def run_pipeline_parallelism(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         # self.run_schedule = False
@@ -702,7 +709,7 @@ class PipelineScheduler:
         while self.get_time() <= time_limit and not self.finish_flag:
             self.check_workload_status(time=self.time)
             self.execute_workload(time=self.time)
-            self.check_device_status()
+            self.check_device_status(time=self.time)
             self.update_time()
         if self.finish_flag:
             if show_success:
