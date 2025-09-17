@@ -7,11 +7,20 @@ import pstats
 
 class Executor:
 
-    def __init__(self, dp_size) -> None:
-        self.time = 0
-        self.finish_flag = False
-        self.dp_size = dp_size
-        self.pipelines = [PipelineScheduler(pipeline_idx=dp_idx, time=0*dp_idx, executor=self) for dp_idx in range(dp_size)]
+    def __init__(self, dp_size, nmb_per_dp: list = None) -> None:
+        self.time           = 0
+        self.finish_flag    = False
+        self.dp_size        = dp_size
+        self.nmb_per_dp     = [gpc["MICRO_BATCH_NUM"] for _ in range(dp_size)] if not nmb_per_dp else nmb_per_dp
+        self.mid_offsets    = [0] + [sum(self.nmb_per_dp[:i]) for i in range(1, dp_size+1)]
+        self.pipelines      = [
+            PipelineScheduler(
+                pipeline_idx=dp_idx, 
+                nmb=self.nmb_per_dp[dp_idx], 
+                mid_offset=self.mid_offsets[dp_idx], 
+                executor=self
+            ) for dp_idx in range(dp_size)
+        ]
     
     def update_time(self):
         self.time += 1
@@ -53,7 +62,7 @@ class Executor:
                 success_count += pipeline.get_completed_workload_count()
                 if self.get_time() == 0:
                     if pipeline.pipeline_idx == 0:
-                        workloads = pipeline.pop_workload(mid_group=list(range(MICRO_BATCH_NUM)),did_group=[2])
+                        workloads = pipeline.pop_workload(mid_group=list(range(pipeline.nmb)),did_group=[2])
                 if self.get_time() == 0:
                     if pipeline.pipeline_idx == 1:
                         pipeline.insert_workload(workloads=workloads,did_group=[2])
@@ -101,7 +110,7 @@ class Executor:
         MPP(res_all_dp["painter_conf"]).draw(res_all_dp["res"])
 
 if __name__ == "__main__":
-    executor = Executor(dp_size=4)
+    executor = Executor(dp_size=4, nmb_per_dp=[15, 12, 20, 17])
     
     if gpc["PROFILE_GENERATION"]:
         profiler = cProfile.Profile()

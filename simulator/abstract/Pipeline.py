@@ -19,7 +19,7 @@ workload_type_mapping = {
 
 class PipelineScheduler:
 
-    def __init__(self, pipeline_idx, time=0, placement=None, run_schedule=False, executor=None) -> None:
+    def __init__(self, pipeline_idx, time=0, nmb=None, mid_offset=None, placement=None, run_schedule=False, executor=None) -> None:
         self.executor = executor
         self.time = time
         self.pipeline_idx = pipeline_idx # A flag for identifying each pipeline
@@ -27,6 +27,9 @@ class PipelineScheduler:
         self.device_num = gpc["DEVICE_NUM"]
         self.layer_num = gpc["LAYER_NUM"]
         self.devices: list[Device] = []
+        self.nmb = gpc["MICRO_BATCH_NUM"] if not nmb else nmb
+        self.mid_offset = pipeline_idx * self.nmb if not mid_offset else mid_offset
+
         self.placement = [] if not placement else placement
         self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
         if GEMMA:
@@ -70,7 +73,6 @@ class PipelineScheduler:
                     self.layer_assignment=[6,3,4,4,4,4,4,3]
                 else:
                     self.layer_assignment=[6,4,4,4,4,4,4,2]
-
         if NEMOTRONH:
             if DEVICE_NUM == 4:
                 self.layer_assignment=[7,7,7,7]
@@ -94,8 +96,7 @@ class PipelineScheduler:
                 if SEQ_LEN == 2*K:
                     self.layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]
                 if SEQ_LEN == 4*K:
-                    self.layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]
-                
+                    self.layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]    
         if VARYLEN:
             if SEQ_LEN == 1*K:
                 self.layer_assignment=[14, 14, 15, 15, 14, 14, 15, 11]
@@ -157,8 +158,7 @@ class PipelineScheduler:
         with open("partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))
             f.flush()
-        self.nmb = gpc["MICRO_BATCH_NUM"]
-        self.mid_offset = pipeline_idx * self.nmb
+        
         self.stage_num = gpc["STAGE_NUM"]
         self.total_workload = self.stage_num * self.device_num * self.nmb
         self.schedule_method = gpc["SCHEDULE_METHOD"]
