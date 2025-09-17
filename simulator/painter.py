@@ -374,7 +374,7 @@ class MultiPipelinePainter:
 
         canvas_height = (self._pp_height + self._pp_align) * self._device_size * len(all_dp_data)
         # 1. Create main canvas
-        main_canvas = tk.Canvas(self._tk_root, bg='#FFFFFF', width=canvas_width, height=canvas_height+5)
+        main_canvas = tk.Canvas(self._tk_root, bg='#FFFFFF', width=canvas_width*1.8, height=canvas_height+5)
         main_canvas.pack()
         
         for dp_idx, data in all_dp_data.items():

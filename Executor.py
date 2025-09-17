@@ -157,7 +157,7 @@ class Executor:
         MPP(res_all_dp["painter_conf"]).draw(res_all_dp["res"])
 
 if __name__ == "__main__":
-    executor = Executor(dp_size=2)
+    executor = Executor(dp_size=1)
     executor.run_all_dp()
     executor.draw()
     
