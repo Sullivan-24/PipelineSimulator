@@ -6,6 +6,9 @@ from ..painter import SchedulingPainter as SP
 from ..LayerwisePainter import LayerwiseSchedulingPainter as LSP
 from ..utils import save_to_file
 from .Placement import PipelinePlacement
+from ..solver.predefined_model_partition_placement import get_predefined_partition_placement
+from ..solver.ordered_model_partition_placement import solve_ordered
+from ..solver.unordered_model_partition_placement import solve_unordered
 import itertools
 import json
 import os
@@ -115,14 +118,13 @@ class PipelineScheduler:
                     self.layer_assignment=[16, 16, 16, 16, 16, 15, 16, 1]
                 if DEVICE_NUM == 4:
                     self.layer_assignment=[31, 33, 33, 15]
-
+        self.layer_assignment = get_predefined_partition_placement(model_type=GEMMA, seq_len=SEQ_LEN, device_num=DEVICE_NUM, layer_num=LAYER_NUM)
+        
         assert sum(self.layer_assignment) == LAYER_NUM, f"{sum(self.layer_assignment)} != {LAYER_NUM}"
 
         if SCHEDULE_METHOD != Schedule.OctoPipe:
             self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
     
-        # self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
-
         if SCHEDULE_METHOD == Schedule.Mist:
             if GEMMA:
                 mist_layer_assignments = {
@@ -152,6 +154,16 @@ class PipelineScheduler:
         self.placement = [
             [1 for _ in range(layer_num)] for layer_num in self.layer_assignment
         ]
+
+        computation_times = [f + b + w for f, b, w in zip(F_TIMES, B_TIMES, W_TIMES)]
+        computation_times[-1] += HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME
+        solver_results = solve_ordered(
+            times=computation_times, 
+            D=self.device_num,
+            mems=[1 for _ in range(self.layer_num)], 
+            mem_limits=[144 for _ in range(self.device_num)]
+        )
+        self.placement = solver_results["assignments"]
 
         if SCHEDULE_METHOD == Schedule.OctoPipe and CHUNK_NUM > 1:
             self.placement = []
