@@ -159,17 +159,5 @@ def main():
         content += str(r)+"\n"
     save_to_file(f"traverse_res_{Schedule.ZBV.name}.txt", content ,'w')
 if __name__ == "__main__":
-
+    # Deprecated test script, move to Executor.py for pipeline generation test.
     run_schedule(show_mem=False)
-
-    # for i in [1, 2, 4, 8, 16, 32, 64, 128, 256]:
-    #     gpc["MICRO_BATCH_NUM"] = i
-    #     start_time = time.time()
-    #     run_schedule(draw=False, show_mem=False, show_res=False, show_utilization=False, show_success=False)
-    #     end_time = time.time()
-    #     print(f"{gpc["MICRO_BATCH_NUM"]} : {end_time-start_time},")
-
-    # for sch in [Schedule.STANDARD_1F1B, Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_ZBH1, Schedule.UnifiedPP]:
-    #     gpc["SCHEDULE_METHOD"] = sch
-    #     print(sch)
-    #     run_schedule(draw=False, show_mem=False, show_res=True, show_utilization=False, show_success=False)

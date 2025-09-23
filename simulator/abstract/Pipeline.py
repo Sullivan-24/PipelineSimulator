@@ -93,7 +93,7 @@ class PipelineScheduler:
             self.placement = solver_results["assignments"]
             self.layer_assignment = [len(p) for p in self.placement]
 
-        with open("partition.txt", 'w') as f:
+        with open("schedule_results/partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))
             f.flush()
 
