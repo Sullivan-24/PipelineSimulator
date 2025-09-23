@@ -117,7 +117,7 @@ class Device:
     BUSY = 1
     IDLE = 2
 
-    def __init__(self, device_id: int, max_activation_counts: int, nmb:int, mid_offset:int, static_schedule: list = None, memory_usage_constrain_rate: float = 1, max_mem: int = gpc["GPU_MAX_MEM"], comp_power: float = 1, layer_density: list = None, pipeline = None):
+    def __init__(self, device_id: int, max_activation_counts: int, nmb:int, mid_offset:int, static_schedule: list = None, memory_usage_constrain_rate: float = 1, max_mem: int = gpc["GPU_MAX_MEM"], comp_power: float = 1, pipeline = None):
         self.did = device_id
         self.warmup_end_flag = False
         self.warmup_diff = 1 if self.did != DEVICE_NUM - 1 else 0
@@ -169,10 +169,6 @@ class Device:
         self.situations = 1
         self.max_memory = max_mem
         self.comp_power = comp_power
-        if layer_density is None:
-            self.layer_density = [1 for _ in range(gpc["LAYER_NUM"])]
-        else:
-            self.layer_density = layer_density
 
         self.workload_execute_record: list[list[Workload]] = [[] for _ in range(gpc["DEVICE_NUM"])]
 
@@ -376,18 +372,18 @@ class Device:
     def get_executable_overlap_aware_workload(self, time)->list[Workload]:
         executable_workoads = []
         workload_type_order = [WorkloadType.B,WorkloadType.F,WorkloadType.W]
-        if SWITCH_WORKLOAD_TYPE:
+        if gpc["SWITCH_WORKLOAD_TYPE"]:
             if self.last_wtype == WorkloadType.B:
                 workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
             if self.last_wtype == WorkloadType.F:
                 workload_type_order = [WorkloadType.B,WorkloadType.F,WorkloadType.W]
 
-        if SAVE_MEMORY and self.get_max_mem_did() == self.did and self.current_mem_usage > self.peak_memory_usage / 5 * 4:
+        if gpc["SAVE_MEMORY"] and self.get_max_mem_did() == self.did and self.current_mem_usage > self.peak_memory_usage / 5 * 4:
             if self.last_wtype == WorkloadType.B:
                 workload_type_order = [WorkloadType.W,WorkloadType.F,WorkloadType.B]
             if self.last_wtype == WorkloadType.W:
                 workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
-        if SAVE_MEMORY:
+        if gpc["SAVE_MEMORY"]:
             head_ce_workloads = []
             for workload_type in [WorkloadType.W]:
                 for mid in range(self.mid_offset, self.mid_offset + self.nmb):
@@ -419,29 +415,6 @@ class Device:
             executable_workoads += canceled_workload
 
         return executable_workoads
-
-    def overlap_aware_executable_workload_reorder(self, workload:Workload):
-        if workload:
-            if workload.wtype ==  WorkloadType.F:
-                next_stage_id = workload.sid + 1
-            elif workload.wtype == WorkloadType.B:
-                next_stage_id = workload.sid - 1
-            else:
-                return
-            
-            if next_stage_id in self.stages.keys():
-                head = []
-                tail = []
-                for wl in self.executable_workloads:
-                    if wl.mid == workload.mid and wl.wtype == workload.wtype and wl.sid == next_stage_id:
-                        tail.append(wl)
-                    else:
-                        head.append(wl)
-                self.executable_workloads = head + tail
-                # if head+tail != self.executable_workloads:
-                #     print(head+tail)
-                #     print(self.executable_workloads)
-                #     input()
 
     def show_stages(self, detail_info=False):
         for sid in self.stages:
@@ -498,7 +471,6 @@ class Device:
                 layer_num=layer_num,
                 layer_idx_start=layer_idx_start,
                 comp_power=self.comp_power,
-                layer_density=self.layer_density,
             )
         self.stages[stage.sid] = stage
         self.total_layers+=layer_num

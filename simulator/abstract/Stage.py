@@ -129,7 +129,7 @@ class Stage:
     VSHAPE = 2
     WAVELIKE = 3
 
-    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, nmb:int, mid_offset:int, layer_num: int, layer_idx_start: int, layerwise:bool = False, recomp: bool = False, comp_power: float = 1, layer_density: list=None):
+    def __init__(self, device_id:int, stage_id: int, para_num:int, stage_type: StageType, nmb:int, mid_offset:int, layer_num: int, layer_idx_start: int, layerwise:bool = False, recomp: bool = False, comp_power: float = 1):
         self.did: int = device_id
         self.sid: int = stage_id
         self.nmb: int = nmb
@@ -152,10 +152,6 @@ class Stage:
         self.comp_power = comp_power
         if layerwise: 
             assert layer_num == 1, f"LAYERWISE require 1 layer per stage but got {layer_num}"
-        if layer_density is None:
-            self.layer_density = [1 for _ in range(gpc["LAYER_NUM"])]
-        else:
-            self.layer_density = layer_density
         self._add_workload()
         
     def _add_workload(self) -> None:

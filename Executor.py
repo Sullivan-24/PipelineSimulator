@@ -60,12 +60,12 @@ class Executor:
                 pipeline.execute_workload(time=self.time)
                 pipeline.check_device_status(time=self.time)
                 success_count += pipeline.get_completed_workload_count()
-                if self.get_time() == 0:
-                    if pipeline.pipeline_idx == 0:
-                        workloads = pipeline.pop_workload(mid_group=list(range(pipeline.nmb)),did_group=[2])
-                if self.get_time() == 0:
-                    if pipeline.pipeline_idx == 1:
-                        pipeline.insert_workload(workloads=workloads,did_group=[2])
+                # if self.get_time() == 0:
+                #     if pipeline.pipeline_idx == 0:
+                #         workloads = pipeline.pop_workload(mid_group=list(range(pipeline.nmb)),did_group=[2])
+                # if self.get_time() == 0:
+                #     if pipeline.pipeline_idx == 1:
+                #         pipeline.insert_workload(workloads=workloads,did_group=[2])
                 # if self.get_time() == 666:
                 #     if pipeline.pipeline_idx == 1:
                 #         workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
@@ -110,7 +110,7 @@ class Executor:
         MPP(res_all_dp["painter_conf"]).draw(res_all_dp["res"])
 
 if __name__ == "__main__":
-    executor = Executor(dp_size=4, nmb_per_dp=[15, 12, 20, 17])
+    executor = Executor(dp_size=1, nmb_per_dp=[15, 12, 20, 17])
     
     if gpc["PROFILE_GENERATION"]:
         profiler = cProfile.Profile()

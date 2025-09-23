@@ -159,6 +159,8 @@ class PipelineScheduler:
             f.write(str(self.layer_assignment))
             f.flush()
         
+        print(self.placement)
+        gpc["SWITCH_WORKLOAD_TYPE"] = True
         self.stage_num = gpc["STAGE_NUM"]
         self.total_workload = self.stage_num * self.device_num * self.nmb
         self.schedule_method = gpc["SCHEDULE_METHOD"]
@@ -170,17 +172,6 @@ class PipelineScheduler:
         self.num_finished_microbatch = 0
         self.run_schedule = run_schedule
         self.manual_recomp_set = []
-        
-        self.fail_indexes = set()
-
-        min_value = min(list(reversed(range(self.layer_num))))
-        max_value = max(list(reversed(range(self.layer_num))))
-
-        # 缩放到 DENSITY_MIN 和 DENSITY_MAX 之间
-        self.layer_density = [
-            gpc["DENSITY_MIN"] + (value - min_value) * (gpc["DENSITY_MAX"] - gpc["DENSITY_MIN"]) / (max_value - min_value)
-            for value in list(reversed(range(self.layer_num)))
-        ]
         self._init_stage()
         self.schedule = [[] for _ in range(self.device_num)]
         self.generate_workload_schedule()
@@ -268,7 +259,6 @@ class PipelineScheduler:
                         memory_usage_constrain_rate=0.85,
                         max_mem=max_mem,
                         comp_power=comp_power,
-                        layer_density=self.layer_density,
                         pipeline=self,
                     )
             dev_compute_power.append(comp_power)
