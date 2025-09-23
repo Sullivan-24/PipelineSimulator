@@ -110,7 +110,9 @@ class Executor:
         MPP(res_all_dp["painter_conf"]).draw(res_all_dp["res"])
 
 if __name__ == "__main__":
-    executor = Executor(dp_size=1, nmb_per_dp=[15, 12, 20, 17])
+    # Example
+    # executor = Executor(dp_size=4, nmb_per_dp=[15, 12, 20, 17])
+    executor = Executor(dp_size=1)
     
     if gpc["PROFILE_GENERATION"]:
         profiler = cProfile.Profile()

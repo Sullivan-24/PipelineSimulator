@@ -199,13 +199,11 @@ class PipelineScheduler:
             for did in range(self.device_num):
                 self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
                 layer_idx_start += len(self.placement[did])
-            # print("Mist")
         elif self.placement and self.schedule_method == Schedule.OctoPipe and CHUNK_NUM == 1:
             layer_idx_start = 0
             for did in range(self.device_num):
                 self.devices[did].add_stage(did, layer_num = len(self.placement[did]), layer_idx_start=layer_idx_start, recomp=self.recomp_set[did])
                 layer_idx_start += len(self.placement[did])
-            # print("S1F1B + model partition + workload scheduling")
         elif self.schedule_method == Schedule.STANDARD_INTERLEAVED:
             layer_idx_start = 0
             for pid in range(self.stage_num):
