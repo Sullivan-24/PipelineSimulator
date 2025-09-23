@@ -1,7 +1,33 @@
 from ..config import *
-def get_predefined_partition_placement(model_type, seq_len, device_num, layer_num):
+def get_mist_predefined_partition_placement(seq_len, device_num, layer_num):
+    if GEMMA:
+        mist_layer_assignments = {
+            32 : { 4 : [8, 9, 9, 6], },
+            64 : { 8 : [6, 9, 9, 9, 9, 9, 9, 4], },
+            128 : { 16 : [12, 18, 18, 18, 18, 18, 18, 8], },
+        }
+    if DEEPSEEK:
+        mist_layer_assignments = {
+            16 : { 4 : [5, 4, 4, 3], },
+            32 : { 8 : [6, 4, 4, 4, 4, 4, 4, 2], },
+            64 : { 8 : [7, 9, 9, 9, 9, 9, 9, 3], },
+        }
+    if NEMOTRONH:
+        mist_layer_assignments = {
+            28 : { 4 : [8, 8, 8, 4], },
+            56 : { 8 : [6, 7, 8, 7, 8, 7, 8, 5], },
+            112 : {
+                8 : [13, 14, 16, 16, 14, 14, 16, 9],
+                16 : [6, 7, 7, 7, 9, 7, 7, 9, 7, 7, 7, 7, 9, 7, 7, 2],
+            },
+        }
+    layer_assignment = mist_layer_assignments[layer_num][device_num]
+    assert sum(layer_assignment) == layer_num, f"Mist {sum(layer_assignment)} != {layer_num}"
+    return layer_assignment
+
+def get_octopipe_predefined_partition_placement(seq_len, device_num, layer_num):
     layer_assignment = []
-    if model_type == GEMMA:
+    if GEMMA:
         if seq_len == 2*K:
             if device_num == 4:
                 layer_assignment=[9,9,8,6]
@@ -30,7 +56,7 @@ def get_predefined_partition_placement(model_type, seq_len, device_num, layer_nu
                 # Mist
                 layer_assignment=[1, 5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5]
                 layer_assignment=[9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 1]
-    if model_type == DEEPSEEK:
+    if DEEPSEEK:
         if device_num == 4:
             layer_assignment=[5,4,4,3]
             if seq_len == 4*K:
@@ -42,7 +68,7 @@ def get_predefined_partition_placement(model_type, seq_len, device_num, layer_nu
                 layer_assignment=[6,3,4,4,4,4,4,3]
             else:
                 layer_assignment=[6,4,4,4,4,4,4,2]
-    if model_type == NEMOTRONH:
+    if NEMOTRONH:
         if device_num == 4:
             layer_assignment=[7,7,7,7]
             if seq_len == 2*K:
@@ -66,7 +92,7 @@ def get_predefined_partition_placement(model_type, seq_len, device_num, layer_nu
                 layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]
             if seq_len == 4*K:
                 layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]    
-    if model_type == VARYLEN:
+    if VARYLEN:
         if seq_len == 1*K:
             layer_assignment=[14, 14, 15, 15, 14, 14, 15, 11]
         if seq_len == 2*K:
@@ -84,5 +110,6 @@ def get_predefined_partition_placement(model_type, seq_len, device_num, layer_nu
                 layer_assignment=[16, 16, 16, 16, 16, 15, 16, 1]
             if device_num == 4:
                 layer_assignment=[31, 33, 33, 15]
+    assert sum(layer_assignment) == layer_num, f"{sum(layer_assignment)} != {layer_num}"
     print("Return predefined model partition and model placement")
     return layer_assignment

@@ -6,7 +6,7 @@ from ..painter import SchedulingPainter as SP
 from ..LayerwisePainter import LayerwiseSchedulingPainter as LSP
 from ..utils import save_to_file
 from .Placement import PipelinePlacement
-from ..solver.predefined_model_partition_placement import get_predefined_partition_placement
+from ..solver.predefined_model_partition_placement import get_octopipe_predefined_partition_placement, get_mist_predefined_partition_placement
 from ..solver.ordered_model_partition_placement import solve_ordered
 from ..solver.unordered_model_partition_placement import solve_unordered
 import itertools
@@ -32,153 +32,17 @@ class PipelineScheduler:
         self.devices: list[Device] = []
         self.nmb = gpc["MICRO_BATCH_NUM"] if not nmb else nmb
         self.mid_offset = pipeline_idx * self.nmb if not mid_offset else mid_offset
-
-        self.placement = [] if not placement else placement
-        self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
-        if GEMMA:
-            if SEQ_LEN == 2*K:
-                if DEVICE_NUM == 4:
-                    self.layer_assignment=[9,9,8,6]
-                if DEVICE_NUM == 8:
-                    if LAYER_NUM == 64:
-                        # Mist 256
-                        self.layer_assignment=[5, 9, 9, 9, 9, 9, 9, 5]
-                        self.layer_assignment=[9, 9, 9, 8, 8, 8, 8, 5]
-                        # Mist 512
-                        self.layer_assignment=[5, 9, 9, 9, 9, 9, 9, 5]
-                        self.layer_assignment=[9, 9, 9, 8, 8, 8, 8, 5]
-                    if LAYER_NUM == 128:
-                        self.layer_assignment=[14, 17, 17, 17, 17, 17, 17, 12]
-                if DEVICE_NUM == 16:
-                    # Mist
-                    self.layer_assignment=[1, 5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5]
-                    self.layer_assignment=[9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 1]
-            if SEQ_LEN == 4*K:
-                if DEVICE_NUM == 4:
-                    self.layer_assignment=[10,9,8,5]
-                if DEVICE_NUM == 8:
-                    self.layer_assignment=[9, 9, 9, 9, 8, 8, 8, 4]
-                    if LAYER_NUM == 128:
-                        self.layer_assignment=[18, 17, 17, 17, 17, 17, 17, 8]
-                if DEVICE_NUM == 16:
-                    # Mist
-                    self.layer_assignment=[1, 5, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 5]
-                    self.layer_assignment=[9, 9, 9, 9, 9, 9, 9, 8, 8, 8, 8, 8, 8, 8, 8, 1]
-        if DEEPSEEK:
-            if DEVICE_NUM == 4:
-                self.layer_assignment=[5,4,4,3]
-                if SEQ_LEN == 4*K:
-                    self.layer_assignment=[6,4,4,2]
-            if DEVICE_NUM == 8:
-                if LAYER_NUM == 64:
-                    self.layer_assignment=[12,8,8,8,8,8,8,4]
-                elif LAYER_NUM == 32:
-                    self.layer_assignment=[6,3,4,4,4,4,4,3]
-                else:
-                    self.layer_assignment=[6,4,4,4,4,4,4,2]
-        if NEMOTRONH:
-            if DEVICE_NUM == 4:
-                self.layer_assignment=[7,7,7,7]
-                if SEQ_LEN == 2*K:
-                    self.layer_assignment=[8,7,8,5]
-                if SEQ_LEN == 4*K:
-                    self.layer_assignment=[8,8,8,4]
-                else:
-                    self.layer_assignment=[8,8,8,4]
-            if DEVICE_NUM == 8:
-                if LAYER_NUM == 56:
-                    if SEQ_LEN == 2*K:
-                        self.layer_assignment=[9,8,7,8,7,7,7,3]
-                    if SEQ_LEN == 4*K:
-                        self.layer_assignment=[9,8,7,8,8,7,7,2]
-                    if SEQ_LEN == 8*K:
-                        self.layer_assignment=[8,8,8,8,8,8,7,1]
-                if LAYER_NUM == 112:
-                    self.layer_assignment=[16, 16, 15, 15, 16, 16, 15, 3]
-            if DEVICE_NUM == 16:
-                if SEQ_LEN == 2*K:
-                    self.layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]
-                if SEQ_LEN == 4*K:
-                    self.layer_assignment=[8, 6, 7, 6, 8, 7, 7, 8, 7, 8, 8, 7, 8, 8, 8, 1]    
-        if VARYLEN:
-            if SEQ_LEN == 1*K:
-                self.layer_assignment=[14, 14, 15, 15, 14, 14, 15, 11]
-            if SEQ_LEN == 2*K:
-                self.layer_assignment=[14, 15, 15, 15, 14, 14, 15, 10]
-            if SEQ_LEN == 4*K:
-                self.layer_assignment=[13, 14, 16, 16, 14, 15, 16, 8]
-            if SEQ_LEN == 8*K:
-                self.layer_assignment=[16, 16, 15, 15, 16, 16, 14, 4]
-                self.layer_assignment=[15, 16, 16, 15, 16, 16, 15, 3]
-            if SEQ_LEN == 16*K:
-                self.layer_assignment=[13, 17, 17, 15, 17, 16, 16, 1]
-            if SEQ_LEN == 32*K:
-                if DEVICE_NUM == 8:
-                    self.layer_assignment=[14, 14, 17, 17, 17, 16, 16, 1]
-                    self.layer_assignment=[16, 16, 16, 16, 16, 15, 16, 1]
-                if DEVICE_NUM == 4:
-                    self.layer_assignment=[31, 33, 33, 15]
-        self.layer_assignment = get_predefined_partition_placement(model_type=GEMMA, seq_len=SEQ_LEN, device_num=DEVICE_NUM, layer_num=LAYER_NUM)
         
-        assert sum(self.layer_assignment) == LAYER_NUM, f"{sum(self.layer_assignment)} != {LAYER_NUM}"
-
-        if SCHEDULE_METHOD != Schedule.OctoPipe:
-            self.layer_assignment = [LAYER_NUM//DEVICE_NUM] * DEVICE_NUM
-    
-        if SCHEDULE_METHOD == Schedule.Mist:
-            if GEMMA:
-                mist_layer_assignments = {
-                    32 : { 4 : [8, 9, 9, 6], },
-                    64 : { 8 : [6, 9, 9, 9, 9, 9, 9, 4], },
-                    128 : { 16 : [12, 18, 18, 18, 18, 18, 18, 8], },
-                }
-            if DEEPSEEK:
-                mist_layer_assignments = {
-                    16 : { 4 : [5, 4, 4, 3], },
-                    32 : { 8 : [6, 4, 4, 4, 4, 4, 4, 2], },
-                    64 : { 8 : [7, 9, 9, 9, 9, 9, 9, 3], },
-                }
-            if NEMOTRONH:
-                mist_layer_assignments = {
-                    28 : { 4 : [8, 8, 8, 4], },
-                    # 56 : { 8 : [3, 9, 7, 8, 9, 7, 8, 5], },
-                    56 : { 8 : [6, 7, 8, 7, 8, 7, 8, 5], },
-                    112 : {
-                        8 : [13, 14, 16, 16, 14, 14, 16, 9],
-                        16 : [6, 7, 7, 7, 9, 7, 7, 9, 7, 7, 7, 7, 9, 7, 7, 2],
-                    },
-                }
-            self.layer_assignment = mist_layer_assignments[self.layer_num][self.device_num]
-            assert sum(self.layer_assignment) == LAYER_NUM, f"Mist {sum(self.layer_assignment)} != {LAYER_NUM}"
-            gpc["SCHEDULE_METHOD"] = Schedule.STANDARD_1F1B
-        self.placement = [
-            [1 for _ in range(layer_num)] for layer_num in self.layer_assignment
-        ]
-
-        computation_times = [f + b + w for f, b, w in zip(F_TIMES, B_TIMES, W_TIMES)]
-        computation_times[-1] += HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME
-        solver_results = solve_ordered(
-            times=computation_times, 
-            D=self.device_num,
-            mems=[1 for _ in range(self.layer_num)], 
-            mem_limits=[144 for _ in range(self.device_num)]
-        )
-        self.placement = solver_results["assignments"]
-
-        if SCHEDULE_METHOD == Schedule.OctoPipe and CHUNK_NUM > 1:
-            self.placement = []
-        with open("partition.txt", 'w') as f:
-            f.write(str(self.layer_assignment))
-            f.flush()
+        self.placement = [] if not placement else placement
+        self.layer_assignment = []
+        self.set_model_partition_and_placement()
         
         print(self.placement)
-        gpc["SWITCH_WORKLOAD_TYPE"] = True
         self.stage_num = gpc["STAGE_NUM"]
         self.total_workload = self.stage_num * self.device_num * self.nmb
         self.schedule_method = gpc["SCHEDULE_METHOD"]
         self.layer_wise = gpc["LAYERWISE"]
         self.head_dp = gpc["HEAD_DP"]
-        self.microbatch_schedule_range = range(0,min(gpc["SCHEDULE_UNIT"], self.nmb))
         self.acc_finished_mb = 0
         self.finish_flag = False
         self.num_finished_microbatch = 0
@@ -196,6 +60,42 @@ class PipelineScheduler:
             self.file2result()
             self.result2schedule()
             self.set_workload_schedule()
+
+    def set_model_partition_and_placement(self):
+        self.layer_assignment = get_octopipe_predefined_partition_placement(seq_len=SEQ_LEN, device_num=self.device_num, layer_num=self.layer_num)
+        if gpc["SCHEDULE_METHOD"] in (Schedule.STANDARD_ZBH, Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB):
+            self.layer_assignment = [self.layer_num // self.device_num] * self.device_num
+        if gpc["SCHEDULE_METHOD"] == Schedule.Mist:
+            self.layer_assignment = get_mist_predefined_partition_placement(seq_len=SEQ_LEN, device_num=self.device_num, layer_num=self.layer_num)
+            gpc["SCHEDULE_METHOD"] = Schedule.STANDARD_1F1B
+        
+        self.placement = [
+            [1 for _ in range(layer_num)] for layer_num in self.layer_assignment
+        ]
+
+        if gpc["SCHEDULE_METHOD"] == Schedule.OctoPipe:
+            computation_times = [f + b + w for f, b, w in zip(F_TIMES, B_TIMES, W_TIMES)]
+            computation_times[-1] += HEAD_F_TIME + HEAD_B_TIME + HEAD_W_TIME
+            if gpc["STAGE_NUM"] == self.layer_num:
+                solver_results = solve_unordered(
+                    times=computation_times, 
+                    D=self.device_num,
+                    mems=[1 for _ in range(self.layer_num)], 
+                    mem_limits=[144 for _ in range(self.device_num)]
+                )
+            else:
+                solver_results = solve_ordered(
+                    times=computation_times, 
+                    D=self.device_num,
+                    mems=[1 for _ in range(self.layer_num)], 
+                    mem_limits=[144 for _ in range(self.device_num)]
+                )
+            self.placement = solver_results["assignments"]
+            self.layer_assignment = [len(p) for p in self.placement]
+
+        with open("partition.txt", 'w') as f:
+            f.write(str(self.layer_assignment))
+            f.flush()
 
     def sid2did(self, sid):
         for did, sids in enumerate(self.placement):
