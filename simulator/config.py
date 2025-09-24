@@ -122,7 +122,7 @@ W_TIMES = [F_TIME] * LAYER_NUM
 if not IDEAL_SITUATION:
     if GEMMA:
         try:
-            from graphs.e2e_data import profiled_data
+            from data.profiled_data import profiled_data
             ratios = profiled_data["GEMMA"][HIDDEN_SIZE][SEQ_LEN][VOCAB_SIZE]
             [tf_tf, tb_tf, tw_tf, _, _, _, hf_tf, hb_tf, hw_tf] = [round(r, 1) for r in ratios]
             B_TIMES = [t*(tb_tf+tw_tf) for i,t in enumerate(F_TIMES)]
@@ -138,7 +138,7 @@ if not IDEAL_SITUATION:
 
     if DEEPSEEK:
         try:
-            from graphs.e2e_data import profiled_data
+            from data.profiled_data import profiled_data
             ratios = profiled_data["DEEPSEEK"][HIDDEN_SIZE][SEQ_LEN][VOCAB_SIZE]
             [tf_tf, tb_tf, tw_tf, mf_tf, mb_tf, mw_tf, hf_tf, hb_tf, hw_tf] = [round(r, 1) for r in ratios]
             B_TIMES = [t*(mb_tf+mw_tf) if i >= LAYER_NUM//PP_SIZE - 1  else t * (tb_tf+tw_tf) for i,t in enumerate(F_TIMES)]
@@ -159,7 +159,7 @@ if not IDEAL_SITUATION:
     if NEMOTRONH:
         diff = 3 * N_SCALE
         try:
-            from graphs.e2e_data import profiled_data
+            from data.profiled_data import profiled_data
             ratios = profiled_data["NEMOTRONH"][HIDDEN_SIZE][SEQ_LEN][VOCAB_SIZE]
             [tf_mf, tb_mf, tw_mf, mf_mf, mb_mf, mw_mf, hf_mf, hb_mf, hw_mf] = [round(r, 1) for r in ratios]
             print(hf_mf,hb_mf,hw_mf)
@@ -178,7 +178,7 @@ if not IDEAL_SITUATION:
 
     if VARYLEN:
         diff = 12
-        from graphs.e2e_data import profiled_data
+        from data.profiled_data import profiled_data
         ratios = profiled_data["NEMOTRONH"][HIDDEN_SIZE][SEQ_LEN][VOCAB_SIZE]
         [tf_mf, tb_mf, tw_mf, mf_mf, mb_mf, mw_mf, hf_mf, hb_mf, hw_mf] = [round(r, 1) for r in ratios]
         B_TIMES = [t*(tb_mf+tw_mf) if (i+1)%diff==0  else t * mb_mf for i,t in enumerate(F_TIMES)]
