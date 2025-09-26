@@ -40,6 +40,8 @@ class Executor:
         pop_num = 0
         mid_done = []
         pop_workloads = []
+        transfer_info = [None for _ in range(self.dp_size)]
+        # transfer_info[source_dp_rank].append({"microbatch_ids":[2,4,7], "stage_id":2, "dst_dp_rank":dst_dp_rank})
         while self.get_time() <= time_limit and not self.finish_flag and not gpc["TERMINAL_FLAG"]:
             success_count = 0
             latest_workloads_dp = [[] for _ in range(self.dp_size)]
@@ -157,7 +159,7 @@ class Executor:
         MPP(res_all_dp["painter_conf"]).draw(res_all_dp["res"])
 
 if __name__ == "__main__":
-    executor = Executor(dp_size=1)
+    executor = Executor(dp_size=2)
     executor.run_all_dp()
     executor.draw()
     

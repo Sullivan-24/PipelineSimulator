@@ -32,7 +32,7 @@ class PipelineScheduler:
         if GEMMA:
             if SEQ_LEN == 2*K:
                 if DEVICE_NUM == 4:
-                    self.layer_assignment=[9,9,8,6]
+                    self.layer_assignment=[8,8,8,8]#[9,9,8,6]
                 if DEVICE_NUM == 8:
                     if LAYER_NUM == 64:
                         # Mist 256

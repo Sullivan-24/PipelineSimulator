@@ -31,7 +31,7 @@ if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH1, Schedule.STANDARD_1F1B, Schedule.
 # --------------------- Solver config ---------------------
 Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.UnifiedPP else False
-DP_Transfer = False
+DP_Transfer = True
 Recycle = False
 HETER_DEVICE = True
 HETER_RATIO = 2
