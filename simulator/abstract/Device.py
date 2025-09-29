@@ -117,8 +117,8 @@ class Device:
     BUSY = 1
     IDLE = 2
 
-    def __init__(self, device_id: int, max_activation_counts: int, nmb:int, mid_offset:int, static_schedule: list = None, memory_usage_constrain_rate: float = 1, max_mem: int = gpc["GPU_MAX_MEM"], comp_power: float = 1, pipeline = None):
-        self.did = device_id
+    def __init__(self, did: int, nmb:int, mid_offset:int, static_schedule: list = None, max_mem: int = gpc["GPU_MAX_MEM"], comp_power: float = 1, pipeline = None):
+        self.did = did
         self.warmup_end_flag = False
         self.warmup_diff = 1 if self.did != DEVICE_NUM - 1 else 0
         self.begin_warmup_num = (gpc["CHUNK_NUM"] - 1) * gpc["PP_SIZE"] + 1 + gpc["PP_SIZE"] - 1 - self.did + self.warmup_diff
@@ -133,7 +133,6 @@ class Device:
         self.nmb: int = nmb
         self.mid_offset: int = mid_offset
         self.held_mids: set = set(range(self.mid_offset, self.mid_offset + self.nmb))
-        self.max_activation_counts: int = max_activation_counts
         self.mem_usage_record: dict[int, int] = {}
         self.peak_mem_usage_record: dict[int, int] = {}
         self.static_schedule: list[str] = static_schedule
@@ -152,11 +151,9 @@ class Device:
         self.overlap_flag = False
         self.order_balance = True
         self.next_workload_type = None
-        self.memory_usage_constrain_rate = memory_usage_constrain_rate
         self.executable_workloads:list[Workload] = []
         self.pipeline = pipeline
 
-        self.workload_type_traverse_order = [WorkloadType.B, WorkloadType.F, WorkloadType.W]
         self.next_mid = 0
         self.released_workloads = []
         self.available_f_num = 0
@@ -186,8 +183,9 @@ class Device:
         return self.stages[workload.sid].update_memory_usage(workload=workload, sim=True)
     
     def init_memory_monitor(self):
-        self.memory_monitor = MemoryMonitor(self.nmb, self.mid_offset, self.stages, self.did, max_memory=self.max_memory * gpc["MEMORY_CONSTRAIN"], gbs=self.pipeline.executor.dp_size * self.nmb)
-        self.memory_monitor.init_monitor()
+        pass
+        # self.memory_monitor = MemoryMonitor(self.nmb, self.mid_offset, self.stages, self.did, max_memory=self.max_memory * gpc["MEMORY_CONSTRAIN"], gbs=self.pipeline.executor.dp_size * self.nmb)
+        # self.memory_monitor.init_monitor()
 
     def get_executable_workload(self, time)->list[Workload]:
         executable_workoads = []

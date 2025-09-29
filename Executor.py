@@ -7,17 +7,22 @@ import pstats
 
 class Executor:
 
-    def __init__(self, dp_size, nmb_per_dp: list = None) -> None:
+    def __init__(self, dp_size, nmb_per_dp: list = None, device_comp_power: list[list] = None, device_mem: list[list] = None) -> None:
         self.time           = 0
         self.finish_flag    = False
         self.dp_size        = dp_size
+        self.device_num_per_dp  = gpc["DEVICE_NUM"]
+        self.device_comp_power  = device_comp_power if device_comp_power else [[gpc["COMP_POWER"] for _ in range(self.device_num_per_dp)] for _ in range(dp_size)]
+        self.device_mem         = device_mem if device_mem else [[gpc["GPU_MAX_MEM"] for _ in range(self.device_num_per_dp)] for _ in range(dp_size)]
         self.nmb_per_dp     = [gpc["MICRO_BATCH_NUM"] for _ in range(dp_size)] if not nmb_per_dp else nmb_per_dp
         self.mid_offsets    = [0] + [sum(self.nmb_per_dp[:i]) for i in range(1, dp_size+1)]
         self.pipelines      = [
             PipelineScheduler(
                 pipeline_idx=dp_idx, 
                 nmb=self.nmb_per_dp[dp_idx], 
-                mid_offset=self.mid_offsets[dp_idx], 
+                mid_offset=self.mid_offsets[dp_idx],
+                comp_power=self.device_comp_power[dp_idx],
+                max_mem=self.device_mem[dp_idx],
                 executor=self
             ) for dp_idx in range(dp_size)
         ]
@@ -60,18 +65,19 @@ class Executor:
                 pipeline.execute_workload(time=self.time)
                 pipeline.check_device_status(time=self.time)
                 success_count += pipeline.get_completed_workload_count()
-                # if self.get_time() == 0:
-                #     if pipeline.pipeline_idx == 0:
-                #         workloads = pipeline.pop_workload(mid_group=list(range(pipeline.nmb)),did_group=[2])
-                # if self.get_time() == 0:
-                #     if pipeline.pipeline_idx == 1:
-                #         pipeline.insert_workload(workloads=workloads,did_group=[2])
-                # if self.get_time() == 666:
-                #     if pipeline.pipeline_idx == 1:
-                #         workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
-                # if self.get_time() == 666:
-                #     if pipeline.pipeline_idx == 0:
-                #         pipeline.insert_workload(workloads=workloads,did_group=[2])
+                if gpc["SCHEDULE_METHOD"] in (Schedule.OctoPipe, ):
+                    if self.get_time() == 0:
+                        if pipeline.pipeline_idx == 0:
+                            workloads = pipeline.pop_workload(mid_group=list(range(pipeline.nmb)),did_group=[2])
+                    if self.get_time() == 0:
+                        if pipeline.pipeline_idx == 1:
+                            pipeline.insert_workload(workloads=workloads,did_group=[2])
+                    # if self.get_time() == 666:
+                    #     if pipeline.pipeline_idx == 1:
+                    #         workloads = pipeline.pop_workload(mid_group=[2],did_group=[2])
+                    # if self.get_time() == 666:
+                    #     if pipeline.pipeline_idx == 0:
+                    #         pipeline.insert_workload(workloads=workloads,did_group=[2])
             self.finish_flag = True if success_count == self.get_total_workload_count() else False
             self.update_time()
         if show_success:
@@ -112,7 +118,9 @@ class Executor:
 if __name__ == "__main__":
     # Example
     # executor = Executor(dp_size=4, nmb_per_dp=[15, 12, 20, 17])
-    executor = Executor(dp_size=1)
+    # Device fail-slow or fail
+    executor = Executor(dp_size=2, nmb_per_dp=[9, 7], device_comp_power=[[2,2,2,2],[2,2,1,2]])
+    # executor = Executor(dp_size=1)
     
     if gpc["PROFILE_GENERATION"]:
         profiler = cProfile.Profile()

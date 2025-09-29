@@ -14,7 +14,7 @@ SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
-SCHEDULE_METHOD = Schedule.OctoPipe
+# SCHEDULE_METHOD = Schedule.OctoPipe
 
 # SCHEDULE_METHOD = Schedule.ZBV
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
@@ -33,6 +33,7 @@ Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 HETER_DEVICE = True
 HETER_RATIO = 1
+COMP_POWER = 2
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True
 # --------------------- Simulator config ---------------------

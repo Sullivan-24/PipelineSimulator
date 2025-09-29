@@ -22,12 +22,14 @@ workload_type_mapping = {
 
 class PipelineScheduler:
 
-    def __init__(self, pipeline_idx, time=0, nmb=None, mid_offset=None, placement=None, run_schedule=False, executor=None) -> None:
+    def __init__(self, pipeline_idx, time=0, nmb=None, mid_offset=None, placement=None, run_schedule=False, comp_power:list=None, max_mem:list=None, executor=None) -> None:
         self.executor = executor
         self.time = time
         self.pipeline_idx = pipeline_idx # A flag for identifying each pipeline
         self.results = {}
         self.device_num = gpc["DEVICE_NUM"]
+        self.comp_power = comp_power if comp_power else [1 for _ in range(self.device_num)]
+        self.max_mem = max_mem if max_mem else [gpc["GPU_MAX_MEM"] for _ in range(self.device_num)]
         self.layer_num = gpc["LAYER_NUM"]
         self.devices: list[Device] = []
         self.nmb = gpc["MICRO_BATCH_NUM"] if not nmb else nmb
@@ -48,7 +50,7 @@ class PipelineScheduler:
         self.num_finished_microbatch = 0
         self.run_schedule = run_schedule
         self.manual_recomp_set = []
-        self._init_stage()
+        self._init_device()
         self.schedule = [[] for _ in range(self.device_num)]
         self.generate_workload_schedule()
         self.set_workload_schedule()
@@ -153,27 +155,17 @@ class PipelineScheduler:
             self.recomp_set[idx] = 1 if r else 0
             self.results[f"theta_{idx}"] = r
 
-    def _init_stage(self):
-        dev_compute_power = []
+    def _init_device(self):
         layer_num = self.layer_num // self.stage_num
         for did in range(self.device_num):
-            max_mem = gpc["GPU_MAX_MEM"]
-            comp_power = 2
-            if gpc["HETER_DEVICE"]:
-                if did >= self.device_num // 2:
-                    max_mem = gpc["GPU_MAX_MEM"] / gpc["HETER_RATIO"]
-                    comp_power = comp_power / gpc["HETER_RATIO"]
             device = Device(
-                        device_id = did, 
-                        max_activation_counts=gpc["MAX_ACTIVATION_COUNTS"], 
+                        did = did,
                         nmb=self.nmb,
                         mid_offset=self.mid_offset,
-                        memory_usage_constrain_rate=0.85,
-                        max_mem=max_mem,
-                        comp_power=comp_power,
+                        max_mem=self.max_mem[did],
+                        comp_power=self.comp_power[did],
                         pipeline=self,
                     )
-            dev_compute_power.append(comp_power)
             self.devices.append(device)
         self.set_recomputation_config()
         if not self.placement and self.schedule_method not in (Schedule.STANDARD_INTERLEAVED, Schedule.STANDARD_1F1B, Schedule.ZBV, Schedule.STANDARD_ZBH):
@@ -189,7 +181,7 @@ class PipelineScheduler:
                 chunk_num=gpc["CHUNK_NUM"],
                 dev_num=self.device_num,
                 dev_max_memory=[100000 for _ in range(total_layer)],
-                dev_compute_power=dev_compute_power,
+                dev_compute_power=self.comp_power,
             )
             if not self.placement:
                 self.placement = self.pipeline_placement_solver.get_placements()
