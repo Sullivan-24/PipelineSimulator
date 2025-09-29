@@ -67,7 +67,7 @@ class PipelineScheduler:
 
     def set_model_partition_and_placement(self):
         self.layer_assignment = get_octopipe_predefined_partition_placement(seq_len=SEQ_LEN, device_num=self.device_num, layer_num=self.layer_num)
-        if gpc["SCHEDULE_METHOD"] in (Schedule.STANDARD_ZBH, Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB):
+        if gpc["SCHEDULE_METHOD"] in (Schedule.STANDARD_ZBH, Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB, Schedule.ReCycle):
             self.layer_assignment = [self.layer_num // self.device_num] * self.device_num
         if gpc["SCHEDULE_METHOD"] == Schedule.Mist:
             self.layer_assignment = get_mist_predefined_partition_placement(seq_len=SEQ_LEN, device_num=self.device_num, layer_num=self.layer_num)
@@ -189,7 +189,7 @@ class PipelineScheduler:
             )
             if not self.placement:
                 self.placement = self.pipeline_placement_solver.get_placements()
-        if self.placement and self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.STANDARD_ZBH, Schedule.STANDARD_AFAB, Schedule.Mist):
+        if self.placement and self.schedule_method in (Schedule.STANDARD_1F1B, Schedule.ReCycle, Schedule.STANDARD_ZBH, Schedule.STANDARD_AFAB, Schedule.Mist):
             assert self.placement is not None
             layer_idx_start = 0
             for did in range(self.device_num):
@@ -361,7 +361,7 @@ class PipelineScheduler:
         for did in range(self.device_num):
             mids = [0 for _ in range(workload_type_num)]
             # warmup
-            while mids[0] < self.device_num - did:
+            while mids[0] < min(self.device_num - did, self.nmb):
                 self.schedule[did].append((WorkloadType.F, mids[0] + mid_offset, did))
                 mids[0] += 1
             
@@ -388,7 +388,7 @@ class PipelineScheduler:
             accumulated_act_num = min(self.nmb, (self.device_num - did - 1) * gpc["MAX_ACT"] + 1)
             mids = [0 for _ in range(workload_type_num)]
             # warmup, should not be simplified
-            while mids[0] < accumulated_act_num:
+            while mids[0] < min(accumulated_act_num, self.nmb):
                 self.schedule[did].append((WorkloadType.F, mids[0] + mid_offset, did))
                 mids[0] += 1
             

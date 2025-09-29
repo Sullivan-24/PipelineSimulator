@@ -69,10 +69,13 @@ class Executor:
                 pipeline.execute_workload(time=self.time)
                 pipeline.check_device_status(time=self.time)
                 success_count += pipeline.get_completed_workload_count()
-                if gpc["SCHEDULE_METHOD"] in (Schedule.OctoPipe, ):
+                if gpc["SCHEDULE_METHOD"] in (Schedule.OctoPipe, Schedule.ReCycle):
                     if self.get_time() == 0:
                         if pipeline.pipeline_idx == 0:
-                            workloads = pipeline.pop_workload(mid_group=list(range(pipeline.nmb)),did_group=[2])
+                            # Pop all
+                            # workloads = pipeline.pop_workload(mid_group=list(range(pipeline.mid_offset, pipeline.mid_offset + pipeline.nmb)), did_group=[2])
+                            # Pop partial
+                            workloads = pipeline.pop_workload(mid_group=list(range(pipeline.mid_offset, pipeline.mid_offset + pipeline.nmb - 3)), did_group=[2])
                     if self.get_time() == 0:
                         if pipeline.pipeline_idx == 1:
                             pipeline.insert_workload(workloads=workloads,did_group=[2])
@@ -123,7 +126,7 @@ if __name__ == "__main__":
     # Example
     # executor = Executor(dp_size=4, nmb_per_dp=[15, 12, 20, 17])
     # Device fail-slow or fail
-    executor = Executor(dp_size=2, nmb_per_dp=[9, 7], device_comp_power=[[2,2,2,2],[2,2,1,2]])
+    executor = Executor(dp_size=2, nmb_per_dp=[9, 7], device_comp_power=[[2,2,1,2,2,2,2,2], [2 for _ in range(gpc["DEVICE_NUM"])]])
     # executor = Executor(dp_size=1)
     
     if gpc["PROFILE_GENERATION"]:

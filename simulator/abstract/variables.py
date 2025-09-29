@@ -30,6 +30,7 @@ class Schedule(Enum):
     Chimera = 9
     OctoPipe = 15
     Mist = 16
+    ReCycle = 17
     
     STANDARD_1F1B = 10
     STANDARD_INTERLEAVED = 11

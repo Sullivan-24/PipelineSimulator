@@ -122,6 +122,7 @@ class Device:
         self.warmup_end_flag = False
         self.warmup_diff = 1 if self.did != DEVICE_NUM - 1 else 0
         self.begin_warmup_num = (gpc["CHUNK_NUM"] - 1) * gpc["PP_SIZE"] + 1 + gpc["PP_SIZE"] - 1 - self.did + self.warmup_diff
+        self.recycle_warmup_num = gpc["PP_SIZE"] - self.did
         # self.begin_warmup_num = (gpc["CHUNK_NUM"] - 1) * gpc["PP_SIZE"] + 1 + (gpc["PP_SIZE"] - 1 - self.did) * 2
         self.idle_time = 0
         self.steady_start_flag = False
@@ -897,6 +898,52 @@ class Device:
                                 self.update_memory_usage()
                                 self.state = Device.BUSY
                                 return proc_workload             
+            elif gpc["SCHEDULE_METHOD"] in (Schedule.ReCycle,):
+                workload_list = self.get_executable_overlap_aware_workload(time=time)
+
+                for workload in workload_list:
+                    mid = workload.mid
+                    sid = workload.sid
+                    wtype = workload.wtype
+                    
+                    # if self.exe_num_f < self.recycle_warmup_num:
+                    #     if wtype != WorkloadType.F:
+                    #         continue
+                    # else:
+                    #     if not self.warmup_end_flag:
+                    #         if wtype != WorkloadType.B:
+                    #             continue
+
+                    # if self.warmup_end_flag:
+                    #     if self.last_wtype == WorkloadType.B:
+                    #         if self.exe_num_w < self.nmb and wtype != WorkloadType.W:
+                    #             continue
+                    #     if self.last_wtype == WorkloadType.F:
+                    #         if self.exe_num_b < self.nmb and wtype != WorkloadType.B:
+                    #             continue
+                    #     if self.last_wtype == WorkloadType.W:
+                    #         if self.exe_num_f < self.nmb and wtype != WorkloadType.F:
+                    #             continue
+                    
+                    proc_workload = self.stages[sid].execute_workload(time, mid=mid,workload_type=wtype)
+
+                    if proc_workload:
+                        self.last_wtype = wtype
+                        if wtype == WorkloadType.F:
+                            if self.stages[sid].stage_type in (StageType.LAYER, StageType.LAYERS):
+                                self.exe_num_f += 1
+                        elif wtype == WorkloadType.B:
+                            if self.stages[sid].stage_type in (StageType.LAYER, StageType.LAYERS):
+                                self.exe_num_b += 1
+                            self.warmup_end_flag = True
+                        elif wtype == WorkloadType.W:
+                            if self.stages[sid].stage_type in (StageType.LAYER, StageType.LAYERS):
+                                self.exe_num_w += 1
+                        
+                        self.current_workload = proc_workload
+                        self.update_memory_usage()
+                        self.state = Device.BUSY
+                        return proc_workload
             else:
                 print("Schedule Not Supported")
         return None

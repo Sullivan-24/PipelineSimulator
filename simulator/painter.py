@@ -352,6 +352,8 @@ class MultiPipelinePainter:
     def draw(self, all_dp_data: dict) -> None:
         """draw with tkinter"""
         # find longest time
+        max_dp_idx = -1
+        max_key = - 1
         canvas_width = -1
         for dp_idx, data in all_dp_data.items():
             self.set_para_by_dp_idx(config=self.all_dp_config[dp_idx])
@@ -368,13 +370,41 @@ class MultiPipelinePainter:
                 else:
                     print("Type not found!")
                 if data[k] + length + 2 * self._pp_align > canvas_width:
+                    max_dp_idx = dp_idx
                     max_key = k
                     canvas_width = data[k] + length + 2 * self._pp_align
         canvas_height = (self._pp_height + self._pp_align) * self._device_size * len(all_dp_data)
-        # 1. Create main canvas
+        # 0. Create main canvas
         main_canvas = tk.Canvas(self._tk_root, bg='#FFFFFF', width=canvas_width, height=canvas_height+5)
         main_canvas.pack()
+
+        # 1. Create label canvas
+        label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
+        y_label = (0 + 30) // 2 + 5
+
+        _, max_key_pid, _, _ = parse_microbatch_key(max_key)
+        if self._max_time == -1:
+            if SPLIT_BACKPROP:
+                self._max_time = (all_dp_data[max_dp_idx][max_key] + self._backward_w_length[max_key_pid])//self._pixel_base
+            else:
+                self._max_time = (all_dp_data[max_dp_idx][max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
+
+        label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
+                round(self._max_time),
+                self._pp_size // self._device_size,
+                self._basic_forward_length[max_key_pid], 
+                self._basic_backward_b_length[max_key_pid], 
+                self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
+                COMM_TIME
+            ),
+        )
+
+        coords_label = label_canvas.create_text(
+            canvas_width - self._pp_align - 120, y_label, text="BlockCoords:(start,end)"
+        )
+        label_canvas.pack()
         
+        # 2. Add timeline for each pipeline
         for dp_idx, data in all_dp_data.items():
             self.set_para_by_dp_idx(config=self.all_dp_config[dp_idx])
             # Convert data offset to pixels
@@ -397,38 +427,6 @@ class MultiPipelinePainter:
                     max_key = k
                     canvas_width = data[k] + length + 2 * self._pp_align
 
-            _, max_key_pid, _, _ = parse_microbatch_key(max_key)
-
-            # 0. Create label canvas
-            if dp_idx == 0:
-                label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
-                y_label = (0 + 30) // 2 + 5
-
-                if self._max_time == -1:
-                    if SPLIT_BACKPROP:
-                        self._max_time = (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base
-                    else:
-                        self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
-
-                label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
-                        # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
-                        round(self._max_time),
-                        self._pp_size // self._device_size,
-                        self._basic_forward_length[max_key_pid], 
-                        self._basic_backward_b_length[max_key_pid], 
-                        self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
-                        # int(sum(self._comm_length) / len(self._comm_length))
-                        COMM_TIME
-                    ),
-                )
-
-                coords_label = label_canvas.create_text(
-                    canvas_width - self._pp_align - 120, y_label, text="BlockCoords:(start,end)"
-                )
-                label_canvas.pack()
-
-            # 2. Add timeline for each pipeline
-            # 按照 Device 画示意图
             pad = 0
             for pid in range(dp_idx * self._device_size, dp_idx * self._device_size + self._device_size):
                 x0 = self._pp_align
