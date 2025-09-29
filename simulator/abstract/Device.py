@@ -117,7 +117,7 @@ class Device:
     BUSY = 1
     IDLE = 2
 
-    def __init__(self, did: int, nmb:int, mid_offset:int, static_schedule: list = None, max_mem: int = gpc["GPU_MAX_MEM"], comp_power: float = 1, pipeline = None):
+    def __init__(self, did: int, nmb:int, mid_offset:int, mbs:int, bs:int, static_schedule: list = None, max_mem: int = gpc["GPU_MAX_MEM"], comp_power: float = 1, pipeline = None):
         self.did = did
         self.warmup_end_flag = False
         self.warmup_diff = 1 if self.did != DEVICE_NUM - 1 else 0
@@ -132,6 +132,8 @@ class Device:
         self.peak_memory_usage: int = 0
         self.nmb: int = nmb
         self.mid_offset: int = mid_offset
+        self.mbs : int = mbs
+        self.bs : int = bs
         self.held_mids: set = set(range(self.mid_offset, self.mid_offset + self.nmb))
         self.mem_usage_record: dict[int, int] = {}
         self.peak_mem_usage_record: dict[int, int] = {}
@@ -396,7 +398,7 @@ class Device:
         delayed_workload = []
         canceled_workload = []
         for workload_type in workload_type_order:
-            for mid in range(self.pipeline.executor.dp_size * self.nmb):
+            for mid in range(self.bs // self.mbs):
                 for stage_id in self.stages:
                     workloads = self.stages[stage_id].workloads
                     if mid in workloads and workload_type in workloads[mid] and workloads[mid][workload_type].is_executable(time=time):

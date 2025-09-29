@@ -16,6 +16,8 @@ class Executor:
         self.device_mem         = device_mem if device_mem else [[gpc["GPU_MAX_MEM"] for _ in range(self.device_num_per_dp)] for _ in range(dp_size)]
         self.nmb_per_dp     = [gpc["MICRO_BATCH_NUM"] for _ in range(dp_size)] if not nmb_per_dp else nmb_per_dp
         self.mid_offsets    = [0] + [sum(self.nmb_per_dp[:i]) for i in range(1, dp_size+1)]
+        self.micro_batch_size = gpc["MICRO_BATCH_SIZE"]
+        self.batch_size = sum(self.nmb_per_dp) * self.micro_batch_size
         self.pipelines      = [
             PipelineScheduler(
                 pipeline_idx=dp_idx, 
@@ -23,6 +25,8 @@ class Executor:
                 mid_offset=self.mid_offsets[dp_idx],
                 comp_power=self.device_comp_power[dp_idx],
                 max_mem=self.device_mem[dp_idx],
+                mbs=self.micro_batch_size,
+                bs=self.batch_size,
                 executor=self
             ) for dp_idx in range(dp_size)
         ]

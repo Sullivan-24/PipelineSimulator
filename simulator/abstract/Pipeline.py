@@ -22,9 +22,11 @@ workload_type_mapping = {
 
 class PipelineScheduler:
 
-    def __init__(self, pipeline_idx, time=0, nmb=None, mid_offset=None, placement=None, run_schedule=False, comp_power:list=None, max_mem:list=None, executor=None) -> None:
+    def __init__(self, pipeline_idx, time=0, nmb=None, mbs=None, bs=None, mid_offset=None, placement=None, run_schedule=False, comp_power:list=None, max_mem:list=None, executor=None) -> None:
         self.executor = executor
         self.time = time
+        self.mbs = mbs
+        self.bs = bs
         self.pipeline_idx = pipeline_idx # A flag for identifying each pipeline
         self.results = {}
         self.device_num = gpc["DEVICE_NUM"]
@@ -159,9 +161,11 @@ class PipelineScheduler:
         layer_num = self.layer_num // self.stage_num
         for did in range(self.device_num):
             device = Device(
-                        did = did,
+                        did=did,
                         nmb=self.nmb,
                         mid_offset=self.mid_offset,
+                        mbs=self.mbs,
+                        bs=self.bs,
                         max_mem=self.max_mem[did],
                         comp_power=self.comp_power[did],
                         pipeline=self,
