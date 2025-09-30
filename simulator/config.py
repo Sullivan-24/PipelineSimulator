@@ -12,7 +12,7 @@ SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
 SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
-# SCHEDULE_METHOD = Schedule.STANDARD_ZBH
+SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
 SCHEDULE_METHOD = Schedule.OctoPipe
 
@@ -31,8 +31,20 @@ if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH, Schedule.STANDARD_1F1B, Schedule.S
 # --------------------- Solver config ---------------------
 Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
+
+DP_Transfer = True
+
 HETER_DEVICE = True
-HETER_RATIO = 1
+HETER_DEVICE_Transfer = True
+HETER_RATIO = 2
+HETER_DP_ID = [0,1]
+HETER_PP_ID = [2,5]
+
+FAILURE_DEVICE = False
+FAILURE_DP_ID = [1]
+FAILURE_PP_ID = [1]
+NMB_PER_DP = [16,16]
+
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True
 # --------------------- Simulator config ---------------------
@@ -294,5 +306,5 @@ if not SPLIT_BACKPROP:
     WORKLOAD_TYPE_NUM = 2
 
 MAX_ACTIVATION_COUNTS = int(STAGE_NUM * 2)
-MAX_ACT = 1
+MAX_ACT = 2
 PROFILE_GENERATION = False

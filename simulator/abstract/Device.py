@@ -41,6 +41,7 @@ class MemoryMonitor:
         return self.stages[workload.sid].update_memory_usage(workload=workload, sim=True)
 
     def init_reserved_mem(self):
+        return
         workload_type = WorkloadType.F
         for sid in self.stages:
             for mid in range(self.mid_offset, self.mid_offset + self.nmb):
@@ -80,6 +81,7 @@ class MemoryMonitor:
         return False
     
     def trace_workload(self,workload:Workload):
+        return
         self.tracing_workloads.append(workload)
         required_mem, _ = self.get_required_memory_by_workload(workload)
         self.workloads_reserved_mem[workload.mid] -= required_mem
@@ -804,7 +806,7 @@ class Device:
                 if self.next_workload_idx == len(self.static_schedule):
                     return None
                 try:
-                    (wtype, mid, sid) = self.static_schedule[self.next_workload_idx][:3]
+                    (wtype, mid, sid) = self.static_schedule[self.next_workload_idx]
                 except Exception as e:
                     print((wtype, mid, sid))
                     input()
@@ -815,6 +817,13 @@ class Device:
                 #             if last_device_did < gpc["PP_SIZE"]:
                 #                 if self.workload_execute_record[last_device_did][-1] != WorkloadType.W:
                 #                     return None
+                # print(f"mid:{mid}, {self.nmb}")
+                # for s in self.static_schedule:
+                #     if s[1] ==
+                #     print(s[1], end=" ")
+                #     print()
+                #     print("11111111111111111111111111111111111")
+                # input(2)
                 proc_workload = self.stages[sid].execute_workload(time=time, mid=mid, workload_type=wtype)
                 if proc_workload:
                     if wtype == WorkloadType.F:

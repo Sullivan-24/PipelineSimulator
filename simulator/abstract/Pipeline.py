@@ -91,7 +91,8 @@ class PipelineScheduler:
                     mem_limits=[144 for _ in range(self.device_num)]
                 )
             self.placement = solver_results["assignments"]
-            self.layer_assignment = [len(p) for p in self.placement]
+            # self.layer_assignment = [len(p) for p in self.placement]
+            self.layer_assignment = [self.layer_num // self.device_num] * self.device_num
 
         with open("schedule_results/partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))
@@ -160,9 +161,13 @@ class PipelineScheduler:
             max_mem = gpc["GPU_MAX_MEM"]
             comp_power = 2
             if gpc["HETER_DEVICE"]:
-                if did >= self.device_num // 2:
-                    max_mem = gpc["GPU_MAX_MEM"] / gpc["HETER_RATIO"]
-                    comp_power = comp_power / gpc["HETER_RATIO"]
+                #if did >= self.device_num // 2:
+                for i in range(len(gpc["HETER_PP_ID"])):
+                    heter_dp = gpc["HETER_DP_ID"][i]
+                    heter_pp = gpc["HETER_PP_ID"][i]
+                    if did == heter_pp and self.pipeline_idx == heter_dp:
+                        max_mem = gpc["GPU_MAX_MEM"] / gpc["HETER_RATIO"]
+                        comp_power = comp_power / gpc["HETER_RATIO"]
             device = Device(
                         device_id = did, 
                         max_activation_counts=gpc["MAX_ACTIVATION_COUNTS"], 
@@ -365,7 +370,7 @@ class PipelineScheduler:
         for did in range(self.device_num):
             mids = [0 for _ in range(workload_type_num)]
             # warmup
-            while mids[0] < self.device_num - did:
+            while mids[0] < min(self.device_num - did, self.nmb):
                 self.schedule[did].append((WorkloadType.F, mids[0] + mid_offset, did))
                 mids[0] += 1
             
@@ -579,6 +584,8 @@ class PipelineScheduler:
 
     def execute_workload(self, time):
         for device in self.devices:
+            if gpc["FAILURE_DEVICE"] and self.pipeline_idx in FAILURE_DP_ID and device.did in FAILURE_PP_ID :
+                    continue
             processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
             self.record_workload(processing_workload)
 
@@ -593,16 +600,18 @@ class PipelineScheduler:
 
     def check_device_status(self, time):
         idle_num = 0
+        exec_f_num_ = [0 for _ in range(self.device_num)]
         for device in self.devices:
             if device.state == Device.IDLE:
                 device.idle_time += 1
                 idle_num += 1
+            exec_f_num_[device.did] = device.exe_num_f
         
         # NOTE: Add missed finished cases caused by transferring micro-batches to other pipelines
         if time > 0 and not self.finish_flag and idle_num == len(self.devices):
             self.finish_flag = True
             print(f"{time}: All devices are idle, set pipeline {self.pipeline_idx} as finished.")
-
+        return exec_f_num_
     def run_pipeline_parallelism(self, time_limit = gpc["TIME_LIMIT"], show_utilization=True, show_mem=True, show_success=True):
         # self.run_schedule = False
         self.reset_time()
@@ -639,7 +648,8 @@ class PipelineScheduler:
                 for wid, workload in stage.workloads.items():
                     if wid in mid_group:
                         for wtype in pop_wtypes:
-                            workloads.append(workload[wtype])
+                            if wtype in workload:
+                                workloads.append(workload[wtype])
                 for mid in mid_group:
                     stage.workloads.pop(mid)
             for mid in mid_group:
