@@ -32,18 +32,18 @@ if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH, Schedule.STANDARD_1F1B, Schedule.S
 Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 
-DP_Transfer = True
+CHUNK_NUM = 1
 
 HETER_DEVICE = True
 HETER_DEVICE_Transfer = True
 HETER_RATIO = 2
-HETER_DP_ID = [0,1]
-HETER_PP_ID = [2,5]
+HETER_DP_ID = [0]
+HETER_PP_ID = [2]
 
-FAILURE_DEVICE = False
+FAILURE_DEVICE = True
 FAILURE_DP_ID = [1]
 FAILURE_PP_ID = [1]
-NMB_PER_DP = [16,16]
+NMB_PER_DP = [8,8]
 
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True
@@ -70,9 +70,13 @@ CE_W_TIME = 0
 F_TIME = 0
 B_TIME = 0
 W_TIME = 0
-COMM_TIME = 0
-
-
+COMM_TIME = [[0 for _ in range(PP_SIZE)] for _ in range(PP_SIZE)]
+# COMM_TIME[0][1] = 120
+# COMM_TIME[1][0] = 120
+# COMM_TIME[3][4] = 120
+# COMM_TIME[4][3] = 120
+# COMM_TIME[6][7] = 120
+# COMM_TIME[7][6] = 120
 if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH, Schedule.ZBV):
     SPLIT_BACKPROP = True
     if SCHEDULE_METHOD == Schedule.ZBV:
@@ -128,8 +132,8 @@ SWITCH_WORKLOAD_TYPE = True
 
 F_TIME = 10
 F_TIMES = [F_TIME] * LAYER_NUM
-B_TIMES = [F_TIME] * LAYER_NUM
-W_TIMES = [F_TIME] * LAYER_NUM
+B_TIMES = [F_TIME*1.6] * LAYER_NUM
+W_TIMES = [F_TIME*0.4] * LAYER_NUM
 
 if not IDEAL_SITUATION:
     if GEMMA:
@@ -306,5 +310,5 @@ if not SPLIT_BACKPROP:
     WORKLOAD_TYPE_NUM = 2
 
 MAX_ACTIVATION_COUNTS = int(STAGE_NUM * 2)
-MAX_ACT = 2
+MAX_ACT = 1
 PROFILE_GENERATION = False

@@ -27,6 +27,7 @@ def get_mist_predefined_partition_placement(seq_len, device_num, layer_num):
 
 def get_octopipe_predefined_partition_placement(seq_len, device_num, layer_num):
     layer_assignment = []
+    layer_assignment = [layer_num // device_num] * device_num
     if GEMMA:
         if seq_len == 2*K:
             if device_num == 4:
