@@ -117,7 +117,7 @@ class Executor:
                                         transfer_info[failure_dp][min_execute_f_dp][failure_did].append(mid_)
                                         workloads_failure = pipeline.pop_workload(mid_group=[mid_],did_group=[failure_did])#pop 下一个f
                                         mid_done_PP[failure_index].append(mid_)
-                                        pop_num_failures[failure_index] = pop_num_failure+1
+                                        pop_num_failures[failure_index] += 1
                             else:
                                 if len(mid_done) == NMB_PER_DP[failure_dp]:
                                     break
@@ -126,9 +126,9 @@ class Executor:
                                     if mid_ not in mid_done:
                                         print(f"pop_mid_failure:{mid_} in PP{failure_did}, from DP{failure_dp} to DP{min_execute_f_dp}")
                                         transfer_info[failure_dp][min_execute_f_dp][failure_did].append(mid_)
-                                        workloads_failure = pipeline.pop_workload(mid_group=[mid_],did_group=[failure_did])#pop 下一个f
-                                        mid_done.append(mid_)
-                                        pop_num_failure+=1
+                                        workloads_failure = pipeline.pop_workload(mid_group=[mid_], did_group=[failure_did])#pop 下一个f
+                                        mid_done_PP[failure_index].append(mid_)
+                                        pop_num_failures[failure_index] += 1
 
                     for pipeline in self.pipelines:
                         if pipeline.pipeline_idx == min_execute_f_dp:
@@ -144,29 +144,29 @@ class Executor:
                     slow_dp = slow_dps[slow_index]
                     fast_dp = None
 
-                    latest_exec_f_num = [0 for _ in range(self.dp_size)]
+                    exec_f_num_slow_dp = exec_f_num_dp[slow_dp][slow_did]+pop_num_slow[slow_index]
+                    min_f_num = exec_f_num_slow_dp
+                    max_f_num = exec_f_num_slow_dp
                     for dp_rank in range(self.dp_size):
-                        latest_exec_f_num[dp_rank] = exec_f_num_dp[dp_rank][slow_did]
-
-                    min_f_num = latest_exec_f_num[slow_dp]
-                    max_f_num = max(latest_exec_f_num)
-
-                    for dp_index in range(self.dp_size):
-                        # if latest_exec_f_num[dp_index]<min_f_num:
-                        #     min_f_num = latest_exec_f_num[dp_index]
-                        #     slow_dp = dp_index
-                        if latest_exec_f_num[dp_index] == max_f_num:
-                            fast_dp = dp_index
-                            break
-                    assert fast_dp is not None   
+                        if dp_rank == slow_dp:
+                            continue
+                        else:
+                            exec_f_num_ =  exec_f_num_dp[dp_rank][slow_did] 
+                            if exec_f_num_>max_f_num:
+                                max_f_num = exec_f_num_
+                                fast_dp = dp_rank
+                            elif exec_f_num_ < min_f_num:
+                                min_f_num = exec_f_num_
+                                slow_dp = dp_rank
                     
-                    if min_f_num+pop_num_slow[slow_index]> max_f_num:
+                    if slow_dp != slow_dps[slow_index] or fast_dp is None:
                         continue
-                    elif min_f_num+pop_num_slow[slow_index] < NMB_PER_DP[slow_dp]:
+
+                    if exec_f_num_slow_dp+pop_num_slow[slow_index] < NMB_PER_DP[slow_dp]:
                         print("diff")
                         for pipeline in self.pipelines:
                             if pipeline.pipeline_idx == slow_dp :#and self.get_time() == pop_time:
-                                pop_mid_slow = min_f_num+pop_num_slow[slow_index]+pipeline.mid_offset
+                                pop_mid_slow = exec_f_num_slow_dp+pipeline.mid_offset
                                 
                                 workloads_slow = pipeline.pop_workload(mid_group=[pop_mid_slow],did_group=[slow_did])#pop 下一个f
                                 # pop_time = None
