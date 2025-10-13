@@ -38,12 +38,6 @@ class SPSimulator:
             self._backward_w_length, (list, tuple)
         ), "backward_execution_time must be list or tuple"
 
-        assert self._sequential_order_constraint_strategy in (
-            "strict",
-            "double_interleaving",
-            "full_interleaving",
-        ), "sequential order constraint strategy is not supported"
-
         self._solver                = z3.Optimize()
         self._layers                = []
         self._forward_offsets       = [[] for _ in range(self._pp_size)]
@@ -57,17 +51,6 @@ class SPSimulator:
             self._fix_stages(stage_type="ZBV")
 
         self.model_result = None
-        # self._construct_stages()
-
-    def show_device_stage_mapping(self):
-        for did,ds in enumerate(self._devices):
-            print_to_file(self._file_path, "Device {}: {}.\n".format(did, ds))
-
-    def show_solution_detail(self):
-        for key in self.model_result:
-            print_to_file(self._file_path, "{},{}.\n".format(str(key), self.model_result[key]))
-            if str(key) == "max_start_offset":
-                print_to_file(self._file_path, "MinExeTime:{}.\n".format(self.model_result[key]))
 
     def _construct_stages(self, stage_type=None):
         if stage_type == "ZBV":
@@ -77,7 +60,6 @@ class SPSimulator:
         else:
             ds = self._device_size
             ss = self._pp_size
-            print_to_file(self._file_path, "Modeling Stages Alignment...\n")
             # 定义阶段变量
             # stages[i] 是设备 i 分配的阶段集合
             self._devices = [z3.Array(f'stage_{i}', z3.IntSort(), z3.IntSort()) for i in range(ds)]

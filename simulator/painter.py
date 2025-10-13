@@ -50,6 +50,7 @@ class SchedulingPainter:
     """Scheduling Painter"""
 
     def __init__(self, config: dict) -> None:
+        self._pipeline_size = config["pipeline_num"]
         self._device_size   = config["device_num"]
         self._devices       = config["devices"]
         self._pp_size       = config["stage_num"]
@@ -117,11 +118,11 @@ class SchedulingPainter:
             kid, pid, mid, did = parse_microbatch_key(k)
             length = 0
             if kid == 'f':
-                length = self._forward_length[pid]
+                length = self._forward_length[pid % self._device_size]
             elif kid == 'b':
-                length = self._backward_b_length[pid]
+                length = self._backward_b_length[pid % self._device_size]
             elif kid == 'w':
-                length = self._backward_w_length[pid]
+                length = self._backward_w_length[pid % self._device_size]
             else:
                 print("Type not found!")
             if data[k] + length + 2 * self._pp_align > canvas_width:
@@ -132,7 +133,7 @@ class SchedulingPainter:
 
         # canvas_width = data[k] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
         # 按照 Device 画示意图
-        canvas_height = (self._pp_height + self._pp_align) * self._device_size
+        canvas_height = (self._pp_height + self._pp_align) * self._device_size * self._pipeline_size
 
         # 0. Create label canvas
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
@@ -176,7 +177,7 @@ class SchedulingPainter:
         main_canvas.pack()
 
         pad = 0
-        for pid in range(self._device_size):
+        for pid in range(self._device_size * self._pipeline_size):
             x0 = self._pp_align
             y0 = (self._pp_height + self._pp_align) * pid + pad + 5
             x1 = canvas_width - self._pp_align
@@ -193,7 +194,7 @@ class SchedulingPainter:
             # y0 = (self._pp_height + self._pp_align) * pid + pad
             y0 = (self._pp_height + self._pp_align) * did + pad + 5
             #修改画图中每个block的宽度
-            block_width = self._forward_length[pid] if k in ('f', 'r') else (self._backward_b_length[pid] if k == 'b' else self._backward_w_length[pid])
+            block_width = self._forward_length[pid % self._device_size] if k in ('f', 'r') else (self._backward_b_length[pid % self._device_size] if k == 'b' else self._backward_w_length[pid % self._device_size])
             x1 = x0 + block_width
             # y1 = (self._pp_height + self._pp_align) * (pid + 1) - pad
             y1 = (self._pp_height + self._pp_align) * (did + 1) - pad + 5
@@ -283,8 +284,6 @@ class SchedulingPainter:
 
         main_canvas.bind("<Button-1>", _trigger_hook)
 
-        button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_as_pdf(main_canvas))
-        button.pack()
         self._tk_root.mainloop()
 
 class MultiPipelinePainter:

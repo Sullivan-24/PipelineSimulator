@@ -16,23 +16,16 @@ class GSimulator:
 
     def __init__(self, config: dict, device_stage_alignments=None, new_comm_length=None) -> None:
         self._base_solution = config['base_solution']
-        self._schedule_method = config['schedule_method']
         self._file_path = config["file_path"]
         self._time_limit = config["time_limit"]
         self._pp_size = config["stage_num"]
         self._device_size = config["device_num"]
-        self._model_layer_num = config["layer_num"]
         self._num_microbatches = config["nmb"]
-        self._max_activation_counts = config["max_activation_counts"]
         self._num_device = config["device_num"]
 
         self.estimated_time_cost = self.estimate_time_cost()
         self.M = self.set_M_value(self.estimated_time_cost)
 
-        self._mix_training = config["mix_training"]
-        self._model_para_num = config["para_num"]
-        self._device_mem = config["device_mem"]
-        # obtained by profiling
         self._profiled_layer_f_length = config["f_time"]
         self._profiled_layer_b_length = config["b_time"]
         self._profiled_layer_w_length = config["w_time"]
@@ -43,7 +36,7 @@ class GSimulator:
         assert isinstance(self._profiled_layer_w_length, (list, tuple))
 
         # 创建 Gurobi 模型
-        self.model = Model("SPSimulator")
+        self.model = Model("Simulator")
 
         self.minimal_time_with_sync_update = (DEVICE_NUM - 1) * (F_TIME // CHUNK_NUM + COMM_TIME) + (F_TIME + B_TIME + W_TIME) * MICRO_BATCH_NUM
         print("MINIMAL TIME WITH SYNC UPDATE:{}".format(self.minimal_time_with_sync_update))

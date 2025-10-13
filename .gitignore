@@ -9,3 +9,4 @@ global_top10.txt
 sim_res*.txt
 traverse_res*.txt
 graphs/
+recycle_test_res.txt
