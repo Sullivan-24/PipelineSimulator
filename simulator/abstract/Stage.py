@@ -85,7 +85,7 @@ def calculate_total_time(wtype:WorkloadType, recomp, layer_idxs:list)->float:
             total_time += gpc["F_TIMES"][idx]
     return total_time
 
-def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:WorkloadType, recomp, layer_idxs:list=None, comp_power:float = 1)->float:
+def get_workload_duration(mid:int, sid:int, layer_wise:bool, layer_num:int, wtype:WorkloadType, recomp, layer_idxs:list=None, comp_power:float = 1)->float:
     if layer_wise:
         assert f"LAYERWISE not enabled."
     
@@ -121,7 +121,7 @@ def get_workload_duration(sid:int, layer_wise:bool, layer_num:int, wtype:Workloa
             duration += gpc["EMB_W_TIME"]
     else:
         raise ValueError(f"Wrong workload type: {wtype}.")
-    return int(duration / comp_power)
+    return int(duration / comp_power) * gpc["MICRO_BATCH_TIME"][mid]
 
 class Stage:
     
@@ -180,6 +180,7 @@ class Stage:
                 microbatch_id=mid,
                 wtype=WorkloadType.F,
                 duration=get_workload_duration(
+                    mid=mid,
                     sid=self.sid,
                     layer_wise=self.layerwise,
                     layer_num=self.layer_num,
@@ -203,6 +204,7 @@ class Stage:
                 microbatch_id=mid,
                 wtype=WorkloadType.B,
                 duration=get_workload_duration(
+                    mid=mid,
                     sid=self.sid,
                     layer_wise=self.layerwise,
                     layer_num=self.layer_num,
@@ -224,6 +226,7 @@ class Stage:
                     microbatch_id=mid,
                     wtype=WorkloadType.R,
                     duration=get_workload_duration(
+                        mid=mid,
                         sid=self.sid,
                         layer_wise=self.layerwise,
                         layer_num=self.layer_num,
@@ -246,6 +249,7 @@ class Stage:
                     microbatch_id=mid,
                     wtype=WorkloadType.W,
                     duration=get_workload_duration(
+                        mid=mid,
                         sid=self.sid,
                         layer_wise=self.layerwise,
                         layer_num=self.layer_num,

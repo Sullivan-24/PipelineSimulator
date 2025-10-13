@@ -1,3 +1,4 @@
+import random
 from dataclasses import dataclass
 from simulator.abstract.variables import *
 from simulator.model_config import *
@@ -8,6 +9,9 @@ RUN_MODE = RunMode.GUROBI_SOLVE
 RUN_MODE = RunMode.CHIMERA
 RUN_MODE = RunMode.SIM_SOLVE
 
+MICRO_BATCH_TIME = [1 + random.randint(0, 1) for _ in range(MICRO_BATCH_NUM)]
+# MICRO_BATCH_TIME = [1 for _ in range(MICRO_BATCH_NUM)]
+
 SOLVING_TIME_LIMIT = 60 * 30
 SCHEDULE_METHOD = Schedule.Layerwise
 SCHEDULE_METHOD = Schedule.STANDARD_1F1B
@@ -15,7 +19,7 @@ SCHEDULE_METHOD = Schedule.ReCycle
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
-# SCHEDULE_METHOD = Schedule.OctoPipe
+SCHEDULE_METHOD = Schedule.OctoPipe
 
 # SCHEDULE_METHOD = Schedule.ZBV
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB

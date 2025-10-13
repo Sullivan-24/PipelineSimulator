@@ -25,9 +25,9 @@ class LayerwiseSchedulingPainter:
 
         self._comm_length = [_len for _len in config["comm_length"]]
 
-        self._forward_length = [_len * config["pixel_base"] for _len in config["forward_length"]]
-        self._backward_b_length = [_len * config["pixel_base"] for _len in config["backward_length"]]
-        self._backward_w_length = [_len * config["pixel_base"] for _len in config["backward_length2"]]
+        self._forward_length = [_len * config["pixel_base"] for _len in config["f_times"]]
+        self._backward_b_length = [_len * config["pixel_base"] for _len in config["b_times"]]
+        self._backward_w_length = [_len * config["pixel_base"] for _len in config["w_times"]]
 
         self._tk_root = tk.Tk()
         self._tk_root.title("SchedulingPainter")

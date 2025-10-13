@@ -664,23 +664,27 @@ class PipelineScheduler:
         return count
 
     def get_workloadload_duration(self):
-        fwd_time = [gpc["F_TIME"] for _ in range(self.layer_num+3)]
-        iwd_time = [gpc["B_TIME"] for _ in range(self.layer_num+3)]
-        pwd_time = [gpc["W_TIME"] for _ in range(self.layer_num+3)]
+        f_times = {}
+        b_times = {}
+        w_times = {}
         for device in self.devices:
             for sid in device.stages:
-                for mid in range(self.mid_offset, self.mid_offset + self.nmb):
+                if sid not in f_times:
+                    f_times[sid] = {}
+                if sid not in b_times:
+                    b_times[sid] = {}
+                if sid not in w_times:
+                    w_times[sid] = {}
+                for mid in range(self.bs):
                     if mid not in device.stages[sid].workloads: continue
-                    fwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.F].duration
-                    if WorkloadType.B in device.stages[sid].workloads[mid]:
-                        iwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.B].duration
-                    if WorkloadType.W in device.stages[sid].workloads[mid]:
-                        pwd_time[sid] = device.stages[sid].workloads[mid][WorkloadType.W].duration
-        return fwd_time, iwd_time, pwd_time
+                    f_times[sid][mid] = device.stages[sid].workloads[mid][WorkloadType.F].duration
+                    b_times[sid][mid] = device.stages[sid].workloads[mid][WorkloadType.B].duration
+                    w_times[sid][mid] = device.stages[sid].workloads[mid][WorkloadType.W].duration
+        return f_times, b_times, w_times
          
     def draw(self) -> None:
         # 绘制结果的逻辑
-        fwd_time, iwd_time, pwd_time = self.get_workloadload_duration()
+        f_times, b_times, w_times = self.get_workloadload_duration()
         res = {}
         for key in self.results:
             if str(key).startswith(("f_","b_","w_","r_")):
@@ -694,9 +698,9 @@ class PipelineScheduler:
             "pixel_base": gpc["PIXEL_BASE"],
             "nmb": self.nmb,
             "mid_offset": self.mid_offset,
-            "forward_length": fwd_time,
-            "backward_length": iwd_time,
-            "backward_length2": pwd_time,
+            "f_times": dict_to_2d_list(f_times),
+            "b_times": dict_to_2d_list(b_times),
+            "w_times": dict_to_2d_list(w_times),
             "comm_length": [gpc["COMM_TIME"] for _ in range(self.stage_num)],
         }
         SP(painter_conf).draw(res)

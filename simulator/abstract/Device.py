@@ -547,7 +547,6 @@ class Device:
                         self.current_workload = proc_workload
                         self.update_memory_usage()
                         self.state = Device.BUSY
-                        self.memory_monitor.trace_workload(workload=self.stages[sid].workloads[mid][wtype])
                         return proc_workload
             elif gpc["SCHEDULE_METHOD"] == Schedule.OctoPipe and gpc["Hierarchical"]:
                 for mid in range(self.mid_offset, self.mid_offset + self.nmb):

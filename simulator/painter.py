@@ -61,14 +61,14 @@ class SchedulingPainter:
         
         self._num_microbatches = config["nmb"]
 
-        self._basic_forward_length = [_len for _len in config["forward_length"]]
-        self._basic_backward_b_length = [_len for _len in config["backward_length"]]
-        self._basic_backward_w_length = [_len for _len in config["backward_length2"]]
+        self._basic_forward_length = [_len for _len in config["f_times"]]
+        self._basic_backward_b_length = [_len for _len in config["b_times"]]
+        self._basic_backward_w_length = [_len for _len in config["w_times"]]
         self._comm_length = [_len for _len in config["comm_length"]]
 
-        self._forward_length = [_len * config["pixel_base"] for _len in config["forward_length"]]
-        self._backward_b_length = [_len * config["pixel_base"] for _len in config["backward_length"]]
-        self._backward_w_length = [_len * config["pixel_base"] for _len in config["backward_length2"]]
+        self._forward_length = [_len * config["pixel_base"] for _len in config["f_times"]]
+        self._backward_b_length = [_len * config["pixel_base"] for _len in config["b_times"]]
+        self._backward_w_length = [_len * config["pixel_base"] for _len in config["w_times"]]
 
         self._tk_root = tk.Tk()
         self._tk_root.title("SchedulingPainter")
@@ -312,14 +312,14 @@ class MultiPipelinePainter:
         self._num_microbatches = config["nmb"]
         self.mid_offset = config["mid_offset"]
 
-        self._basic_forward_length = [_len for _len in config["forward_length"]]
-        self._basic_backward_b_length = [_len for _len in config["backward_length"]]
-        self._basic_backward_w_length = [_len for _len in config["backward_length2"]]
+        self._basic_forward_length = [_len for _len in config["f_times"]]
+        self._basic_backward_b_length = [_len for _len in config["b_times"]]
+        self._basic_backward_w_length = [_len for _len in config["w_times"]]
         self._comm_length = [_len for _len in config["comm_length"]]
 
-        self._forward_length = [_len * config["pixel_base"] for _len in config["forward_length"]]
-        self._backward_b_length = [_len * config["pixel_base"] for _len in config["backward_length"]]
-        self._backward_w_length = [_len * config["pixel_base"] for _len in config["backward_length2"]]
+        self._forward_length = [[_len * config["pixel_base"] for _len in lens] for lens in config["f_times"]]
+        self._backward_b_length = [[_len * config["pixel_base"] for _len in lens] for lens in config["b_times"]]
+        self._backward_w_length = [[_len * config["pixel_base"] for _len in lens] for lens in config["w_times"]]
 
     def _highlight_and_resume_block(self, canvas, item_id):
         if self._highlight_state[item_id]:
@@ -361,11 +361,11 @@ class MultiPipelinePainter:
                 kid, pid, mid, did = parse_microbatch_key(k)
                 length = 0
                 if kid == 'f':
-                    length = self._forward_length[pid]
+                    length = self._forward_length[pid][mid]
                 elif kid == 'b':
-                    length = self._backward_b_length[pid]
+                    length = self._backward_b_length[pid][mid]
                 elif kid == 'w':
-                    length = self._backward_w_length[pid]
+                    length = self._backward_w_length[pid][mid]
                 else:
                     print("Type not found!")
                 if data[k] + length + 2 * self._pp_align > canvas_width:
@@ -381,20 +381,16 @@ class MultiPipelinePainter:
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
         y_label = (0 + 30) // 2 + 5
 
-        _, max_key_pid, _, _ = parse_microbatch_key(max_key)
+        _, max_key_pid, max_key_mid, _ = parse_microbatch_key(max_key)
         if self._max_time == -1:
             if SPLIT_BACKPROP:
-                self._max_time = (all_dp_data[max_dp_idx][max_key] + self._backward_w_length[max_key_pid])//self._pixel_base
+                self._max_time = (all_dp_data[max_dp_idx][max_key] + self._backward_w_length[max_key_pid][max_key_mid])//self._pixel_base
             else:
-                self._max_time = (all_dp_data[max_dp_idx][max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
+                self._max_time = (all_dp_data[max_dp_idx][max_key] + self._backward_b_length[max_key_pid][max_key_mid])//self._pixel_base
 
-        label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
+        label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Chunk:{}".format(
                 round(self._max_time),
                 self._pp_size // self._device_size,
-                self._basic_forward_length[max_key_pid], 
-                self._basic_backward_b_length[max_key_pid], 
-                self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
-                COMM_TIME
             ),
         )
 
@@ -415,11 +411,11 @@ class MultiPipelinePainter:
                 kid, pid, mid, did = parse_microbatch_key(k)
                 length = 0
                 if kid == 'f':
-                    length = self._forward_length[pid]
+                    length = self._forward_length[pid][mid]
                 elif kid == 'b':
-                    length = self._backward_b_length[pid]
+                    length = self._backward_b_length[pid][mid]
                 elif kid == 'w':
-                    length = self._backward_w_length[pid]
+                    length = self._backward_w_length[pid][mid]
                 else:
                     print("Type not found!")
                 if data[k] + length + 2 * self._pp_align > canvas_width:
@@ -441,7 +437,7 @@ class MultiPipelinePainter:
 
                 x0 = self._pp_align + offset
                 y0 = (self._pp_height + self._pp_align) * (did + dp_idx * self._device_size) + pad + 5
-                block_width = self._forward_length[pid] if k in ('f', 'r') else (self._backward_b_length[pid] if k == 'b' else self._backward_w_length[pid])
+                block_width = self._forward_length[pid][mid] if k in ('f', 'r') else (self._backward_b_length[pid][mid] if k == 'b' else self._backward_w_length[pid][mid])
                 x1 = x0 + block_width
                 y1 = (self._pp_height + self._pp_align) * (did + dp_idx * self._device_size + 1) - pad + 5
 

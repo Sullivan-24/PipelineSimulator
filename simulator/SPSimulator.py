@@ -304,9 +304,9 @@ class SPSimulator:
             "pp_align": 10,
             "pixel_base": 1,
             "nmb": self._num_microbatches,
-            "forward_length": self._forward_length,
-            "backward_length": self._backward_b_length,
-            "backward_length2": self._backward_w_length,
+            "f_times": self._forward_length,
+            "b_times": self._backward_b_length,
+            "w_times": self._backward_w_length,
             "comm_length": self._comm_length,
             "file_path": self._file_path,
         }

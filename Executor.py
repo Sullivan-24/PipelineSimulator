@@ -97,9 +97,23 @@ class Executor:
         res_all_dp = {}
         res_all_dp["res"]={}
         res_all_dp["painter_conf"]={}
+        all_dp_f_times = {}
+        all_dp_b_times = {}
+        all_dp_w_times = {}
         for dp_idx in range(self.dp_size):
             pipeline = self.pipelines[dp_idx]
-            fwd_time, iwd_time, pwd_time = pipeline.get_workloadload_duration()
+            f_times, b_times, w_times = pipeline.get_workloadload_duration()
+            for sid in f_times:
+                if sid not in all_dp_f_times:
+                    all_dp_f_times[sid] = {}
+                    all_dp_b_times[sid] = {}
+                    all_dp_w_times[sid] = {}
+
+                for mid in f_times[sid]:
+                    all_dp_f_times[sid][mid] = f_times[sid][mid]
+                    all_dp_b_times[sid][mid] = b_times[sid][mid]
+                    all_dp_w_times[sid][mid] = w_times[sid][mid]
+            
             res = {}
             for key in pipeline.results:
                 if key.startswith(("f_","b_","w_","r_")):
@@ -113,20 +127,21 @@ class Executor:
                 "pixel_base": gpc["PIXEL_BASE"],
                 "nmb": pipeline.nmb,
                 "mid_offset": pipeline.mid_offset,
-                "forward_length": fwd_time,
-                "backward_length": iwd_time,
-                "backward_length2": pwd_time,
                 "comm_length": [gpc["COMM_TIME"] for _ in range(pipeline.stage_num)],
             }
             res_all_dp["res"][dp_idx]=res
             res_all_dp["painter_conf"][dp_idx]=painter_conf
+        for dp_idx in range(self.dp_size):
+            res_all_dp["painter_conf"][dp_idx]["f_times"] = dict_to_2d_list(all_dp_f_times)
+            res_all_dp["painter_conf"][dp_idx]["b_times"] = dict_to_2d_list(all_dp_b_times)
+            res_all_dp["painter_conf"][dp_idx]["w_times"] = dict_to_2d_list(all_dp_w_times)
         MPP(res_all_dp["painter_conf"]).draw(res_all_dp["res"])
 
 if __name__ == "__main__":
     # Example
     # executor = Executor(dp_size=4, nmb_per_dp=[15, 12, 20, 17])
     # Device fail-slow or fail
-    executor = Executor(dp_size=2, nmb_per_dp=[9, 7], device_comp_power=[[2,2,1,2,2,2,2,2], [2 for _ in range(gpc["DEVICE_NUM"])]])
+    executor = Executor(dp_size=2, nmb_per_dp=[9, 7], device_comp_power=[[2,2,2,2,2,2,2,2], [2 for _ in range(gpc["DEVICE_NUM"])]])
     # executor = Executor(dp_size=1)
     
     if gpc["PROFILE_GENERATION"]:

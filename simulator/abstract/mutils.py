@@ -1,5 +1,9 @@
 from ..config import *
 
+def dict_to_2d_list(nested_dict):
+    rows = sorted(nested_dict.keys())
+    cols = sorted(set().union(*(d.keys() for d in nested_dict.values())))
+    return [[nested_dict[row].get(col, None) for col in cols] for row in rows]
 
 if RUN_MODE == RunMode.LAYERWISE_GUROBI_SOLVE:
     assert SCHEDULE_METHOD == Schedule.Layerwise, "SCHEDULE_METHOD should be Layerwise"
