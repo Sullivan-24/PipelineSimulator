@@ -11,7 +11,7 @@ if __name__ == "__main__":
         'microbatch_num': microbatch_num,
         'stage_num': stage_num,
         'fail_pipelines_stages': {1:[2]},
-        'file_path': "/Users/hanayukino/Code/PipelineSimulator/recycle_test_res.txt",
+        'file_path': "recycle_test_res.txt",
         'time_limit': 30,
         'f_time': [comp_time for _ in range(stage_num)],
         'b_time': [comp_time for _ in range(stage_num)],
