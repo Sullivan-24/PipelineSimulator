@@ -57,8 +57,10 @@ class Executor:
         mid_done_PP = [[] for _ in range(len(FAILURE_PP_ID))]
         pop_num_failures = [_ for _ in range(len(FAILURE_PP_ID))]
         pop_num_slow = [_ for _ in range(len(HETER_PP_ID))]
+        recv_num_slow = [[0 for _ in range(self.dp_size)] for _ in range(len(HETER_PP_ID))]
+        recv_num_failure = [[0 for _ in range(self.dp_size)] for _ in range(len(HETER_PP_ID))]
         all_DP = set([_ for _ in range(self.dp_size)])
-        transfer_info = [[[[]for _ in range(PP_SIZE)]for _ in range(self.dp_size)] for _ in range(self.dp_size)]
+        transfer_info = [[[[]for _ in range(PP_SIZE)] for _ in range(self.dp_size)] for _ in range(self.dp_size)]
         # transfer_info[source_dp_rank].append({"microbatch_ids":[2,4,7], "stage_id":2, "dst_dp_rank":dst_dp_rank})
         while self.get_time() <= time_limit and not self.finish_flag:
             success_count = 0
@@ -148,20 +150,20 @@ class Executor:
                     min_f_num = exec_f_num_slow_dp
                     max_f_num = exec_f_num_slow_dp
                     for dp_rank in range(self.dp_size):
+                        # if dp_rank in HETER_DP_ID:
                         if dp_rank == slow_dp:
                             continue
                         else:
-                            exec_f_num_ =  exec_f_num_dp[dp_rank][slow_did] 
+                            exec_f_num_ =  exec_f_num_dp[dp_rank][slow_did] - recv_num_slow[slow_index][dp_rank]
                             if exec_f_num_>max_f_num:
                                 max_f_num = exec_f_num_
                                 fast_dp = dp_rank
                             elif exec_f_num_ < min_f_num:
                                 min_f_num = exec_f_num_
                                 slow_dp = dp_rank
-                    
                     if slow_dp != slow_dps[slow_index] or fast_dp is None:
                         continue
-
+                    # print(f"slow_dp:{slow_dp}, exec_f_num_slow_dp:{exec_f_num_slow_dp}, fast_dp:{fast_dp}, max_f_num:{max_f_num}, exe_f_num:{[exec_f_num_dp[_][slow_did] for _ in range(self.dp_size)]}")
                     if exec_f_num_slow_dp+pop_num_slow[slow_index] < NMB_PER_DP[slow_dp]:
                         print("diff")
                         for pipeline in self.pipelines:
@@ -171,6 +173,7 @@ class Executor:
                                 workloads_slow = pipeline.pop_workload(mid_group=[pop_mid_slow],did_group=[slow_did])#pop 下一个f
                                 # pop_time = None
                                 pop_num_slow[slow_index] += 1
+                                recv_num_slow[slow_index][fast_dp] += 1
                                 print(f"pop_mid_slow:{pop_mid_slow} in PP{slow_did}, from DP{slow_dp} to DP{fast_dp}")
                                 transfer_info[slow_dp][fast_dp][slow_did].append(pop_mid_slow)
                         for pipeline in self.pipelines:
@@ -228,7 +231,7 @@ class Executor:
 if __name__ == "__main__":
     # Example
     # executor = Executor(dp_size=4, nmb_per_dp=[15, 12, 20, 17])
-    executor = Executor(dp_size=2,nmb_per_dp = NMB_PER_DP)
+    executor = Executor(dp_size=DP_SIZE,nmb_per_dp = NMB_PER_DP)
     
     if gpc["PROFILE_GENERATION"]:
         profiler = cProfile.Profile()
