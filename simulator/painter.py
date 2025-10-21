@@ -130,7 +130,7 @@ class SchedulingPainter:
                 canvas_width = data[k] + length + 2 * self._pp_align
 
         _, max_key_pid, _, _ = parse_microbatch_key(max_key)
-
+        max_key_pid %= self._device_size
         # canvas_width = data[k] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
         # 按照 Device 画示意图
         canvas_height = (self._pp_height + self._pp_align) * self._device_size * self._pipeline_size
@@ -146,13 +146,11 @@ class SchedulingPainter:
                 self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
 
         label_canvas.create_text(self._pp_align + 145, y_label, text="MinExeTime:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
-                # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
                 round(self._max_time),
                 self._pp_size // self._device_size,
                 self._basic_forward_length[max_key_pid], 
                 self._basic_backward_b_length[max_key_pid], 
                 self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
-                # int(sum(self._comm_length) / len(self._comm_length))
                 COMM_TIME
             ),
         )
@@ -217,7 +215,7 @@ class SchedulingPainter:
             )
             if SHOW_WORKLOAD_TEXT:
                 text = main_canvas.create_text(
-                    (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid % self._num_microbatches}", font=bold_font
+                    (x0 + x1) // 2, (y0 + y1) // 2, text=f"{mid}", font=bold_font
                 )
                 self._item2block[text] = block
             # else:
@@ -269,7 +267,7 @@ class SchedulingPainter:
 
             tags = [
                 f"p_{pid}_m_{self._item2mid[current_item]}_{fb}"
-                for pid in range(self._pp_size)
+                for pid in range(self._pp_size * self._pipeline_size)
                 for fb in ("f", "b", "w", "r") #点击后的效果，加上w的判断
             ]
             

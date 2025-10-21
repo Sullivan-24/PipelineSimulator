@@ -52,7 +52,7 @@ class ReCyclePipeline:
         self.model_result = None
 
     def estimate_time_cost(self):
-        res = (self._num_microbatches + self._num_devices) * (sum(self._f_time) + sum(self._b_time) + sum(self._w_time)) / self._num_stages
+        res = (max(self._num_microbatches) + self._num_devices) * (sum(self._f_time) + sum(self._b_time) + sum(self._w_time)) / self._num_stages
         assert res > 0, "Time cost should be greater than 0"
         print_to_file(self._file_path, "Estimated time cost {}.\n".format(res))
         return res
@@ -94,16 +94,16 @@ class ReCyclePipeline:
         nhpp = len(health_pipeline_idxs)
         for pid in range(self._num_pipelines):
             for sid in range(self._num_stages):
-                for mid in range(self._num_microbatches):
+                for mid in range(self._num_microbatches[pid]):
                     if pid in self._fail_pipelines_stages and sid in self._fail_pipelines_stages[pid]:
                         d_pid = health_pipeline_idxs[mid % nhpp]
-                        self._stage_f_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid + self._num_microbatches * pid}_{d_pid + self._num_stages * d_pid}", lb=0))
-                        self._stage_b_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid + self._num_microbatches * pid}_{d_pid + self._num_stages * d_pid}", lb=0))
-                        self._stage_w_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid + self._num_microbatches * pid}_{d_pid + self._num_stages * d_pid}", lb=0))
+                        self._stage_f_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * d_pid}", lb=0))
+                        self._stage_b_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * d_pid}", lb=0))
+                        self._stage_w_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * d_pid}", lb=0))
                     else:
-                        self._stage_f_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid + self._num_microbatches * pid}_{sid + self._num_stages * pid}", lb=0))
-                        self._stage_b_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid + self._num_microbatches * pid}_{sid + self._num_stages * pid}", lb=0))
-                        self._stage_w_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid + self._num_microbatches * pid}_{sid + self._num_stages * pid}", lb=0))
+                        self._stage_f_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * pid}", lb=0))
+                        self._stage_b_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * pid}", lb=0))
+                        self._stage_w_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * pid}", lb=0))
                 
                 self._stage_f_time.append(self._f_time[sid])
                 self._stage_b_time.append(self._b_time[sid])
@@ -127,7 +127,7 @@ class ReCyclePipeline:
 
     def _construct_pipeline_data_dependencies(self):
         for pid in range(self._num_pipelines):
-            for mb in range(self._num_microbatches):
+            for mb in range(self._num_microbatches[pid]):
                 for i in range(1, self._num_stages):
                     self.model.addConstr(self._stage_f_offsets[pid][i][mb] >= self._stage_f_offsets[pid][i - 1][mb] +
                                         self._stage_f_time[i - 1] + self._comm_time[i - 1][i])
@@ -159,7 +159,7 @@ class ReCyclePipeline:
                                                 self._stage_w_time[i])
             self.model.addConstr(self._stage_f_offsets[pid][0][0] == 0)
 
-    def _construct_constraints_of_schedule(self, schedules):
+    def _construct_constraints_of_schedule(self, pipeline_schedules):
         type2offset = {
             WorkloadType.F: self._stage_f_offsets,
             WorkloadType.B : self._stage_b_offsets, 
@@ -171,10 +171,11 @@ class ReCyclePipeline:
             WorkloadType.W : self._stage_w_time,
         }
         for pid in range(self._num_pipelines):
-            for schedule in schedules:
-                for idx in range(len(schedule) - 1):
-                    wtype, mid, sid = schedule[idx]
-                    nwtype, nmid, nsid = schedule[idx + 1]
+            pipeline_schedule = pipeline_schedules[pid]
+            for stage_schedule in pipeline_schedule:
+                for idx in range(len(stage_schedule) - 1):
+                    wtype, mid, sid = stage_schedule[idx]
+                    nwtype, nmid, nsid = stage_schedule[idx + 1]
                     if pid in self._fail_pipelines_stages and sid in self._fail_pipelines_stages[pid]:
                         continue
                     self.model.addConstr(type2offset[nwtype][pid][nsid][nmid] >= type2offset[wtype][pid][sid][mid] + type2time[wtype][sid])
@@ -184,27 +185,28 @@ class ReCyclePipeline:
         wtype_order = [WorkloadType.B, WorkloadType.W, WorkloadType.F]
         wtype_num = len(wtype_order)
         workload_idx_in_mids = {WorkloadType.F: 0, WorkloadType.B : 1, WorkloadType.W : 2}
-        schedules = [[] for _ in range(self._num_devices)]
+        schedules = [[[] for _ in range(self._num_stages)] for _ in range(self._num_pipelines)]
         mid_offset = 0
-        for did in range(self._num_devices):
-            mids = [0 for _ in range(wtype_num)]
-            # warmup
-            while mids[0] < min(self._num_devices - did, self._num_microbatches):
-                schedules[did].append((WorkloadType.F, mids[0] + mid_offset, did))
-                mids[0] += 1
-            # 1F1B
-            iter = 0
-            finish_flag = [0 for _ in range(wtype_num)]
-            while sum(finish_flag) < wtype_num:
-                next_workload_type = wtype_order[iter % wtype_num]
-                next_mid = mids[workload_idx_in_mids[next_workload_type]]
-                if next_mid < self._num_microbatches:
-                    schedules[did].append((next_workload_type, next_mid + mid_offset, did))
-                    mids[workload_idx_in_mids[next_workload_type]] += 1
-                else:
-                    finish_flag[workload_idx_in_mids[next_workload_type]] = 1
-                iter+=1
-        self._construct_constraints_of_schedule(schedules=schedules)
+        for pid in range(self._num_pipelines):
+            for sid in range(self._num_stages):
+                mids = [0 for _ in range(wtype_num)]
+                # warmup
+                while mids[0] < min(self._num_stages - sid, self._num_microbatches[pid]):
+                    schedules[pid][sid].append((WorkloadType.F, mids[0] + mid_offset, sid))
+                    mids[0] += 1
+                # 1F1B
+                iter = 0
+                finish_flag = [0 for _ in range(wtype_num)]
+                while sum(finish_flag) < wtype_num:
+                    next_workload_type = wtype_order[iter % wtype_num]
+                    next_mid = mids[workload_idx_in_mids[next_workload_type]]
+                    if next_mid < self._num_microbatches[pid]:
+                        schedules[pid][sid].append((next_workload_type, next_mid + mid_offset, sid))
+                        mids[workload_idx_in_mids[next_workload_type]] += 1
+                    else:
+                        finish_flag[workload_idx_in_mids[next_workload_type]] = 1
+                    iter+=1
+        self._construct_constraints_of_schedule(pipeline_schedules=schedules)
         self._construct_serial_constraints()
         self._construct_across_device_serial_evenly_distributed_constraints()
 
@@ -255,15 +257,15 @@ class ReCyclePipeline:
                             if o_sid != sid:
                                 continue
                             for of_mid, of in enumerate(self._stage_f_offsets[o_pid][o_sid]):
-                                y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{o_sid}_{f_mid}_{of_mid}")
+                                y = self.model.addVar(vtype=GRB.BINARY)
                                 self.model.addConstr(f >= of + self._stage_f_time[o_sid] - (1 - y) * M) 
                                 self.model.addConstr(f + self._stage_f_time[sid] <= of + y * M)
                             for of_mid, of in enumerate(self._stage_b_offsets[o_pid][o_sid]):
-                                y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{o_sid}_{f_mid}_{of_mid}")
+                                y = self.model.addVar(vtype=GRB.BINARY)
                                 self.model.addConstr(f >= of + self._stage_b_time[o_sid] - (1 - y) * M) 
                                 self.model.addConstr(f + self._stage_b_time[sid] <= of + y * M)
                             for of_mid, of in enumerate(self._stage_w_offsets[o_pid][o_sid]):
-                                y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{o_sid}_{f_mid}_{of_mid}")
+                                y = self.model.addVar(vtype=GRB.BINARY)
                                 self.model.addConstr(f >= of + self._stage_w_time[o_sid] - (1 - y) * M) 
                                 self.model.addConstr(f + self._stage_w_time[sid] <= of + y * M)
                 for f_mid, f in enumerate(self._stage_b_offsets[pid][sid]):
@@ -274,15 +276,15 @@ class ReCyclePipeline:
                             if o_sid != sid:
                                 continue
                             for of_mid, of in enumerate(self._stage_f_offsets[o_pid][o_sid]):
-                                y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{o_sid}_{f_mid}_{of_mid}")
+                                y = self.model.addVar(vtype=GRB.BINARY)
                                 self.model.addConstr(f >= of + self._stage_f_time[o_sid] - (1 - y) * M) 
                                 self.model.addConstr(f + self._stage_f_time[sid] <= of + y * M)
                             for of_mid, of in enumerate(self._stage_b_offsets[o_pid][o_sid]):
-                                y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{o_sid}_{f_mid}_{of_mid}")
+                                y = self.model.addVar(vtype=GRB.BINARY)
                                 self.model.addConstr(f >= of + self._stage_b_time[o_sid] - (1 - y) * M) 
                                 self.model.addConstr(f + self._stage_b_time[sid] <= of + y * M)
                             for of_mid, of in enumerate(self._stage_w_offsets[o_pid][o_sid]):
-                                y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{o_sid}_{f_mid}_{of_mid}")
+                                y = self.model.addVar(vtype=GRB.BINARY)
                                 self.model.addConstr(f >= of + self._stage_w_time[o_sid] - (1 - y) * M) 
                                 self.model.addConstr(f + self._stage_w_time[sid] <= of + y * M)
                 for f_mid, f in enumerate(self._stage_w_offsets[pid][sid]):
@@ -293,15 +295,15 @@ class ReCyclePipeline:
                             if o_sid != sid:
                                 continue
                             for of_mid, of in enumerate(self._stage_f_offsets[o_pid][o_sid]):
-                                y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{o_sid}_{f_mid}_{of_mid}")
+                                y = self.model.addVar(vtype=GRB.BINARY)
                                 self.model.addConstr(f >= of + self._stage_f_time[o_sid] - (1 - y) * M) 
                                 self.model.addConstr(f + self._stage_f_time[sid] <= of + y * M)
                             for of_mid, of in enumerate(self._stage_b_offsets[o_pid][o_sid]):
-                                y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{o_sid}_{f_mid}_{of_mid}")
+                                y = self.model.addVar(vtype=GRB.BINARY)
                                 self.model.addConstr(f >= of + self._stage_b_time[o_sid] - (1 - y) * M) 
                                 self.model.addConstr(f + self._stage_b_time[sid] <= of + y * M)
                             for of_mid, of in enumerate(self._stage_w_offsets[o_pid][o_sid]):
-                                y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{o_sid}_{f_mid}_{of_mid}")
+                                y = self.model.addVar(vtype=GRB.BINARY)
                                 self.model.addConstr(f >= of + self._stage_w_time[o_sid] - (1 - y) * M) 
                                 self.model.addConstr(f + self._stage_w_time[sid] <= of + y * M)
         
@@ -315,33 +317,33 @@ class ReCyclePipeline:
                     continue
                 for f_mid, f in enumerate(self._stage_f_offsets[pid][sid]):
                     for b_mid, b in enumerate(self._stage_b_offsets[pid][sid]):
-                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{sid}_{f_mid}_{b_mid}")
-                        self.model.addConstr(f >= b + self._stage_b_time[sid] - (1 - y) * M, name=f"Do{sid}_{f_mid}_{b_mid}1") 
-                        self.model.addConstr(f + self._stage_f_time[sid] <= b + y * M, name=f"Do{sid}_{f_mid}_{b_mid}2")
+                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Dofb{sid}_{f_mid}_{b_mid}")
+                        self.model.addConstr(f >= b + self._stage_b_time[sid] - (1 - y) * M, name=f"Dofb{sid}_{f_mid}_{b_mid}1") 
+                        self.model.addConstr(f + self._stage_f_time[sid] <= b + y * M, name=f"Dofb{sid}_{f_mid}_{b_mid}2")
                     for w_mid, w in enumerate(self._stage_w_offsets[pid][sid]):
-                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{sid}_{f_mid}_{w_mid}")
-                        self.model.addConstr(f >= w + self._stage_w_time[sid] - (1 - y) * M, name=f"Do{sid}_{f_mid}_{w_mid}1") 
-                        self.model.addConstr(f + self._stage_f_time[sid] <= w + y * M, name=f"Do{sid}_{f_mid}_{w_mid}2")
+                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Dofw{sid}_{f_mid}_{w_mid}")
+                        self.model.addConstr(f >= w + self._stage_w_time[sid] - (1 - y) * M, name=f"Dofw{sid}_{f_mid}_{w_mid}1") 
+                        self.model.addConstr(f + self._stage_f_time[sid] <= w + y * M, name=f"Dofw{sid}_{f_mid}_{w_mid}2")
 
                 for f_mid, f in enumerate(self._stage_b_offsets[pid][sid]):
                     for b_mid, b in enumerate(self._stage_f_offsets[pid][sid]):
-                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{sid}_{f_mid}_{b_mid}")
-                        self.model.addConstr(f >= b + self._stage_b_time[sid] - (1 - y) * M, name=f"Do{sid}_{f_mid}_{b_mid}1") 
-                        self.model.addConstr(f + self._stage_f_time[sid] <= b + y * M, name=f"Do{sid}_{f_mid}_{b_mid}2")
+                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Dobf{sid}_{f_mid}_{b_mid}")
+                        self.model.addConstr(f >= b + self._stage_b_time[sid] - (1 - y) * M, name=f"Dobf{sid}_{f_mid}_{b_mid}1") 
+                        self.model.addConstr(f + self._stage_f_time[sid] <= b + y * M, name=f"Dobf{sid}_{f_mid}_{b_mid}2")
                     for w_mid, w in enumerate(self._stage_w_offsets[pid][sid]):
-                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{sid}_{f_mid}_{w_mid}")
-                        self.model.addConstr(f >= w + self._stage_w_time[sid] - (1 - y) * M, name=f"Do{sid}_{f_mid}_{w_mid}1") 
-                        self.model.addConstr(f + self._stage_f_time[sid] <= w + y * M, name=f"Do{sid}_{f_mid}_{w_mid}2")
+                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Dobw{sid}_{f_mid}_{w_mid}")
+                        self.model.addConstr(f >= w + self._stage_w_time[sid] - (1 - y) * M, name=f"Dobw{sid}_{f_mid}_{w_mid}1") 
+                        self.model.addConstr(f + self._stage_f_time[sid] <= w + y * M, name=f"Dobw{sid}_{f_mid}_{w_mid}2")
 
                 for f_mid, f in enumerate(self._stage_w_offsets[pid][sid]):
                     for b_mid, b in enumerate(self._stage_f_offsets[pid][sid]):
-                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{sid}_{f_mid}_{b_mid}")
-                        self.model.addConstr(f >= b + self._stage_b_time[sid] - (1 - y) * M, name=f"Do{sid}_{f_mid}_{b_mid}1") 
-                        self.model.addConstr(f + self._stage_f_time[sid] <= b + y * M, name=f"Do{sid}_{f_mid}_{b_mid}2")
+                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Dowf{sid}_{f_mid}_{b_mid}")
+                        self.model.addConstr(f >= b + self._stage_b_time[sid] - (1 - y) * M, name=f"Dowf{sid}_{f_mid}_{b_mid}1") 
+                        self.model.addConstr(f + self._stage_f_time[sid] <= b + y * M, name=f"Dowf{sid}_{f_mid}_{b_mid}2")
                     for w_mid, w in enumerate(self._stage_b_offsets[pid][sid]):
-                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Do{sid}_{f_mid}_{w_mid}")
-                        self.model.addConstr(f >= w + self._stage_w_time[sid] - (1 - y) * M, name=f"Do{sid}_{f_mid}_{w_mid}1") 
-                        self.model.addConstr(f + self._stage_f_time[sid] <= w + y * M, name=f"Do{sid}_{f_mid}_{w_mid}2")
+                        y = self.model.addVar(vtype=GRB.BINARY, name=f"Dowb{sid}_{f_mid}_{w_mid}")
+                        self.model.addConstr(f >= w + self._stage_w_time[sid] - (1 - y) * M, name=f"Dowb{sid}_{f_mid}_{w_mid}1") 
+                        self.model.addConstr(f + self._stage_f_time[sid] <= w + y * M, name=f"Dowb{sid}_{f_mid}_{w_mid}2")
 
     def _build_optimize_objectives(self) -> None:
         max_var = self.model.addVar(vtype=GRB.INTEGER, name="max_start_offset")
