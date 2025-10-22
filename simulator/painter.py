@@ -51,9 +51,9 @@ class SchedulingPainter:
 
     def __init__(self, config: dict) -> None:
         self._pipeline_size = config["pipeline_num"]
-        self._device_size   = config["device_num"]
+        self._device_num   = config["device_num"]
         self._devices       = config["devices"]
-        self._pp_size       = config["stage_num"]
+        self._stage_num       = config["stage_num"]
         self._pp_height     = config["pp_height"]
         self._pp_align      = config["pp_align"]
         self._pixel_base    = config["pixel_base"]
@@ -115,25 +115,26 @@ class SchedulingPainter:
 
         canvas_width = -1
         for k,v in data.items():
-            kid, pid, mid, did = parse_microbatch_key(k)
+            kid, sid, mid, did = parse_microbatch_key(k)
             length = 0
             if kid == 'f':
-                length = self._forward_length[did // self._pipeline_size][pid % self._device_size]
+                length = self._forward_length[did // self._stage_num][sid % self._device_num]
             elif kid == 'b':
-                length = self._backward_b_length[did // self._pipeline_size][pid % self._device_size]
+                length = self._backward_b_length[did // self._stage_num][sid % self._device_num]
             elif kid == 'w':
-                length = self._backward_w_length[did // self._pipeline_size][pid % self._device_size]
+                length = self._backward_w_length[did // self._stage_num][sid % self._device_num]
             else:
                 print("Type not found!")
             if data[k] + length + 2 * self._pp_align > canvas_width:
                 max_key = k
                 canvas_width = data[k] + length + 2 * self._pp_align
 
-        _, max_key_pid, _, _ = parse_microbatch_key(max_key)
-        max_key_pid %= self._device_size
+        _, max_key_sid, _, did = parse_microbatch_key(max_key)
+        # max_key_sid %= self._device_num
+        max_key_pid = did // self._stage_num
         # canvas_width = data[k] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
         # 按照 Device 画示意图
-        canvas_height = (self._pp_height + self._pp_align) * self._device_size * self._pipeline_size
+        canvas_height = (self._pp_height + self._pp_align) * self._device_num * self._pipeline_size
 
         # 0. Create label canvas
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
@@ -141,16 +142,16 @@ class SchedulingPainter:
 
         if self._max_time == -1:
             if SPLIT_BACKPROP:
-                self._max_time = (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base
+                self._max_time = (data[max_key] + self._backward_w_length[max_key_sid])//self._pixel_base
             else:
-                self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
+                self._max_time = (data[max_key] + self._backward_b_length[max_key_sid])//self._pixel_base
 
         label_canvas.create_text(self._pp_align + 145, y_label, text="MinExeTime:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
                 round(self._max_time),
-                self._pp_size // self._device_size,
-                self._basic_forward_length[max_key_pid], 
-                self._basic_backward_b_length[max_key_pid], 
-                self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
+                self._stage_num // self._device_num,
+                self._basic_forward_length[max_key_pid][max_key_sid], 
+                self._basic_backward_b_length[max_key_pid][max_key_sid], 
+                self._basic_backward_w_length[max_key_pid][max_key_sid] if SPLIT_BACKPROP else 0, 
                 COMM_TIME
             ),
         )
@@ -175,43 +176,43 @@ class SchedulingPainter:
         main_canvas.pack()
 
         pad = 0
-        for pid in range(self._device_size * self._pipeline_size):
+        for sid in range(self._device_num * self._pipeline_size):
             x0 = self._pp_align
-            y0 = (self._pp_height + self._pp_align) * pid + pad + 5
+            y0 = (self._pp_height + self._pp_align) * sid + pad + 5
             x1 = canvas_width - self._pp_align
-            y1 = (self._pp_height + self._pp_align) * (pid + 1) - pad + 5
+            y1 = (self._pp_height + self._pp_align) * (sid + 1) - pad + 5
             main_canvas.create_rectangle(x0, y0, x1, y1, fill="#FFFFFF", outline="black")
 
         # 3. Draw execution block for each microbatch according to start and end time
         schedule_res_content = ""
         for microbatch_key, offset in data.items():
-            k, pid, mid, did = parse_microbatch_key(microbatch_key)
+            k, sid, mid, did = parse_microbatch_key(microbatch_key)
 
             x0 = self._pp_align + offset
             # did = self._pid2did(pid=pid) # 获取对应的device id，把每个stage画在对应的device上
             # y0 = (self._pp_height + self._pp_align) * pid + pad
             y0 = (self._pp_height + self._pp_align) * did + pad + 5
             #修改画图中每个block的宽度
-            block_width = self._forward_length[did // self._pipeline_size][pid % self._device_size] if k in ('f', 'r') else (self._backward_b_length[did // self._pipeline_size][pid % self._device_size] if k == 'b' else self._backward_w_length[did // self._pipeline_size][pid % self._device_size])
+            block_width = self._forward_length[did // self._stage_num][sid % self._device_num] if k in ('f', 'r') else (self._backward_b_length[did // self._stage_num][sid % self._device_num] if k == 'b' else self._backward_w_length[did // self._stage_num][sid % self._device_num])
             x1 = x0 + block_width
             # y1 = (self._pp_height + self._pp_align) * (pid + 1) - pad
             y1 = (self._pp_height + self._pp_align) * (did + 1) - pad + 5
 
             # save schedule representation in painter
             if HEAD_DP:
-                schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,did,offset,offset+block_width)
+                schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,sid,did,offset,offset+block_width)
             else:
-                schedule_res_content += "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width)
+                schedule_res_content += "{}_{}_{},{},{}\n".format(k,mid,sid,offset,offset+block_width)
 
-            tag = f"p_{pid}_m_{mid}_{k}"
-            color = set_color(pid,workload_type=k,layer_num=self._pp_size)
+            tag = f"p_{sid}_m_{mid}_{k}"
+            color = set_color(sid,workload_type=k,layer_num=self._stage_num)
 
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况
             bold_font = font.Font(
                 # family="Calibri Light", 
-                underline= pid // self._device_size % 2,
-                weight= tk.font.NORMAL if pid // self._device_size % 2 else tk.font.BOLD
+                underline= sid // self._device_num % 2,
+                weight= tk.font.NORMAL if sid // self._device_num % 2 else tk.font.BOLD
             )
             if SHOW_WORKLOAD_TEXT:
                 text = main_canvas.create_text(
@@ -267,7 +268,7 @@ class SchedulingPainter:
 
             tags = [
                 f"p_{pid}_m_{self._item2mid[current_item]}_{fb}"
-                for pid in range(self._pp_size * self._pipeline_size)
+                for pid in range(self._stage_num * self._pipeline_size)
                 for fb in ("f", "b", "w", "r") #点击后的效果，加上w的判断
             ]
             
