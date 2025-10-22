@@ -35,11 +35,11 @@ test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 CHUNK_NUM = 1
 
 DP_SIZE = 2
-HETER_DEVICE = False
-HETER_DEVICE_Transfer = False
-HETER_RATIO = 3
-HETER_DP_ID = [0,1]
-HETER_PP_ID = [2,1]
+HETER_DEVICE = True
+HETER_DEVICE_Transfer = True
+HETER_RATIO = 2
+HETER_DP_ID = [0]
+HETER_PP_ID = [2]
 
 FAILURE_DEVICE = True
 FAILURE_DP_ID = [1]
