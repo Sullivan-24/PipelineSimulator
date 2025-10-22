@@ -118,11 +118,11 @@ class SchedulingPainter:
             kid, pid, mid, did = parse_microbatch_key(k)
             length = 0
             if kid == 'f':
-                length = self._forward_length[pid % self._device_size]
+                length = self._forward_length[did // self._pipeline_size][pid % self._device_size]
             elif kid == 'b':
-                length = self._backward_b_length[pid % self._device_size]
+                length = self._backward_b_length[did // self._pipeline_size][pid % self._device_size]
             elif kid == 'w':
-                length = self._backward_w_length[pid % self._device_size]
+                length = self._backward_w_length[did // self._pipeline_size][pid % self._device_size]
             else:
                 print("Type not found!")
             if data[k] + length + 2 * self._pp_align > canvas_width:
@@ -192,7 +192,7 @@ class SchedulingPainter:
             # y0 = (self._pp_height + self._pp_align) * pid + pad
             y0 = (self._pp_height + self._pp_align) * did + pad + 5
             #修改画图中每个block的宽度
-            block_width = self._forward_length[pid % self._device_size] if k in ('f', 'r') else (self._backward_b_length[pid % self._device_size] if k == 'b' else self._backward_w_length[pid % self._device_size])
+            block_width = self._forward_length[did // self._pipeline_size][pid % self._device_size] if k in ('f', 'r') else (self._backward_b_length[did // self._pipeline_size][pid % self._device_size] if k == 'b' else self._backward_w_length[did // self._pipeline_size][pid % self._device_size])
             x1 = x0 + block_width
             # y1 = (self._pp_height + self._pp_align) * (pid + 1) - pad
             y1 = (self._pp_height + self._pp_align) * (did + 1) - pad + 5
