@@ -20,6 +20,7 @@ class ReCyclePipeline:
         self._num_pipelines = config['pipeline_num']
         self._num_devices = config["device_num"]
         self._num_microbatches = config["microbatch_num"]
+        self._mid_offset = [sum(self._num_microbatches[: idx]) for idx, nmb in enumerate(self._num_microbatches)]
         self._num_stages = config["stage_num"]
         self._fail_pipelines_stages = config['fail_pipelines_stages']
         self._file_path = config["file_path"]
@@ -98,13 +99,13 @@ class ReCyclePipeline:
                 for mid in range(self._num_microbatches[pid]):
                     if pid in self._fail_pipelines_stages and sid in self._fail_pipelines_stages[pid]:
                         d_pid = health_pipeline_idxs[mid % nhpp]
-                        self._stage_f_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * d_pid}", lb=0))
-                        self._stage_b_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * d_pid}", lb=0))
-                        self._stage_w_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * d_pid}", lb=0))
+                        self._stage_f_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid + self._mid_offset[pid]}_{sid + self._num_stages * d_pid}", lb=0))
+                        self._stage_b_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid + self._mid_offset[pid]}_{sid + self._num_stages * d_pid}", lb=0))
+                        self._stage_w_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid + self._mid_offset[pid]}_{sid + self._num_stages * d_pid}", lb=0))
                     else:
-                        self._stage_f_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * pid}", lb=0))
-                        self._stage_b_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * pid}", lb=0))
-                        self._stage_w_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid + self._num_microbatches[pid] * pid}_{sid + self._num_stages * pid}", lb=0))
+                        self._stage_f_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid + self._mid_offset[pid]}_{sid + self._num_stages * pid}", lb=0))
+                        self._stage_b_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid + self._mid_offset[pid]}_{sid + self._num_stages * pid}", lb=0))
+                        self._stage_w_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid + self._mid_offset[pid]}_{sid + self._num_stages * pid}", lb=0))
                 
                 self._stage_f_time[pid].append(int(self._f_time[sid] * self._comp_time_ratio[pid][sid]))
                 self._stage_b_time[pid].append(int(self._b_time[sid] * self._comp_time_ratio[pid][sid]))

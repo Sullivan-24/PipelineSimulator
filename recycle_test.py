@@ -5,6 +5,7 @@ if __name__ == "__main__":
     stage_num = 4
     device_num = stage_num
     microbatch_num = [stage_num * 2 for _ in range(pipeline_num)]
+    microbatch_num = [12, 16]
     comp_time = 40
     comp_time_ratio = [[1 for _ in range(stage_num)] for _ in range(pipeline_num)]
     comp_time_ratio[0][2] = 2
