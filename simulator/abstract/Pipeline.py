@@ -584,7 +584,9 @@ class PipelineScheduler:
 
     def execute_workload(self, time):
         for device in self.devices:
-            if gpc["FAILURE_DEVICE"] and self.pipeline_idx in FAILURE_DP_ID and device.did in FAILURE_PP_ID :
+            if gpc["FAILURE_DEVICE"] and self.pipeline_idx in FAILURE_DP_ID:
+                 failure_index = FAILURE_DP_ID.index(self.pipeline_idx)
+                 if device.did  == FAILURE_PP_ID[failure_index]:
                     continue
             processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
             self.record_workload(processing_workload)

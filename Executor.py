@@ -4,7 +4,7 @@ from simulator.painter import MultiPipelinePainter as MPP
 from simulator.abstract.Pipeline import PipelineScheduler
 import cProfile
 import pstats
-
+import pdb
 class Executor:
 
     def __init__(self, dp_size, nmb_per_dp: list = None) -> None:
@@ -53,12 +53,12 @@ class Executor:
         self.reset_time()
         workloads_failure = {}
         workloads_slow = {}
-
+        add_dp_index = 0
         mid_done_PP = [[] for _ in range(len(FAILURE_PP_ID))]
         pop_num_failures = [_ for _ in range(len(FAILURE_PP_ID))]
         pop_num_slow = [_ for _ in range(len(HETER_PP_ID))]
         recv_num_slow = [[0 for _ in range(self.dp_size)] for _ in range(len(HETER_PP_ID))]
-        recv_num_failure = [[0 for _ in range(self.dp_size)] for _ in range(len(HETER_PP_ID))]
+        recv_num_failures = [[0 for _ in range(self.dp_size)] for _ in range(len(FAILURE_PP_ID))]
         all_DP = set([_ for _ in range(self.dp_size)])
         transfer_info = [[[[]for _ in range(PP_SIZE)] for _ in range(self.dp_size)] for _ in range(self.dp_size)]
         # transfer_info[source_dp_rank].append({"microbatch_ids":[2,4,7], "stage_id":2, "dst_dp_rank":dst_dp_rank})
@@ -92,51 +92,55 @@ class Executor:
                 # if self.get_time() == 0:
                 for failure_index,failure_did in enumerate(failure_dids):
                     failure_dp = failure_dps[failure_index]
-                    min_execute_f_num = None
-                    min_execute_f_dp = None
-                    #minst execute_f_num of failure pprank in other dp
-                    for dp_index in range(self.dp_size):
-                        if failure_dp == dp_index:
-                            continue
-                        exec_f_num_ = exec_f_num_dp[dp_index][failure_did]
-                        if min_execute_f_num is None:
-                            min_execute_f_num = exec_f_num_
-                            min_execute_f_dp = dp_index
-                        elif exec_f_num_ < min_execute_f_num:
-                            min_execute_f_num = exec_f_num_
-                            min_execute_f_dp = dp_index
+                    # min_execute_f_num = None
+                    # min_execute_f_dp = None
+                    fast_dp = None
 
+                    execute_f_num_failure = pop_num_failures[failure_index]
+                    max_f_num = execute_f_num_failure
+
+                    # if execute_f_num_failure == 12:
+                    #     pdb.set_trace()
+                    most_f_num_except_failure = 0
+                    for dp_rank in range(self.dp_size):
+                        # if dp_rank in HETER_DP_ID:
+                        if dp_rank == failure_dp:
+                            continue
+                        else:
+                            exec_f_num_ =  exec_f_num_dp[dp_rank][failure_did] - recv_num_failures[failure_index][dp_rank]
+                            if exec_f_num_>max_f_num:
+                                max_f_num = exec_f_num_
+                                fast_dp = dp_rank
+                            if NMB_PER_DP[dp_rank] > most_f_num_except_failure:
+                                most_f_num_except_failure = NMB_PER_DP[dp_rank]
+
+                    if fast_dp is None and execute_f_num_failure<most_f_num_except_failure:
+                        continue
+                    if fast_dp is None:
+                        if add_dp_index % DP_SIZE == failure_dp:
+                            add_dp_index += 1
+                        fast_dp = add_dp_index % DP_SIZE
+                        add_dp_index += 1    
                     for pipeline in self.pipelines:
                         if pipeline.pipeline_idx == failure_dp:
-                            pop_num_failure = pop_num_failures[failure_index]
                             mid_done  = mid_done_PP[failure_index]
-                            if pop_num_failure < NMB_PER_DP[min_execute_f_dp]:
-                                exec_f_num_diff = min_execute_f_num-pop_num_failure
-                                if exec_f_num_diff >= 0:
-                                    mid_ = min_execute_f_num+pipeline.mid_offset
-                                    if mid_ not in mid_done:
-                                        print(f"pop_mid_failure:{mid_} in PP{failure_did}, from DP{failure_dp} to DP{min_execute_f_dp}")
-                                        transfer_info[failure_dp][min_execute_f_dp][failure_did].append(mid_)
-                                        workloads_failure = pipeline.pop_workload(mid_group=[mid_],did_group=[failure_did])#pop 下一个f
-                                        mid_done_PP[failure_index].append(mid_)
-                                        pop_num_failures[failure_index] += 1
-                            else:
-                                if len(mid_done) == NMB_PER_DP[failure_dp]:
-                                    break
-                                for mid_ in range(NMB_PER_DP[min_execute_f_dp],NMB_PER_DP[failure_dp]):
-                                    mid_ += pipeline.mid_offset
-                                    if mid_ not in mid_done:
-                                        print(f"pop_mid_failure:{mid_} in PP{failure_did}, from DP{failure_dp} to DP{min_execute_f_dp}")
-                                        transfer_info[failure_dp][min_execute_f_dp][failure_did].append(mid_)
-                                        workloads_failure = pipeline.pop_workload(mid_group=[mid_], did_group=[failure_did])#pop 下一个f
-                                        mid_done_PP[failure_index].append(mid_)
-                                        pop_num_failures[failure_index] += 1
+                            if execute_f_num_failure < NMB_PER_DP[failure_dp]:
+                                mid_ = execute_f_num_failure+pipeline.mid_offset
+                                if mid_ not in mid_done:
+                                    print(f"pop_mid_failure:{mid_} in PP{failure_did}, from DP{failure_dp} to DP{fast_dp}")
+                                    transfer_info[failure_dp][fast_dp][failure_did].append(mid_)
+                                    workloads_failure = pipeline.pop_workload(mid_group=[mid_],did_group=[failure_did])#pop 下一个f
+                                    mid_done_PP[failure_index].append(mid_)
+                                    pop_num_failures[failure_index] += 1
+                                    recv_num_failures[failure_index][fast_dp] += 1
 
                     for pipeline in self.pipelines:
-                        if pipeline.pipeline_idx == min_execute_f_dp:
+                        if pipeline.pipeline_idx == fast_dp:
                             if workloads_failure is not None:
                                 pipeline.insert_workload(workloads=workloads_failure, did_group=[failure_did])
+                                print(f"add_mid_failure:{workloads_failure[0].mid} in DP{fast_dp}")
                                 workloads_failure = None
+
             if HETER_DEVICE_Transfer:
                 slow_dids = HETER_PP_ID
                 slow_dps = HETER_DP_ID
