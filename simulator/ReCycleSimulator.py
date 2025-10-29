@@ -91,14 +91,11 @@ class ReCyclePipeline:
         return new_comm_length
 
     def _build_constraints(self) -> None:
-
-        health_pipeline_idxs = [i for i in range(self._num_pipelines) if i not in self._fail_pipelines_stages]
-        nhpp = len(health_pipeline_idxs)
         for pid in range(self._num_pipelines):
             for sid in range(self._num_stages):
                 for mid in range(self._num_microbatches[pid]):
                     if pid in self._fail_pipelines_stages and sid in self._fail_pipelines_stages[pid]:
-                        d_pid = health_pipeline_idxs[mid % nhpp]
+                        d_pid = self._real_pid(pid=pid, sid=sid, mid=mid)
                         self._stage_f_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"f_{mid + self._mid_offset[pid]}_{sid + self._num_stages * d_pid}", lb=0))
                         self._stage_b_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"b_{mid + self._mid_offset[pid]}_{sid + self._num_stages * d_pid}", lb=0))
                         self._stage_w_offsets[pid][sid].append(self.model.addVar(vtype=GRB.INTEGER, name=f"w_{mid + self._mid_offset[pid]}_{sid + self._num_stages * d_pid}", lb=0))
@@ -129,7 +126,7 @@ class ReCyclePipeline:
 
     def _real_pid(self, pid, sid, mid):
         if pid in self._fail_pipelines_stages and sid in self._fail_pipelines_stages[pid]:
-            health_pipeline_idxs = [i for i in range(self._num_pipelines) if i not in self._fail_pipelines_stages]
+            health_pipeline_idxs = [i for i in range(self._num_pipelines) if i not in self._fail_pipelines_stages or ( i in self._fail_pipelines_stages and sid not in self._fail_pipelines_stages[i])]
             nhpp = len(health_pipeline_idxs)
             r_pid = health_pipeline_idxs[mid % nhpp]
             return r_pid
@@ -140,34 +137,35 @@ class ReCyclePipeline:
             for mid in range(self._num_microbatches[pid]):
                 for sid in range(1, self._num_stages):
                     self.model.addConstr(self._stage_f_offsets[pid][sid][mid] >= self._stage_f_offsets[pid][sid - 1][mid] +
-                                        self._stage_f_time[self._real_pid(pid, sid - 1, mid)][sid - 1] + self._comm_time[sid - 1][sid])
+                                        self._stage_f_time[self._real_pid(pid, sid - 1, mid)][sid - 1] + self._comm_time[sid - 1][sid], name=f"f_{pid}_{sid}_{mid} > f_{pid}_{sid - 1}_{mid}")
 
                 for sid in range(self._num_stages - 1, 0, -1):
                     self.model.addConstr(self._stage_b_offsets[pid][sid - 1][mid] >= self._stage_b_offsets[pid][sid][mid] +
-                                        self._stage_b_time[self._real_pid(pid, sid, mid)][sid] + self._comm_time[sid][sid - 1])
+                                        self._stage_b_time[self._real_pid(pid, sid, mid)][sid] + self._comm_time[sid][sid - 1], name=f"b_{pid}_{sid - 1}_{mid} > b_{pid}_{sid}_{mid}")
 
                 self.model.addConstr(self._stage_b_offsets[pid][self._num_stages - 1][mid] >= self._stage_f_offsets[pid][self._num_stages - 1][mid] +
-                                    self._stage_f_time[self._real_pid(pid, self._num_stages - 1, mid)][self._num_stages - 1])
+                                    self._stage_f_time[self._real_pid(pid, self._num_stages - 1, mid)][self._num_stages - 1], name=f"b_{pid}_{self._num_stages - 1}_{mid} > f_{pid}_{self._num_stages - 1}_{mid}")
 
                 if SPLIT_BACKPROP:
                     for sid in range(self._num_stages):
                         if pid in self._fail_pipelines_stages and sid in self._fail_pipelines_stages[pid]:
                             self.model.addConstr(self._stage_w_offsets[pid][sid][mid] >= self._stage_b_offsets[pid][sid][mid] +
-                                            self._stage_b_time[self._real_pid(pid, sid, mid)][sid])
+                                            self._stage_b_time[self._real_pid(pid, sid, mid)][sid], name=f"w_{sid} > b_{sid}")
                         else:
                             self.model.addConstr(self._stage_w_offsets[pid][sid][mid] == self._stage_b_offsets[pid][sid][mid] +
-                                            self._stage_b_time[self._real_pid(pid, sid, mid)][sid])
+                                            self._stage_b_time[self._real_pid(pid, sid, mid)][sid], name=f"w_{sid} = b_{sid}")
 
                 if mid > 0:
                     for sid in range(self._num_stages):
                         self.model.addConstr(self._stage_f_offsets[pid][sid][mid] >= self._stage_f_offsets[pid][sid][mid - 1] +
-                                            self._stage_f_time[self._real_pid(pid, sid, mid - 1)][sid])
+                                            self._stage_f_time[self._real_pid(pid, sid, mid - 1)][sid], name=f"f_mid{mid} > f_mid{mid-1}")
                         self.model.addConstr(self._stage_b_offsets[pid][sid][mid] >= self._stage_b_offsets[pid][sid][mid - 1] +
-                                            self._stage_b_time[self._real_pid(pid, sid, mid - 1)][sid])
+                                            self._stage_b_time[self._real_pid(pid, sid, mid - 1)][sid], name=f"b_mid{mid} > b_mid{mid-1}")
                         if SPLIT_BACKPROP:
                             self.model.addConstr(self._stage_w_offsets[pid][sid][mid] >= self._stage_w_offsets[pid][sid][mid - 1] +
-                                                self._stage_w_time[self._real_pid(pid, sid, mid - 1)][sid])
-            self.model.addConstr(self._stage_f_offsets[pid][0][0] == 0)
+                                                self._stage_w_time[self._real_pid(pid, sid, mid - 1)][sid], name=f"w_mid{mid} > w_mid{mid-1}")
+            if pid not in self._fail_pipelines_stages or (0 not in self._fail_pipelines_stages[pid]):
+                self.model.addConstr(self._stage_f_offsets[pid][0][0] == 0, name=f"f_start_at_0")
 
     def _construct_constraints_of_schedule(self, pipeline_schedules):
         type2offset = {
@@ -186,7 +184,9 @@ class ReCyclePipeline:
                 for idx in range(len(stage_schedule) - 1):
                     wtype, mid, sid = stage_schedule[idx]
                     nwtype, nmid, nsid = stage_schedule[idx + 1]
-                    self.model.addConstr(type2offset[nwtype][pid][nsid][nmid] >= type2offset[wtype][pid][sid][mid] + type2time[wtype][self._real_pid(pid, sid, mid)][sid])
+                    # if pid in self._fail_pipelines_stages and (sid in self._fail_pipelines_stages[pid] or nsid in self._fail_pipelines_stages[pid]):
+                    #     continue
+                    self.model.addConstr(type2offset[nwtype][pid][nsid][nmid] >= type2offset[wtype][pid][sid][mid] + type2time[wtype][self._real_pid(pid, sid, mid)][sid], name=f"1f1b constr")
 
     def _construct_recycle_constraints(self):
         #NOTE Maintain 1F1B schedule on healthy devices and ILP solved schedule on failed devices
@@ -215,7 +215,6 @@ class ReCyclePipeline:
                         finish_flag[workload_idx_in_mids[next_workload_type]] = 1
                     iter+=1
         self._construct_constraints_of_schedule(pipeline_schedules=schedules)
-        # self._construct_serial_constraints()
         self._construct_across_device_serial_evenly_distributed_constraints()
 
     def _get_stage_fbw_offsets(self, pid, sid):
@@ -323,6 +322,7 @@ class ReCyclePipeline:
             for c in self.model.getConstrs():
                 if c.IISConstr:
                     print(f"{c.ConstrName}")
+                    print(f"{c.IISConstr}")
                     input("Press any key to continue...")
 
             # 可选：输出变量
