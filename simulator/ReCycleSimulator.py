@@ -61,7 +61,7 @@ class ReCyclePipeline:
 
     def set_M_value(self, estimated_cost):
         import math
-        n = math.floor(math.log10(estimated_cost))  # 计算位数
+        n = math.floor(math.log10(estimated_cost)) + 2 # 计算位数
         print("Set M to {}.\n".format(10 ** (n + 1)))
         return 10 ** (n + 1)  # 返回 10 的 (n + 1) 次方
 
