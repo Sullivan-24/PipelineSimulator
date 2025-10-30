@@ -4,11 +4,11 @@ if __name__ == "__main__":
     pipeline_num = 4
     stage_num = 4
     device_num = stage_num
-    microbatch_num = [stage_num * 2 for _ in range(pipeline_num)]
-    microbatch_num = [12,12,12,12]
+    microbatch_num = [stage_num * 1 for _ in range(pipeline_num)]
+    # microbatch_num = [12,12,12,12]
     comp_time = 20
     comp_time_ratio = [[1 for _ in range(stage_num)] for _ in range(pipeline_num)]
-    # comp_time_ratio[0][2] = 2
+    comp_time_ratio[0][2] = 2
 
     # pipeline_num = 4
     # stage_num = 4
@@ -29,7 +29,7 @@ if __name__ == "__main__":
         'device_num': stage_num,
         'microbatch_num': microbatch_num,
         'stage_num': stage_num,
-        'fail_pipelines_stages': {0:[0,3]},
+        'fail_pipelines_stages': {0:[0], 1:[0, 1], 2:[2], 3:[3]},
         'file_path': "recycle_test_res.txt",
         'time_limit': 30,
         'f_time': [comp_time * 1.0 for _ in range(stage_num)],
