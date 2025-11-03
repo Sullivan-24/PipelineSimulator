@@ -93,6 +93,9 @@ class PipelineScheduler:
             self.placement = solver_results["assignments"]
             # self.layer_assignment = [len(p) for p in self.placement]
             self.layer_assignment = [self.layer_num // self.device_num] * self.device_num#TODO
+            # self.layer_assignment=[9,9,5,9]
+            # self.placement = [[sum(self.layer_assignment[:i])+j for j in range(self.layer_assignment[i])] for i in range(len(self.layer_assignment))]
+
         os.makedirs("schedule_results",exist_ok=True)
         with open("schedule_results/partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))

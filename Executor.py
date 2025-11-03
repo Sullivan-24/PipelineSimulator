@@ -168,7 +168,7 @@ class Executor:
                     if slow_dp != slow_dps[slow_index] or fast_dp is None:
                         continue
                     # print(f"slow_dp:{slow_dp}, exec_f_num_slow_dp:{exec_f_num_slow_dp}, fast_dp:{fast_dp}, max_f_num:{max_f_num}, exe_f_num:{[exec_f_num_dp[_][slow_did] for _ in range(self.dp_size)]}")
-                    if exec_f_num_slow_dp+pop_num_slow[slow_index] < NMB_PER_DP[slow_dp]:
+                    if exec_f_num_slow_dp < NMB_PER_DP[slow_dp]:
                         print("diff")
                         for pipeline in self.pipelines:
                             if pipeline.pipeline_idx == slow_dp :#and self.get_time() == pop_time:

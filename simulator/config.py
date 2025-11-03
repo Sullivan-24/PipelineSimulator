@@ -34,19 +34,23 @@ test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 
 CHUNK_NUM = 1
 
-DP_SIZE = 2
-HETER_DEVICE = False
-HETER_DEVICE_Transfer = False
+DP_SIZE = 4
+HETER_DEVICE = True
+HETER_DEVICE_Transfer = True
 HETER_RATIO = 2
-HETER_DP_ID = [0]
-HETER_PP_ID = [0]
+HETER_DP_ID = [1,3]
+HETER_PP_ID = [3,7]
 
 FAILURE_DEVICE = True
-FAILURE_DP_ID = [1]
-FAILURE_PP_ID = [1]
+FAILURE_DP_ID = [0,2]
+FAILURE_PP_ID = [1,5]
 
 NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
-NMB_PER_DP = [12,20]
+# NMB_PER_DP = [11,21]
+if SCHEDULE_METHOD != Schedule.OctoPipe:
+    HETER_DEVICE_Transfer = False
+if SCHEDULE_METHOD == Schedule.OctoPipe:
+    NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
 
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True

@@ -46,6 +46,33 @@ import tkinter as tk
 #         if os.path.exists(ps_filename):
 #             os.remove(ps_filename)
 
+import os
+from PIL import Image
+
+def save_canvas_postscript(canvas, out_path, fmt='PNG', scale=2):
+    canvas.update()
+    ps = out_path + '.ps'
+    canvas.postscript(file=ps, colormode='color')  # 生成 PS
+    img = Image.open(ps)                            # 需要 ghostscript 支持 PS -> Image
+    img.load()
+    if scale != 1:
+        img = img.resize((img.width * scale, img.height * scale), Image.LANCZOS)
+    if fmt.upper() == 'PDF':
+        img = img.convert('RGB')
+        img.save(out_path, 'PDF')
+    else:
+        img.save(out_path, fmt.upper())
+    os.remove(ps)
+
+from PIL import ImageGrab
+def save_canvas_screenshot(canvas, out_path):
+    canvas.update()
+    x = canvas.winfo_rootx()
+    y = canvas.winfo_rooty()
+    w = canvas.winfo_width()
+    h = canvas.winfo_height()
+    img = ImageGrab.grab(bbox=(x, y, x + w, y + h))
+    img.save(out_path)
 class SchedulingPainter:
     """Scheduling Painter"""
 
@@ -517,6 +544,6 @@ class MultiPipelinePainter:
 
         main_canvas.bind("<Button-1>", _trigger_hook)
 
-        button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_as_pdf(main_canvas))
+        button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_postscript(main_canvas, "schedule_results/_schedule.png"))
         button.pack()
         self._tk_root.mainloop()
