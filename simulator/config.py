@@ -21,7 +21,7 @@ SCHEDULE_METHOD = Schedule.OctoPipe
 STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.SEARCHED
 # STAGE_PLACEMENT = Placement.WAVELIKE
-SPLIT_BACKPROP = True
+SPLIT_BACKPROP = False
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
     CHUNK_NUM = LAYER_NUM // DEVICE_NUM
@@ -34,19 +34,26 @@ test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 
 CHUNK_NUM = 1
 
-DP_SIZE = 4
+DP_SIZE = 2
 HETER_DEVICE = True
 HETER_DEVICE_Transfer = True
-HETER_RATIO = 2
-HETER_DP_ID = [1,3]
-HETER_PP_ID = [3,7]
+HETER_RATIOS = [[1 for _ in range(DEVICE_NUM)]for _ in range(DP_SIZE)]
+# HETER_RATIOS[0][0] = 
+# HETER_RATIOS[1][1] = 1.7
+# HETER_RATIOS[2][2] = 2
+# HETER_RATIOS[3][3] = 3
+HETER_RATIOS[0][2] = 3
+HETER_RATIOS[1][2] = 3
 
-FAILURE_DEVICE = True
-FAILURE_DP_ID = [0,2]
-FAILURE_PP_ID = [1,5]
+HETER_DP_ID = [0,1]
+HETER_PP_ID = [2,2]
+
+FAILURE_DEVICE = False
+FAILURE_DP_ID = [1]
+FAILURE_PP_ID = [1]
 
 NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
-# NMB_PER_DP = [11,21]
+# NMB_PER_DP = [11,5,5,11]#[12,4,4,12]#[13,8,7,4]#[9,8,8,7]
 if SCHEDULE_METHOD != Schedule.OctoPipe:
     HETER_DEVICE_Transfer = False
 if SCHEDULE_METHOD == Schedule.OctoPipe:
@@ -62,7 +69,7 @@ HEAD_DP = False if test_upp else False
 OVERLAP_DEGREE = None
 MEMORY_CONSTRAIN = 0.9
 MEMORY_REDUCATION = 0.0
-IDEAL_SITUATION = False
+IDEAL_SITUATION = True
 
 # Gemma
 EMB_F_TIME = 0
@@ -137,12 +144,20 @@ SAVE_MEMORY = True
 CONSTRAIN_WARMUP = False
 SWITCH_WORKLOAD_TYPE = True
 
+f_b_w = [1,1.6,0.4]
+if not SPLIT_BACKPROP:
+    f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
+
 F_TIME = 10
 F_TIMES = [F_TIME] * LAYER_NUM
-B_TIMES = [F_TIME*1.6] * LAYER_NUM
-W_TIMES = [F_TIME*0.4] * LAYER_NUM
+B_TIMES = [F_TIME*f_b_w[1]] * LAYER_NUM
+W_TIMES = [F_TIME*f_b_w[2]] * LAYER_NUM
 
 if not IDEAL_SITUATION:
+    F_TIME = 10
+    F_TIMES = [F_TIME] * LAYER_NUM
+    B_TIMES = [F_TIME] * LAYER_NUM
+    W_TIMES = [F_TIME] * LAYER_NUM
     if GEMMA:
         try:
             from data.profiled_data import profiled_data

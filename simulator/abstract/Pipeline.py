@@ -91,11 +91,11 @@ class PipelineScheduler:
                     mem_limits=[144 for _ in range(self.device_num)]
                 )
             self.placement = solver_results["assignments"]
-            # self.layer_assignment = [len(p) for p in self.placement]
+            self.layer_assignment = [len(p) for p in self.placement]
             self.layer_assignment = [self.layer_num // self.device_num] * self.device_num#TODO
-            # self.layer_assignment=[9,9,5,9]
-            # self.placement = [[sum(self.layer_assignment[:i])+j for j in range(self.layer_assignment[i])] for i in range(len(self.layer_assignment))]
-
+        # self.layer_assignment=[12,4,4,12]#[11,5,5,11]####[14,7,6,5]#[14,8,6,4]#[9,8,8,7]#[11,5,5,11]#[12,4,4,12]##[9,7,7,9]#
+        # self.placement = [[sum(self.layer_assignment[:i])+j for j in range(self.layer_assignment[i])] for i in range(len(self.layer_assignment))]
+        print("Solved OctoPipe layer_assignment:", self.layer_assignment)
         os.makedirs("schedule_results",exist_ok=True)
         with open("schedule_results/partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))
@@ -164,13 +164,14 @@ class PipelineScheduler:
             max_mem = gpc["GPU_MAX_MEM"]
             comp_power = 2
             if gpc["HETER_DEVICE"]:
-                #if did >= self.device_num // 2:
-                for i in range(len(gpc["HETER_PP_ID"])):
-                    heter_dp = gpc["HETER_DP_ID"][i]
-                    heter_pp = gpc["HETER_PP_ID"][i]
-                    if did == heter_pp and self.pipeline_idx == heter_dp:
-                        max_mem = gpc["GPU_MAX_MEM"] / gpc["HETER_RATIO"]
-                        comp_power = comp_power / gpc["HETER_RATIO"]
+                # for i in range(len(gpc["HETER_PP_ID"])):
+                #     heter_dp = gpc["HETER_DP_ID"][i]
+                #     heter_pp = gpc["HETER_PP_ID"][i]
+                #     if did == heter_pp and self.pipeline_idx == heter_dp:
+                #         max_mem = gpc["GPU_MAX_MEM"] / gpc["HETER_RATIO"]
+                #         comp_power = comp_power / gpc["HETER_RATIO"]
+                max_mem = gpc["GPU_MAX_MEM"] / gpc["HETER_RATIOS"][self.pipeline_idx][did]
+                comp_power = comp_power / gpc["HETER_RATIOS"][self.pipeline_idx][did]
             device = Device(
                         device_id = did, 
                         max_activation_counts=gpc["MAX_ACTIVATION_COUNTS"], 

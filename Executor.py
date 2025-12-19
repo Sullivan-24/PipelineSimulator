@@ -55,8 +55,8 @@ class Executor:
         workloads_slow = {}
         add_dp_index = 0
         mid_done_PP = [[] for _ in range(len(FAILURE_PP_ID))]
-        pop_num_failures = [_ for _ in range(len(FAILURE_PP_ID))]
-        pop_num_slow = [_ for _ in range(len(HETER_PP_ID))]
+        pop_num_failures = [0 for _ in range(len(FAILURE_PP_ID))]
+        pop_num_slow = [0 for _ in range(len(HETER_PP_ID))]
         recv_num_slow = [[0 for _ in range(self.dp_size)] for _ in range(len(HETER_PP_ID))]
         recv_num_failures = [[0 for _ in range(self.dp_size)] for _ in range(len(FAILURE_PP_ID))]
         all_DP = set([_ for _ in range(self.dp_size)])
@@ -123,7 +123,7 @@ class Executor:
                         add_dp_index += 1    
                     for pipeline in self.pipelines:
                         if pipeline.pipeline_idx == failure_dp:
-                            mid_done  = mid_done_PP[failure_index]
+                            mid_done = mid_done_PP[failure_index]
                             if execute_f_num_failure < NMB_PER_DP[failure_dp]:
                                 mid_ = execute_f_num_failure+pipeline.mid_offset
                                 if mid_ not in mid_done:
@@ -154,11 +154,11 @@ class Executor:
                     min_f_num = exec_f_num_slow_dp
                     max_f_num = exec_f_num_slow_dp
                     for dp_rank in range(self.dp_size):
-                        # if dp_rank in HETER_DP_ID:
-                        if dp_rank == slow_dp:
+                        if dp_rank in HETER_DP_ID:
+                        # if dp_rank == slow_dp:
                             continue
                         else:
-                            exec_f_num_ =  exec_f_num_dp[dp_rank][slow_did] - recv_num_slow[slow_index][dp_rank]
+                            exec_f_num_ = exec_f_num_dp[dp_rank][slow_did] - recv_num_slow[slow_index][dp_rank]#+1# 想多pop就多加1，表示其他正常dp执行过的workload数量
                             if exec_f_num_>max_f_num:
                                 max_f_num = exec_f_num_
                                 fast_dp = dp_rank
@@ -166,6 +166,7 @@ class Executor:
                                 min_f_num = exec_f_num_
                                 slow_dp = dp_rank
                     if slow_dp != slow_dps[slow_index] or fast_dp is None:
+                    # if slow_dp in slow_dps or fast_dp is None:
                         continue
                     # print(f"slow_dp:{slow_dp}, exec_f_num_slow_dp:{exec_f_num_slow_dp}, fast_dp:{fast_dp}, max_f_num:{max_f_num}, exe_f_num:{[exec_f_num_dp[_][slow_did] for _ in range(self.dp_size)]}")
                     if exec_f_num_slow_dp < NMB_PER_DP[slow_dp]:
