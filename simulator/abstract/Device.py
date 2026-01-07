@@ -385,22 +385,24 @@ class Device:
                 workload_type_order = [WorkloadType.W,WorkloadType.F,WorkloadType.B]
             if self.last_wtype == WorkloadType.W:
                 workload_type_order = [WorkloadType.F,WorkloadType.B,WorkloadType.W]
-        if gpc["SAVE_MEMORY"]:
-            head_ce_workloads = []
-            for workload_type in [WorkloadType.W]:
-                for mid in range(self.mid_offset, self.mid_offset + self.nmb):
-                    for stage_id in self.stages:
-                            workloads = self.stages[stage_id].workloads
-                            if mid not in workloads: continue
-                            if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable(time=time):
-                                head_ce_workloads.append(workloads[mid][workload_type])                          
-            # ensure head to be executed as quickly as possible
-            executable_workoads += head_ce_workloads
-
+        
+        # if gpc["SAVE_MEMORY"]:
+        #     head_ce_workloads = []
+        #     for workload_type in [WorkloadType.W]:
+        #         for mid in range(self.mid_offset, self.mid_offset + self.nmb):
+        #             for stage_id in self.stages:
+        #                     workloads = self.stages[stage_id].workloads
+        #                     if mid not in workloads: continue
+        #                     if workload_type in workloads[mid] and workloads[mid][workload_type].is_executable(time=time):
+        #                         head_ce_workloads.append(workloads[mid][workload_type])                          
+        #     # ensure head to be executed as quickly as possible
+        #     executable_workoads += head_ce_workloads
         delayed_workload = []
         canceled_workload = []
         for workload_type in workload_type_order:
-            for mid in range(self.pipeline.executor.dp_size * self.nmb):
+            # for mid in range(self.pipeline.executor.dp_size * self.nmb):
+            micro_batch_ids = [i // self.pipeline.executor.dp_size + (i % self.pipeline.executor.dp_size) * self.nmb for i in range(self.nmb * self.pipeline.executor.dp_size)]
+            for mid in micro_batch_ids:
                 for stage_id in self.stages:
                     workloads = self.stages[stage_id].workloads
                     if mid in workloads and workload_type in workloads[mid] and workloads[mid][workload_type].is_executable(time=time):

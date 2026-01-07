@@ -62,6 +62,7 @@ class Executor:
         all_DP = set([_ for _ in range(self.dp_size)])
         transfer_info = [[[[]for _ in range(PP_SIZE)] for _ in range(self.dp_size)] for _ in range(self.dp_size)]
         # transfer_info[source_dp_rank].append({"microbatch_ids":[2,4,7], "stage_id":2, "dst_dp_rank":dst_dp_rank})
+        TUNE_NUM = [1,0] 
         while self.get_time() <= time_limit and not self.finish_flag:
             success_count = 0
             latest_workloads_dp = [[] for _ in range(self.dp_size)]
@@ -103,11 +104,11 @@ class Executor:
                     #     pdb.set_trace()
                     most_f_num_except_failure = 0
                     for dp_rank in range(self.dp_size):
-                        # if dp_rank in HETER_DP_ID:
+                        # if dp_rank in failure_dps:
                         if dp_rank == failure_dp:
                             continue
                         else:
-                            exec_f_num_ =  exec_f_num_dp[dp_rank][failure_did] - recv_num_failures[failure_index][dp_rank]
+                            exec_f_num_ =  exec_f_num_dp[dp_rank][failure_did] - recv_num_failures[failure_index][dp_rank]+TUNE_NUM[0]# 想多pop就多加1，表示其他正常dp执行过的workload数量
                             if exec_f_num_>max_f_num:
                                 max_f_num = exec_f_num_
                                 fast_dp = dp_rank
@@ -154,11 +155,11 @@ class Executor:
                     min_f_num = exec_f_num_slow_dp
                     max_f_num = exec_f_num_slow_dp
                     for dp_rank in range(self.dp_size):
-                        if dp_rank in HETER_DP_ID:
-                        # if dp_rank == slow_dp:
+                        # if dp_rank in HETER_DP_ID:
+                        if dp_rank == slow_dp:
                             continue
                         else:
-                            exec_f_num_ = exec_f_num_dp[dp_rank][slow_did] - recv_num_slow[slow_index][dp_rank]#+1# 想多pop就多加1，表示其他正常dp执行过的workload数量
+                            exec_f_num_ = exec_f_num_dp[dp_rank][slow_did] - recv_num_slow[slow_index][dp_rank]+TUNE_NUM[1]# 想多pop就多加1，表示其他正常dp执行过的workload数量
                             if exec_f_num_>max_f_num:
                                 max_f_num = exec_f_num_
                                 fast_dp = dp_rank

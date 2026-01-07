@@ -1,6 +1,30 @@
 from dataclasses import dataclass
 from simulator.abstract.variables import *
 from simulator.model_config import *
+
+def allocate_tasks(machine_capacities, total_tasks):
+    """
+    将任务分配给不同计算能力的机器，最小化最大执行时间
+    
+    Args:
+        machine_capacities: 机器计算能力列表
+        total_tasks: 总任务数
+    
+    Returns:
+        每台机器分配的任务数
+    """
+    total_capacity = sum(machine_capacities)
+    # 按比例分配，然后四舍五入到整数
+    allocation = [round(capacity / total_capacity * total_tasks) for capacity in machine_capacities]
+    
+    # 确保总数等于total_tasks
+    diff = total_tasks - sum(allocation)
+    if diff != 0:
+        # 找到计算能力最强的机器，调整它
+        max_idx = machine_capacities.index(max(machine_capacities))
+        allocation[max_idx] += diff
+    
+    return allocation
 # --------------------- Solver config ---------------------
 BASE_SOLUTION = True
 RUN_MODE = RunMode.LAYERWISE_GUROBI_SOLVE
@@ -21,7 +45,7 @@ SCHEDULE_METHOD = Schedule.OctoPipe
 STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.SEARCHED
 # STAGE_PLACEMENT = Placement.WAVELIKE
-SPLIT_BACKPROP = False
+SPLIT_BACKPROP = True
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
     CHUNK_NUM = LAYER_NUM // DEVICE_NUM
@@ -34,26 +58,54 @@ test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 
 CHUNK_NUM = 1
 
-DP_SIZE = 2
-HETER_DEVICE = True
+DP_SIZE = 4
+HETER_DEVICE = False
 HETER_DEVICE_Transfer = True
 HETER_RATIOS = [[1 for _ in range(DEVICE_NUM)]for _ in range(DP_SIZE)]
-# HETER_RATIOS[0][0] = 
-# HETER_RATIOS[1][1] = 1.7
-# HETER_RATIOS[2][2] = 2
-# HETER_RATIOS[3][3] = 3
-HETER_RATIOS[0][2] = 3
-HETER_RATIOS[1][2] = 3
+# HETER_RATIOS[0][1] = 1.5
+# HETER_RATIOS[1][2] = 1.5
+# HETER_RATIOS[2][3] = 1.5
+# HETER_RATIOS[3][0] = 1.5
+# HETER_RATIOS[1][3] = 1.5
+# HETER_RATIOS[2][1] = 1.5
+# HETER_RATIOS[3][1] = 1.5
+HETER_DP_ID = []
+HETER_PP_ID = []
+if HETER_DEVICE:
+    for dp_index, comptime_pps in enumerate(HETER_RATIOS):
+        for pp_index, comptime in enumerate(comptime_pps):
+            if comptime > 1:
+                HETER_DP_ID.append(dp_index)
+                HETER_PP_ID.append(pp_index)
+# print(f"HETER_DP_ID: {HETER_DP_ID}, HETER_PP_ID: {HETER_PP_ID}")
 
-HETER_DP_ID = [0,1]
-HETER_PP_ID = [2,2]
+FAILURE_DEVICE = True
+FAILURE_INDEX = {0:[1],1:[2],2:[3],3:[0]}#,1:[2,3],2:[3,1],3:[0,1]}
 
-FAILURE_DEVICE = False
-FAILURE_DP_ID = [1]
-FAILURE_PP_ID = [1]
+FAILURE_DP_ID = []
+FAILURE_PP_ID = []
+if FAILURE_DEVICE:
+    for dp_index in FAILURE_INDEX.keys():
+        pp_indexs = FAILURE_INDEX[dp_index]
+        if len(pp_indexs) > 0:
+            for pp_index in pp_indexs:
+                FAILURE_DP_ID.append(dp_index)
+                FAILURE_PP_ID.append(pp_index)
+
+pipeline_comp_power = [0 for _ in range(DEVICE_NUM)]
+for pipeline_index in range(DEVICE_NUM):
+    for dp_index in range(DP_SIZE):
+        if FAILURE_DEVICE and pipeline_index in FAILURE_INDEX.get(dp_index, []):
+            continue
+        if HETER_DEVICE:
+            pipeline_comp_power[pipeline_index] += 1/HETER_RATIOS[dp_index][pipeline_index]
+        else:
+            pipeline_comp_power[pipeline_index] += 1
+suggest_allocation = allocate_tasks(pipeline_comp_power, LAYER_NUM)
+print(f"Suggest Layer Assignment: {suggest_allocation}, pipeline_comp_power: {pipeline_comp_power}")
 
 NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
-# NMB_PER_DP = [11,5,5,11]#[12,4,4,12]#[13,8,7,4]#[9,8,8,7]
+# NMB_PER_DP = [6,6,6,14]
 if SCHEDULE_METHOD != Schedule.OctoPipe:
     HETER_DEVICE_Transfer = False
 if SCHEDULE_METHOD == Schedule.OctoPipe:
