@@ -13,16 +13,50 @@ def allocate_tasks(machine_capacities, total_tasks):
     Returns:
         每台机器分配的任务数
     """
+
     total_capacity = sum(machine_capacities)
     # 按比例分配，然后四舍五入到整数
     allocation = [round(capacity / total_capacity * total_tasks) for capacity in machine_capacities]
     
     # 确保总数等于total_tasks
     diff = total_tasks - sum(allocation)
-    if diff != 0:
-        # 找到计算能力最强的机器，调整它
-        max_idx = machine_capacities.index(max(machine_capacities))
-        allocation[max_idx] += diff
+    while diff != 0:
+        if diff > 0:
+            # 找到当前负载最小的机器（allocation / capacity 最小），分配额外任务
+            loads = [allocation[i] / machine_capacities[i] for i in range(len(machine_capacities))]
+            min_load_idx = loads.index(min(loads))
+            allocation[min_load_idx] += 1
+            diff -= 1
+        else:
+            # 找到当前负载最大的机器，减少任务
+            loads = [allocation[i] / machine_capacities[i] for i in range(len(machine_capacities))]
+            max_load_idx = loads.index(max(loads))
+            allocation[max_load_idx] -= 1
+            diff += 1
+    # n = len(machine_capacities)
+    # allocation = [0] * n
+    # current_time = [0.0] * n
+    
+    # # 初始化：给每个工人分配1个任务（如果总任务足够）
+    # initial_assign = min(total_tasks, n)
+    # for i in range(initial_assign):
+    #     allocation[i] += 1
+    #     current_time[i] = 1.0 / machine_capacities[i]
+    # total_tasks -= initial_assign
+    
+    # # 贪心分配剩余任务：每次给能力最大的工人分配下一个任务（在相同能力中，选择当前时间最小的）
+    # while total_tasks > 0:
+    #     # 找到能力最大的工人
+    #     max_cap = max(machine_capacities)
+    #     candidates = [i for i in range(n) if machine_capacities[i] == max_cap]
+    #     # 在候选者中，选择当前时间最小的
+    #     min_time_among_candidates = min(current_time[i] for i in candidates)
+    #     min_time_idx = [i for i in candidates if current_time[i] == min_time_among_candidates][0]
+    #     # 分配一个任务
+    #     allocation[min_time_idx] += 1
+    #     # 更新完成时间
+    #     current_time[min_time_idx] += 1.0 / machine_capacities[min_time_idx]
+    #     total_tasks -= 1
     
     return allocation
 # --------------------- Solver config ---------------------
@@ -38,7 +72,7 @@ SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
-SCHEDULE_METHOD = Schedule.OctoPipe
+# SCHEDULE_METHOD = Schedule.OctoPipe
 
 # SCHEDULE_METHOD = Schedule.ZBV
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
@@ -46,6 +80,8 @@ STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.SEARCHED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 SPLIT_BACKPROP = True
+
+LAYER_ADAPT = False#TODO
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
     CHUNK_NUM = LAYER_NUM // DEVICE_NUM
@@ -58,7 +94,7 @@ test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 
 CHUNK_NUM = 1
 
-DP_SIZE = 4
+DP_SIZE = 2
 HETER_DEVICE = False
 HETER_DEVICE_Transfer = True
 HETER_RATIOS = [[1 for _ in range(DEVICE_NUM)]for _ in range(DP_SIZE)]
@@ -69,6 +105,17 @@ HETER_RATIOS = [[1 for _ in range(DEVICE_NUM)]for _ in range(DP_SIZE)]
 # HETER_RATIOS[1][3] = 1.5
 # HETER_RATIOS[2][1] = 1.5
 # HETER_RATIOS[3][1] = 1.5
+
+# HETER_RATIOS[0][6] = 1.5 #break
+# HETER_RATIOS[0][9] = 1.5
+
+# HETER_RATIOS[1][3] = 2
+# HETER_RATIOS[1][9] = 1.5
+# HETER_RATIOS[0][2] = 3
+# HETER_RATIOS[1][13] = 3
+# HETER_RATIOS[0][8] = 2
+# HETER_RATIOS[1][14] = 1.5
+
 HETER_DP_ID = []
 HETER_PP_ID = []
 if HETER_DEVICE:
@@ -79,8 +126,8 @@ if HETER_DEVICE:
                 HETER_PP_ID.append(pp_index)
 # print(f"HETER_DP_ID: {HETER_DP_ID}, HETER_PP_ID: {HETER_PP_ID}")
 
-FAILURE_DEVICE = True
-FAILURE_INDEX = {0:[1],1:[2],2:[3],3:[0]}#,1:[2,3],2:[3,1],3:[0,1]}
+FAILURE_DEVICE = False
+FAILURE_INDEX = {0:[14],1:[5]}#,1:[2,3],2:[3,1],3:[0,1]}
 
 FAILURE_DP_ID = []
 FAILURE_PP_ID = []
@@ -196,7 +243,9 @@ SAVE_MEMORY = True
 CONSTRAIN_WARMUP = False
 SWITCH_WORKLOAD_TYPE = True
 
-f_b_w = [1,1.6,0.4]
+f_b_w = [1,1.6,0.4] #llama2 40layers,32layers
+if LAYER_NUM == 80 and MODEL_TYPE == "LLAMA" and DEVICE_NUM==16 :
+    f_b_w = [1,1.8,0.5]#[1,1.5,0.5] 
 if not SPLIT_BACKPROP:
     f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
 

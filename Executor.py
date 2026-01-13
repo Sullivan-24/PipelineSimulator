@@ -62,7 +62,7 @@ class Executor:
         all_DP = set([_ for _ in range(self.dp_size)])
         transfer_info = [[[[]for _ in range(PP_SIZE)] for _ in range(self.dp_size)] for _ in range(self.dp_size)]
         # transfer_info[source_dp_rank].append({"microbatch_ids":[2,4,7], "stage_id":2, "dst_dp_rank":dst_dp_rank})
-        TUNE_NUM = [1,0] 
+        TUNE_NUM = [0,0]
         while self.get_time() <= time_limit and not self.finish_flag:
             success_count = 0
             latest_workloads_dp = [[] for _ in range(self.dp_size)]
@@ -192,9 +192,9 @@ class Executor:
             self.update_time()
         if show_success:
             if self.finish_flag:
-                print("Success")
+                print(f"Success,time:{self.get_time()}")
             else:
-                print("Fail")
+                print(f"Fail,time:{self.get_time()}")
 
         opt_put_info = [[]for _ in range(self.dp_size)]
         for slow_dp_index in range(self.dp_size):
