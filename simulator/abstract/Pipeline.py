@@ -93,7 +93,8 @@ class PipelineScheduler:
             self.placement = solver_results["assignments"]
             self.layer_assignment = [len(p) for p in self.placement]
             self.layer_assignment = [self.layer_num // self.device_num] * self.device_num#TODO
-        self.layer_assignment=suggest_allocation#[13,9,9,9]#[12,4,4,4,4,4,4,4]#[8,4,4,4,8,4,4,4]#[5,4,6,4,6,4,6,5]#[5,4,5,6,6,4,5,5]#[5,4,5,6,5,5,5,5]#[10,2,10,10]#[9,5,9,9]#[12,4,4,12]#[10,6,6,10]#[5,5,5,17]##[11, 11, 11, 3, 11, 11, 11, 11]#[11, 11, 10, 6, 10, 11, 11, 10]#[24,8,24,24]#[23,12,23,22]#[27,13,13,27]#[23,17,17,23]#[23,12,23,22]#[21,17,21,21]#[11,7,11,7,11,11,11,11]#[11,6,10,11,11,10,11,10]#[11,5,5,11]####[14,7,6,5]#[14,8,6,4]#[9,8,8,7]#[11,5,5,11]#[12,4,4,12]##[9,7,7,9]#
+        if LAYER_ADAPT:
+            self.layer_assignment=suggest_allocation
         self.placement = [[sum(self.layer_assignment[:i])+j for j in range(self.layer_assignment[i])] for i in range(len(self.layer_assignment))]
         print("Solved OctoPipe layer_assignment:", self.layer_assignment)
         os.makedirs("schedule_results",exist_ok=True)

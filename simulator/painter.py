@@ -437,17 +437,17 @@ class MultiPipelinePainter:
                     else:
                         self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
 
-                label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
-                        # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
-                        round(self._max_time),
-                        self._pp_size // self._device_size,
-                        self._basic_forward_length[max_key_pid], 
-                        self._basic_backward_b_length[max_key_pid], 
-                        self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
-                        # int(sum(self._comm_length) / len(self._comm_length))
-                        COMM_TIME
-                    ),
-                )
+                # label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
+                #         # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
+                #         round(self._max_time),
+                #         self._pp_size // self._device_size,
+                #         self._basic_forward_length[max_key_pid], 
+                #         self._basic_backward_b_length[max_key_pid], 
+                #         self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
+                #         # int(sum(self._comm_length) / len(self._comm_length))
+                #         COMM_TIME
+                #     ),
+                # )
 
                 coords_label = label_canvas.create_text(
                     canvas_width - self._pp_align - 120, y_label, text="BlockCoords:(start,end)"
