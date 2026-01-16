@@ -275,6 +275,31 @@ class Stage:
                         workload_type=constraint.wtype
                     )
                 ) 
+        # c_did = constraint.did
+        # c_sid = constraint.sid
+        # c_mid = constraint.mid
+        # c_wlt = constraint.wtype
+        # cstr = WorkloadConstraint(
+        #     device_id=c_did,
+        #     stage_id=c_sid, 
+        #     microbatch_id=c_mid, 
+        #     workload_type=c_wlt
+        # )
+        # if c_wlt == WorkloadType.F:
+        #     if self.sid == c_sid + 1 :
+        #         self.workloads[c_mid][c_wlt].update_constraints(time, cstr)
+        #     elif self.sid == c_sid and self.sid == constraint.total_stages - 1:
+        #         self.workloads[c_mid][WorkloadType.B].update_constraints(time, cstr)
+        # elif c_wlt == WorkloadType.B:
+        #     if self.sid == c_sid - 1:
+        #         self.workloads[c_mid][c_wlt].update_constraints(time, cstr)
+        #     elif self.sid == c_sid:
+        #         self.workloads[c_mid][WorkloadType.W].update_constraints(time, cstr)
+        # elif c_wlt == WorkloadType.R:
+        #     if self.sid == c_sid:
+        #         self.workloads[c_mid][WorkloadType.B].update_constraints(time, cstr)
+        # else:
+        #     pass
 
     def update_memory_usage(self, workload:Workload, sim = False):
         begin_memory = self.memory_usage
