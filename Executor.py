@@ -5,6 +5,7 @@ from simulator.abstract.Pipeline import PipelineScheduler
 import cProfile
 import pstats
 import pdb
+import time
 class Executor:
 
     def __init__(self, dp_size, nmb_per_dp: list = None) -> None:
@@ -62,7 +63,7 @@ class Executor:
         all_DP = set([_ for _ in range(self.dp_size)])
         transfer_info = [[[[]for _ in range(PP_SIZE)] for _ in range(self.dp_size)] for _ in range(self.dp_size)]
         # transfer_info[source_dp_rank].append({"microbatch_ids":[2,4,7], "stage_id":2, "dst_dp_rank":dst_dp_rank})
-        TUNE_NUM = [0,0]
+        TUNE_NUM = [0,2]
         while self.get_time() <= time_limit and not self.finish_flag:
             success_count = 0
             latest_workloads_dp = [[] for _ in range(self.dp_size)]
@@ -174,8 +175,9 @@ class Executor:
                         print("diff")
                         for pipeline in self.pipelines:
                             if pipeline.pipeline_idx == slow_dp :#and self.get_time() == pop_time:
+                                if pop_num_slow[slow_index] >= MICRO_BATCH_NUM-1:
+                                    continue
                                 pop_mid_slow = exec_f_num_slow_dp+pipeline.mid_offset
-                                
                                 workloads_slow = pipeline.pop_workload(mid_group=[pop_mid_slow],did_group=[slow_did])#pop 下一个f
                                 # pop_time = None
                                 pop_num_slow[slow_index] += 1
@@ -192,10 +194,13 @@ class Executor:
             self.update_time()
         if show_success:
             if self.finish_flag:
+                for pipeline_index in range(len(self.pipelines)):
+                    pipeline = self.pipelines[pipeline_index]
+                    print(f"DP{pipeline_index}:{pipeline.devices[0].finish_time}")
                 print(f"Success,time:{self.get_time()}")
             else:
                 print(f"Fail,time:{self.get_time()}")
-
+        
         opt_put_info = [[]for _ in range(self.dp_size)]
         for slow_dp_index in range(self.dp_size):
             for fast_dp_index in range(self.dp_size):
@@ -238,7 +243,7 @@ if __name__ == "__main__":
     # Example
     # executor = Executor(dp_size=4, nmb_per_dp=[15, 12, 20, 17])
     executor = Executor(dp_size=DP_SIZE,nmb_per_dp = NMB_PER_DP)
-    
+    start_time = time.time() 
     if gpc["PROFILE_GENERATION"]:
         profiler = cProfile.Profile()
         profiler.enable()
@@ -249,5 +254,5 @@ if __name__ == "__main__":
         stats.print_stats(20)  # 打印前 10 个耗时函数
     else:
         executor.run_all_dp()
-
+    print("Total execution time: {:.2f} seconds".format(time.time() - start_time))
     executor.draw()

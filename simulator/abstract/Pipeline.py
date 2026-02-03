@@ -583,6 +583,7 @@ class PipelineScheduler:
                 self.update_workload_execution_record()
 
                 device.current_workload.complete(time=time)
+                device.finish_time = time
                 self.update_constraints_within_pipeline(time=time, constraint=device.current_workload)
                 device.update_memory_usage()
                 device.state = Device.IDLE

@@ -171,7 +171,7 @@ class Device:
         self.situations = 1
         self.max_memory = max_mem
         self.comp_power = comp_power
-
+        self.finish_time = 0
         self.workload_execute_record: list[list[Workload]] = [[] for _ in range(gpc["DEVICE_NUM"])]
 
     def get_max_mem_did(self):
