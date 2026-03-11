@@ -63,7 +63,7 @@ class Executor:
         all_DP = set([_ for _ in range(self.dp_size)])
         transfer_info = [[[[]for _ in range(PP_SIZE)] for _ in range(self.dp_size)] for _ in range(self.dp_size)]
         # transfer_info[source_dp_rank].append({"microbatch_ids":[2,4,7], "stage_id":2, "dst_dp_rank":dst_dp_rank})
-        TUNE_NUM = [0,2]
+        TUNE_NUM = [0,0]
         while self.get_time() <= time_limit and not self.finish_flag:
             success_count = 0
             latest_workloads_dp = [[] for _ in range(self.dp_size)]
@@ -146,7 +146,6 @@ class Executor:
             if HETER_DEVICE_Transfer:
                 slow_dids = HETER_PP_ID
                 slow_dps = HETER_DP_ID
-                fast_dps = list(all_DP-set(HETER_DP_ID))
                 for slow_index in range(len(slow_dids)):
                     slow_did =  slow_dids[slow_index]
                     slow_dp = slow_dps[slow_index]
@@ -167,12 +166,15 @@ class Executor:
                             elif exec_f_num_ < min_f_num:
                                 min_f_num = exec_f_num_
                                 slow_dp = dp_rank
+                            # if (self.pipelines[dp_rank].devices[slow_did].exe_num_f-self.pipelines[dp_rank].devices[slow_did].exe_num_w )>int(1*MICRO_BATCH_NUM):
+                            #     # print("pass")
+                            #     continue
                     if slow_dp != slow_dps[slow_index] or fast_dp is None:
                     # if slow_dp in slow_dps or fast_dp is None:
                         continue
                     # print(f"slow_dp:{slow_dp}, exec_f_num_slow_dp:{exec_f_num_slow_dp}, fast_dp:{fast_dp}, max_f_num:{max_f_num}, exe_f_num:{[exec_f_num_dp[_][slow_did] for _ in range(self.dp_size)]}")
                     if exec_f_num_slow_dp < NMB_PER_DP[slow_dp]:
-                        print("diff")
+                        # print("diff")
                         for pipeline in self.pipelines:
                             if pipeline.pipeline_idx == slow_dp :#and self.get_time() == pop_time:
                                 if pop_num_slow[slow_index] >= MICRO_BATCH_NUM-1:

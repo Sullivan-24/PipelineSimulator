@@ -72,7 +72,7 @@ SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
-SCHEDULE_METHOD = Schedule.OctoPipe
+# SCHEDULE_METHOD = Schedule.OctoPipe
 
 # SCHEDULE_METHOD = Schedule.ZBV
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
@@ -80,9 +80,8 @@ STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.SEARCHED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 SPLIT_BACKPROP = True
-LAYER_ADAPT = True#TODO
+LAYER_ADAPT = False#TODO
 opti = False
-
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
     CHUNK_NUM = LAYER_NUM // DEVICE_NUM
@@ -97,10 +96,143 @@ CHUNK_NUM = 1
 
 DP_SIZE = 2
 HETER_DEVICE = True
-HETER_DEVICE_Transfer = True
+HETER_DEVICE_Transfer = False
 HETER_RATIOS = [[1 for _ in range(DEVICE_NUM)]for _ in range(DP_SIZE)]
-HETER_RATIOS[0][3] = 3
+
+# # HETER_RATIOS[0][10] = 3
+
+# # HETER_RATIOS[1][4] = 3
+# HETER_RATIOS[2][7] = 3
+# # HETER_RATIOS[3][12] = 3
+
+# # HETER_RATIOS[0][2] = 3
+# # HETER_RATIOS[0][9] = 3
+# # HETER_RATIOS[3][1] = 3
+# HETER_RATIOS[3][7] = 3
+
+# HETER_RATIOS[0][4] = 1.65
+# # HETER_RATIOS[1][11] = 1.65
+
+# # HETER_RATIOS[2][11] = 1.65
+# # HETER_RATIOS[3][11] = 1.65
+# # HETER_RATIOS[0][13] = 1.65
+# # HETER_RATIOS[0][1] = 1.65
+# HETER_RATIOS[1][9] = 1.65
+# HETER_RATIOS[1][1] = 1.65
+
+# HETER_RATIOS[1][4] = 3
+# HETER_RATIOS[2][9] = 3
+# HETER_RATIOS[2][1] = 3
+# HETER_RATIOS[2][15] = 3
+# HETER_RATIOS[3][10] = 3
+# HETER_RATIOS[3][4] = 1.5
+
+# HETER_RATIOS[0][1] = 1.6
+# HETER_RATIOS[0][5] = 1.6
+# HETER_RATIOS[1][2] = 1.6
+# HETER_RATIOS[1][6] = 1.6
+
+# HETER_RATIOS[0][1] = 1.6
+# HETER_RATIOS[0][5] = 1.6
+# HETER_RATIOS[0][3] = 1.6
+# HETER_RATIOS[0][4] = 1.6
+# HETER_RATIOS[0][7] = 1.6
+# HETER_RATIOS[1][0] = 1.6
+# HETER_RATIOS[1][2] = 1.6
+# HETER_RATIOS[1][6] = 1.6
+
+# HETER_RATIOS[0][0] = 1.6
+# HETER_RATIOS[0][1] = 1.6
+# HETER_RATIOS[0][2] = 1.6
+# HETER_RATIOS[0][3] = 1.6
+# HETER_RATIOS[0][4] = 1.6
+# HETER_RATIOS[0][5] = 1.6
+# HETER_RATIOS[0][6] = 1.6
+# HETER_RATIOS[0][7] = 1.6
+# HETER_RATIOS[1][0] = 1.6
+# HETER_RATIOS[1][1] = 1.6
+# HETER_RATIOS[1][2] = 1.6
+# HETER_RATIOS[1][3] = 1.6
+# HETER_RATIOS[1][4] = 1.6
+# HETER_RATIOS[1][5] = 1.6
+# HETER_RATIOS[1][6] = 1.6
+# HETER_RATIOS[1][7] = 1.6
+
+# HETER_RATIOS[0][5] = 1.6
+# HETER_RATIOS[1][2] = 1.6
+# HETER_RATIOS[0][6] = 3
+# HETER_RATIOS[1][1] = 3
+# HETER_RATIOS[1][4] = 3
+# HETER_RATIOS[1][7] = 3
+
+# HETER_RATIOS[0][5] = 1.6
+# HETER_RATIOS[1][2] = 1.6
+# HETER_RATIOS[0][3] = 1.6
+# HETER_RATIOS[1][0] = 1.6
+# HETER_RATIOS[0][0] = 3
+# HETER_RATIOS[0][2] = 3
+# HETER_RATIOS[0][6] = 3
+# HETER_RATIOS[1][1] = 3
+# HETER_RATIOS[1][3] = 3
+# HETER_RATIOS[1][4] = 3
+# HETER_RATIOS[1][5] = 3
+# HETER_RATIOS[1][7] = 3
+
+HETER_RATIOS[0][1] = 1.6
+HETER_RATIOS[0][3] = 1.6
+HETER_RATIOS[0][4] = 1.6
+HETER_RATIOS[0][5] = 1.6
+HETER_RATIOS[0][7] = 1.6
+HETER_RATIOS[1][0] = 1.6
+HETER_RATIOS[1][2] = 1.6
+HETER_RATIOS[1][6] = 1.6 
+HETER_RATIOS[0][0] = 3
+HETER_RATIOS[0][2] = 3
+HETER_RATIOS[0][6] = 3
+HETER_RATIOS[1][1] = 3
 HETER_RATIOS[1][3] = 3
+HETER_RATIOS[1][4] = 3
+HETER_RATIOS[1][5] = 3
+HETER_RATIOS[1][7] = 3
+
+# HETER_RATIOS[1][0] = 1.5
+# HETER_RATIOS[1][1] = 1.5
+# HETER_RATIOS[1][2] = 1.5
+# HETER_RATIOS[1][3] = 1.5
+
+# HETER_RATIOS[0][0] = 1.5
+# HETER_RATIOS[0][1] = 1.5
+# HETER_RATIOS[0][2] = 1.5    if ZERO_SIZE == 4 and TP_SIZE == 4:#A100
+# HETER_RATIOS[0][3] = 1.5
+
+# HETER_RATIOS[1][2] = 1.5
+# HETER_RATIOS[0][0] = 3
+# HETER_RATIOS[0][3] = 3
+
+# HETER_RATIOS[0][1] = 1.5
+# HETER_RATIOS[1][2] = 1.5
+# HETER_RATIOS[0][0] = 3
+# HETER_RATIOS[0][2] = 3
+# HETER_RATIOS[0][3] = 3
+# HETER_RATIOS[1][1] = 3
+
+# HETER_RATIOS[0][1] = 1.5    if ZERO_SIZE == 4 and TP_SIZE == 4:#A100
+# HETER_RATIOS[0][0] = 3
+# HETER_RATIOS[0][2] = 3
+# HETER_RATIOS[0][3] = 3
+# HETER_RATIOS[1][1] = 3
+
+# HETER_RATIOS[1][0] = 1.5
+# HETER_RATIOS[1][1] = 3
+
+# HETER_RATIOS[0][3] = 4
+BEST = True
+if BEST == True:
+    SCHEDULE_METHOD = Schedule.OctoPipe
+    LAYER_ADAPT = False
+    opti = False
+    HETER_DEVICE_Transfer = True
+
 HETER_DP_ID = []
 HETER_PP_ID = []
 if HETER_DEVICE:
@@ -112,7 +244,7 @@ if HETER_DEVICE:
 # print(f"HETER_DP_ID: {HETER_DP_ID}, HETER_PP_ID: {HETER_PP_ID}")
 
 FAILURE_DEVICE = False
-FAILURE_INDEX = {0:[1,5],1:[6,2]}#{0:[1,3,4,5,7],1:[0,2,6],}#{0:[10,5,11,12,9,4],1:[15,1,3,13]}#,1:[2,3],2:[3,1],3:[0,1]}
+FAILURE_INDEX = {0:[],1:[]}
 
 FAILURE_DP_ID = []
 FAILURE_PP_ID = []
@@ -137,7 +269,11 @@ suggest_allocation = allocate_tasks(pipeline_comp_power, LAYER_NUM, opti)
 print(f"Suggest Layer Assignment: {suggest_allocation}, pipeline_comp_power: {pipeline_comp_power}")
 
 NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
-# NMB_PER_DP = [9,7]
+# NMB_PER_DP = [7,19,19,19]
+# NMB_PER_DP = [15,18,17,14]
+# NMB_PER_DP = [22,22,10,10]
+
+# NMB_PER_DP=[4,12]
 if SCHEDULE_METHOD != Schedule.OctoPipe:
     HETER_DEVICE_Transfer = False
 if SCHEDULE_METHOD == Schedule.OctoPipe:
@@ -170,11 +306,7 @@ B_TIME = 0
 W_TIME = 0
 COMM_TIME = [[0 for _ in range(PP_SIZE)] for _ in range(PP_SIZE)]
 # COMM_TIME[0][1] = 120
-# COMM_TIME[1][0] = 120
-# COMM_TIME[3][4] = 120
-# COMM_TIME[4][3] = 120
-# COMM_TIME[6][7] = 120
-# COMM_TIME[7][6] = 120
+
 if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH, Schedule.ZBV):
     SPLIT_BACKPROP = True
     if SCHEDULE_METHOD == Schedule.ZBV:
@@ -229,12 +361,32 @@ CONSTRAIN_WARMUP = False
 SWITCH_WORKLOAD_TYPE = True
 
 f_b_w = [1,1.6,0.4] #llama2 40layers,32layers
-f_b_w = [1,2,0.5]#llama2,64layers
-if LAYER_NUM == 80 and MODEL_TYPE == "LLAMA" and DEVICE_NUM==16 :
-    f_b_w = [1,1.8,0.5]#[1,1.5,0.5] 
+
+#H800
+# if LAYER_NUM == 80 and DEVICE_NUM==16:
+#     f_b_w = [1,1.8,0.5]
+#     if ZERO_SIZE == 4 and TP_SIZE ==4:#A100
+#         f_b_w = [1,1.5,0.6]
+# elif LAYER_NUM == 64 and DEVICE_NUM==8:
+#     f_b_w = [1,2,0.5]#llama2,64layers
+# elif LAYER_NUM == 40 and DEVICE_NUM==4:
+#     f_b_w = [1,2,2/7]
+# elif LAYER_NUM == 32 and DEVICE_NUM==2:
+#     f_b_w = [1,1.5,1/6]
+# if not SPLIT_BACKPROP:
+#     f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
+
+#A100
+if LAYER_NUM == 80 and DEVICE_NUM==16:
+    f_b_w = [1,1.5,0.6]
+elif LAYER_NUM == 64 and DEVICE_NUM==8:
+    f_b_w = [1,1.5,0.5]#llama2,64layers
+elif LAYER_NUM == 40 and DEVICE_NUM==4:
+    f_b_w = [1,1.6,0.4]
+elif LAYER_NUM == 32 and DEVICE_NUM==2:
+    f_b_w = [1,1.45,0.3]
 if not SPLIT_BACKPROP:
     f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
-
 F_TIME = 10
 F_TIMES = [F_TIME] * LAYER_NUM
 B_TIMES = [F_TIME*f_b_w[1]] * LAYER_NUM
