@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from simulator.abstract.variables import *
 from simulator.model_config import *
-
+import math
 def allocate_tasks(machine_capacities, total_tasks, opti=False):
     """
     将任务分配给不同计算能力的机器，最小化最大执行时间
@@ -73,7 +73,6 @@ SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
 # SCHEDULE_METHOD = Schedule.OctoPipe
-
 # SCHEDULE_METHOD = Schedule.ZBV
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
 STAGE_PLACEMENT = Placement.INTERLEAVED
@@ -81,160 +80,77 @@ STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 SPLIT_BACKPROP = True
 LAYER_ADAPT = False#TODO
-opti = False
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
-    CHUNK_NUM = LAYER_NUM // DEVICE_NUM
+    CHUNK_NUM = LAYER_NUM // PP_SIZE
     SPLIT_BACKPROP = False
 if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH, Schedule.STANDARD_1F1B, Schedule.STANDARD_AFAB):
     CHUNK_NUM = 1
-# --------------------- Solver config ---------------------
 Hierarchical = True
 test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 
-CHUNK_NUM = 1
+# --------------------- Solver config ---------------------
 
+CHUNK_NUM = 1
 DP_SIZE = 2
+HETER_RATIOS = [[1 for _ in range(PP_SIZE)]for _ in range(DP_SIZE)]
+HETER_DP_ID = []
+HETER_PP_ID = []
+Failure_ranks_map = [[[] for _ in range(PP_SIZE)] for _ in range(DP_SIZE)]
+FAILURE_DP_ID = []
+FAILURE_PP_ID = []
+ALL_TPfail_map = [[] for _ in range(DP_SIZE)]
+FAILURE_GLOBAL_RANKS = []
+Failure_ranks_info = []
+Available_ranks_map = [[[i for i in range(TP_SIZE)] for _ in range(PP_SIZE) ] for _ in range(DP_SIZE)]
+HETER_DP_ID
 HETER_DEVICE = True
 HETER_DEVICE_Transfer = False
-HETER_RATIOS = [[1 for _ in range(DEVICE_NUM)]for _ in range(DP_SIZE)]
-
-# # HETER_RATIOS[0][10] = 3
-
-# # HETER_RATIOS[1][4] = 3
-# HETER_RATIOS[2][7] = 3
-# # HETER_RATIOS[3][12] = 3
-
-# # HETER_RATIOS[0][2] = 3
-# # HETER_RATIOS[0][9] = 3
-# # HETER_RATIOS[3][1] = 3
-# HETER_RATIOS[3][7] = 3
-
-# HETER_RATIOS[0][4] = 1.65
-# # HETER_RATIOS[1][11] = 1.65
-
-# # HETER_RATIOS[2][11] = 1.65
-# # HETER_RATIOS[3][11] = 1.65
-# # HETER_RATIOS[0][13] = 1.65
-# # HETER_RATIOS[0][1] = 1.65
-# HETER_RATIOS[1][9] = 1.65
-# HETER_RATIOS[1][1] = 1.65
-
-# HETER_RATIOS[1][4] = 3
-# HETER_RATIOS[2][9] = 3
-# HETER_RATIOS[2][1] = 3
-# HETER_RATIOS[2][15] = 3
-# HETER_RATIOS[3][10] = 3
-# HETER_RATIOS[3][4] = 1.5
-
-# HETER_RATIOS[0][1] = 1.6
-# HETER_RATIOS[0][5] = 1.6
-# HETER_RATIOS[1][2] = 1.6
-# HETER_RATIOS[1][6] = 1.6
-
-# HETER_RATIOS[0][1] = 1.6
-# HETER_RATIOS[0][5] = 1.6
-# HETER_RATIOS[0][3] = 1.6
-# HETER_RATIOS[0][4] = 1.6
-# HETER_RATIOS[0][7] = 1.6
-# HETER_RATIOS[1][0] = 1.6
-# HETER_RATIOS[1][2] = 1.6
-# HETER_RATIOS[1][6] = 1.6
-
-# HETER_RATIOS[0][0] = 1.6
-# HETER_RATIOS[0][1] = 1.6
-# HETER_RATIOS[0][2] = 1.6
-# HETER_RATIOS[0][3] = 1.6
-# HETER_RATIOS[0][4] = 1.6
-# HETER_RATIOS[0][5] = 1.6
-# HETER_RATIOS[0][6] = 1.6
-# HETER_RATIOS[0][7] = 1.6
-# HETER_RATIOS[1][0] = 1.6
-# HETER_RATIOS[1][1] = 1.6
-# HETER_RATIOS[1][2] = 1.6
-# HETER_RATIOS[1][3] = 1.6
-# HETER_RATIOS[1][4] = 1.6
-# HETER_RATIOS[1][5] = 1.6
-# HETER_RATIOS[1][6] = 1.6
-# HETER_RATIOS[1][7] = 1.6
-
-# HETER_RATIOS[0][5] = 1.6
-# HETER_RATIOS[1][2] = 1.6
-# HETER_RATIOS[0][6] = 3
-# HETER_RATIOS[1][1] = 3
-# HETER_RATIOS[1][4] = 3
-# HETER_RATIOS[1][7] = 3
-
-# HETER_RATIOS[0][5] = 1.6
-# HETER_RATIOS[1][2] = 1.6
-# HETER_RATIOS[0][3] = 1.6
-# HETER_RATIOS[1][0] = 1.6
-# HETER_RATIOS[0][0] = 3
-# HETER_RATIOS[0][2] = 3
-# HETER_RATIOS[0][6] = 3
-# HETER_RATIOS[1][1] = 3
-# HETER_RATIOS[1][3] = 3
-# HETER_RATIOS[1][4] = 3
-# HETER_RATIOS[1][5] = 3
-# HETER_RATIOS[1][7] = 3
-
-HETER_RATIOS[0][1] = 1.6
-HETER_RATIOS[0][3] = 1.6
-HETER_RATIOS[0][4] = 1.6
-HETER_RATIOS[0][5] = 1.6
-HETER_RATIOS[0][7] = 1.6
-HETER_RATIOS[1][0] = 1.6
-HETER_RATIOS[1][2] = 1.6
-HETER_RATIOS[1][6] = 1.6 
-HETER_RATIOS[0][0] = 3
-HETER_RATIOS[0][2] = 3
-HETER_RATIOS[0][6] = 3
-HETER_RATIOS[1][1] = 3
-HETER_RATIOS[1][3] = 3
-HETER_RATIOS[1][4] = 3
-HETER_RATIOS[1][5] = 3
-HETER_RATIOS[1][7] = 3
-
-# HETER_RATIOS[1][0] = 1.5
-# HETER_RATIOS[1][1] = 1.5
-# HETER_RATIOS[1][2] = 1.5
-# HETER_RATIOS[1][3] = 1.5
-
-# HETER_RATIOS[0][0] = 1.5
-# HETER_RATIOS[0][1] = 1.5
-# HETER_RATIOS[0][2] = 1.5    if ZERO_SIZE == 4 and TP_SIZE == 4:#A100
-# HETER_RATIOS[0][3] = 1.5
-
-# HETER_RATIOS[1][2] = 1.5
-# HETER_RATIOS[0][0] = 3
-# HETER_RATIOS[0][3] = 3
-
-# HETER_RATIOS[0][1] = 1.5
-# HETER_RATIOS[1][2] = 1.5
-# HETER_RATIOS[0][0] = 3
-# HETER_RATIOS[0][2] = 3
-# HETER_RATIOS[0][3] = 3
-# HETER_RATIOS[1][1] = 3
-
-# HETER_RATIOS[0][1] = 1.5    if ZERO_SIZE == 4 and TP_SIZE == 4:#A100
-# HETER_RATIOS[0][0] = 3
-# HETER_RATIOS[0][2] = 3
-# HETER_RATIOS[0][3] = 3
-# HETER_RATIOS[1][1] = 3
-
-# HETER_RATIOS[1][0] = 1.5
-# HETER_RATIOS[1][1] = 3
-
-# HETER_RATIOS[0][3] = 4
+HETER_RATIOS[0][1] = 3
+HETER_RATIOS[1][2] = 1.5
+FAILURE_DEVICE = True
 BEST = True
+# Failure_ranks_map[0][2]= [0,1,2,3]
+opti = False#for layer paratation
+NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
+
 if BEST == True:
     SCHEDULE_METHOD = Schedule.OctoPipe
     LAYER_ADAPT = False
     opti = False
     HETER_DEVICE_Transfer = True
+if SCHEDULE_METHOD != Schedule.OctoPipe:
+    HETER_DEVICE_Transfer = False
+if SCHEDULE_METHOD == Schedule.OctoPipe:
+    NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
 
-HETER_DP_ID = []
-HETER_PP_ID = []
+
+if FAILURE_DEVICE:
+    for dp_index, pp_ranks in enumerate(Failure_ranks_map):
+        for pp_index, failure_tp_ranks in enumerate(pp_ranks): 
+            TPGroup = Available_ranks_map[dp_index][pp_index]
+            for failure_tp_rank in failure_tp_ranks:
+                TPGroup.remove(failure_tp_rank)
+                Failure_ranks_info.append(f"dp:{dp_index}, pp:{pp_index},tp:{failure_tp_rank}")
+            if len(TPGroup)>0:
+                while(math.log2(len(TPGroup))%1 != 0):
+                    Failure_ranks_map[dp_index][pp_index].append(TPGroup.pop(-1))
+            for failure_local_tp_rank in Failure_ranks_map[dp_index][pp_index]:
+                FAILURE_GLOBAL_RANKS.append(pp_index*(DP_SIZE*TP_SIZE)+dp_index*TP_SIZE+failure_local_tp_rank)
+            Available_ranks_map[dp_index][pp_index] = TPGroup
+            if len(TPGroup)== 0:
+                FAILURE_DP_ID.append(dp_index)  
+                FAILURE_PP_ID.append(pp_index)
+                ALL_TPfail_map[dp_index].append(pp_index)
+            else:
+                slow_down_by_failTP = int(TP_SIZE/len(TPGroup))
+                if slow_down_by_failTP == 2:
+                    HETER_RATIOS[dp_index][pp_index] = 1.5
+                elif slow_down_by_failTP == 4:
+                    HETER_RATIOS[dp_index][pp_index] = 2
+                elif slow_down_by_failTP == 8:
+                    HETER_RATIOS[dp_index][pp_index] = 3.5
+
 if HETER_DEVICE:
     for dp_index, comptime_pps in enumerate(HETER_RATIOS):
         for pp_index, comptime in enumerate(comptime_pps):
@@ -242,42 +158,15 @@ if HETER_DEVICE:
                 HETER_DP_ID.append(dp_index)
                 HETER_PP_ID.append(pp_index)
 # print(f"HETER_DP_ID: {HETER_DP_ID}, HETER_PP_ID: {HETER_PP_ID}")
-
-FAILURE_DEVICE = False
-FAILURE_INDEX = {0:[],1:[]}
-
-FAILURE_DP_ID = []
-FAILURE_PP_ID = []
-if FAILURE_DEVICE:
-    for dp_index in FAILURE_INDEX.keys():
-        pp_indexs = FAILURE_INDEX[dp_index]
-        if len(pp_indexs) > 0:
-            for pp_index in pp_indexs:
-                FAILURE_DP_ID.append(dp_index)
-                FAILURE_PP_ID.append(pp_index)
-
-pipeline_comp_power = [0 for _ in range(DEVICE_NUM)]
-for pipeline_index in range(DEVICE_NUM):
-    for dp_index in range(DP_SIZE):
-        if FAILURE_DEVICE and pipeline_index in FAILURE_INDEX.get(dp_index, []):
-            continue
+pipeline_comp_power = [0 for _ in range(PP_SIZE)]
+for dp_index in range(DP_SIZE):
+    for pp_index in range(PP_SIZE):
         if HETER_DEVICE:
-            pipeline_comp_power[pipeline_index] += 1/HETER_RATIOS[dp_index][pipeline_index]
+            pipeline_comp_power[pp_index] += 1/HETER_RATIOS[dp_index][pp_index]
         else:
-            pipeline_comp_power[pipeline_index] += 1
-suggest_allocation = allocate_tasks(pipeline_comp_power, LAYER_NUM, opti)
+            pipeline_comp_power[pp_index] += 1
+suggest_allocation = allocate_tasks(pipeline_comp_power, LAYER_NUM)
 print(f"Suggest Layer Assignment: {suggest_allocation}, pipeline_comp_power: {pipeline_comp_power}")
-
-NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
-# NMB_PER_DP = [7,19,19,19]
-# NMB_PER_DP = [15,18,17,14]
-# NMB_PER_DP = [22,22,10,10]
-
-# NMB_PER_DP=[4,12]
-if SCHEDULE_METHOD != Schedule.OctoPipe:
-    HETER_DEVICE_Transfer = False
-if SCHEDULE_METHOD == Schedule.OctoPipe:
-    NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
 
 OVERLAP_AWARE_SCHEDULE = True if not HETER_DEVICE else False
 OVERLAP_AWARE_SCHEDULE = True
@@ -363,27 +252,27 @@ SWITCH_WORKLOAD_TYPE = True
 f_b_w = [1,1.6,0.4] #llama2 40layers,32layers
 
 #H800
-# if LAYER_NUM == 80 and DEVICE_NUM==16:
+# if LAYER_NUM == 80 and PP_SIZE==16:
 #     f_b_w = [1,1.8,0.5]
 #     if ZERO_SIZE == 4 and TP_SIZE ==4:#A100
 #         f_b_w = [1,1.5,0.6]
-# elif LAYER_NUM == 64 and DEVICE_NUM==8:
+# elif LAYER_NUM == 64 and PP_SIZE==8:
 #     f_b_w = [1,2,0.5]#llama2,64layers
-# elif LAYER_NUM == 40 and DEVICE_NUM==4:
+# elif LAYER_NUM == 40 and PP_SIZE==4:
 #     f_b_w = [1,2,2/7]
-# elif LAYER_NUM == 32 and DEVICE_NUM==2:
+# elif LAYER_NUM == 32 and PP_SIZE==2:
 #     f_b_w = [1,1.5,1/6]
 # if not SPLIT_BACKPROP:
 #     f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
 
 #A100
-if LAYER_NUM == 80 and DEVICE_NUM==16:
+if LAYER_NUM == 80 and PP_SIZE==16:
     f_b_w = [1,1.5,0.6]
-elif LAYER_NUM == 64 and DEVICE_NUM==8:
+elif LAYER_NUM == 64 and PP_SIZE==8:
     f_b_w = [1,1.5,0.5]#llama2,64layers
-elif LAYER_NUM == 40 and DEVICE_NUM==4:
+elif LAYER_NUM == 40 and PP_SIZE==4:
     f_b_w = [1,1.6,0.4]
-elif LAYER_NUM == 32 and DEVICE_NUM==2:
+elif LAYER_NUM == 32 and PP_SIZE==2:
     f_b_w = [1,1.45,0.3]
 if not SPLIT_BACKPROP:
     f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
@@ -557,12 +446,12 @@ if CHUNK_NUM > PP_SIZE:
 
 # --------------------- Save File Config ---------------------
 SAVE_RES_TO_FILE = True
-SCH_FILE_PATH = f"schedule_results/schedules/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}_c{CHUNK_NUM}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
-PLA_FILE_PATH = f"schedule_results/placements/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}_c{CHUNK_NUM}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
-TEMP_PLA_PATH = f"schedule_results/placement.txt"
-TEMP_RES_PATH = f"schedule_results/result.txt"
+SCH_FILE_PATH = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/schedules/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}_c{CHUNK_NUM}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
+PLA_FILE_PATH = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/placements/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}_c{CHUNK_NUM}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
+TEMP_PLA_PATH = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/placement.txt"
+TEMP_RES_PATH = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/result.txt"
 
-STAGE_NUM = int(DEVICE_NUM * CHUNK_NUM)
+STAGE_NUM = int(PP_SIZE * CHUNK_NUM)
 assert STAGE_NUM <= LAYER_NUM, f"Stage ({STAGE_NUM}) should be less than Layer ({LAYER_NUM}). "
 
 WORKLOAD_TYPE_NUM = 3

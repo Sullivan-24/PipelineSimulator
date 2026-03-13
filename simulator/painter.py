@@ -504,7 +504,7 @@ class MultiPipelinePainter:
                 # 求余考虑virtual stage的情况
                 self._item2mid[block] = mid
 
-        save_to_file(f"schedule_results/result.txt", schedule_res_content, 'w')
+        save_to_file(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/result.txt", schedule_res_content, 'w')
 
         # Register hook for highlighting execution block of this microbatch
         def _trigger_hook(event):
@@ -544,6 +544,6 @@ class MultiPipelinePainter:
 
         main_canvas.bind("<Button-1>", _trigger_hook)
 
-        button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_postscript(main_canvas, "schedule_results/_schedule.png"))
+        button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_postscript(main_canvas, f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/_schedule.png"))
         button.pack()
         self._tk_root.mainloop()

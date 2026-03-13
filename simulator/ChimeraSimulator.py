@@ -308,7 +308,7 @@ class ChimeraSimulator:
                 "cwi_1_f_","cwi_1_b_","cwi_1_w_",
                 ))}
             self._draw(resort_microbatch_index(self._num_microbatches ,results))
-        self.model.write("schedule_results/model.lp")
+        self.model.write(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/model.lp")
         return results
     
 

@@ -2,10 +2,12 @@ from simulator.abstract.Device import *
 from simulator.abstract.mutils import *
 from simulator.painter import MultiPipelinePainter as MPP
 from simulator.abstract.Pipeline import PipelineScheduler
+from PipelineSimulator.preprocess import generate_schedule
 import cProfile
 import pstats
 import pdb
 import time
+
 class Executor:
 
     def __init__(self, dp_size, nmb_per_dp: list = None) -> None:
@@ -210,7 +212,7 @@ class Executor:
                     transfer_mid = transfer_info[slow_dp_index][fast_dp_index][slow_did_index]
                     if len(transfer_mid)>0:
                         opt_put_info[slow_dp_index].append({"microbatch_ids":transfer_mid, "stage_id":slow_did_index, "dst_dp_rank":fast_dp_index})#TODO slow_did_index == stage_id just in single chunk
-        save_to_file(f"schedule_results/transfer_info.txt", str(opt_put_info), 'w')
+        save_to_file(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/transfer_info.txt", str(opt_put_info), 'w')
 
     def draw(self) -> None:
         res_all_dp = {}
@@ -258,3 +260,9 @@ if __name__ == "__main__":
         executor.run_all_dp()
     print("Total execution time: {:.2f} seconds".format(time.time() - start_time))
     executor.draw()
+    generate_schedule(num_microbatches=MICRO_BATCH_NUM, MODEL_NAME=MODEL_NAME,
+                      SEQ_LEN=SEQ_LEN, NUM_LAYER= LAYER_NUM, DP_SIZE=DP_SIZE, PP_SIZE=PP_SIZE, TP_SIZE=TP_SIZE,
+                        HETER=HETER_DEVICE, FALCON= NMB_PER_DP!=[MICRO_BATCH_NUM]*DP_SIZE, FAILURE=FAILURE_DEVICE,
+                        HETER_RATIOS=HETER_RATIOS,Failure_ranks_map=Failure_ranks_map, Available_ranks_map=Available_ranks_map,
+                        FAILURE_GLOBAL_RANKS= FAILURE_GLOBAL_RANKS, Failure_ranks_info = Failure_ranks_info,
+                      )

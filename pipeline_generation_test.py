@@ -33,9 +33,9 @@ def clear_old_files():
     clear_old_file(TEMP_PLA_PATH)
     clear_old_file(TEMP_RES_PATH)
     for did in range(DEVICE_NUM):
-        workload_stat_filepath = f"schedule_results/workload_statistics/device{did}.txt"
+        workload_stat_filepath = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/workload_statistics/device{did}.txt"
         clear_old_file(workload_stat_filepath)
-        memory_record_filepath = f"schedule_results/memory/device{did}.txt"
+        memory_record_filepath = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/memory/device{did}.txt"
         clear_old_file(memory_record_filepath)
 
 def generate_parallel_config(num_gpu:int):

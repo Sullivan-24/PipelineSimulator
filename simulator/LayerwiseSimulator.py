@@ -440,7 +440,7 @@ class LayerwiseSimulator:
                 var.Start = self.pipeline_scheduler.results[var.VarName]
 
         # DEBUG
-        self.model.write("schedule_results/model.lp")
+        self.model.write(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/model.lp")
 
     def freeze_schedule_by_mid(self, mid):
         if BASE_SOLUTION:

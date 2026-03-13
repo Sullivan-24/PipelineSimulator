@@ -97,8 +97,8 @@ class PipelineScheduler:
             self.layer_assignment=suggest_allocation#[5, 5, 3, 6, 6, 6, 6, 6, 5, 2, 6, 6, 5, 3, 5, 5]#
         self.placement = [[sum(self.layer_assignment[:i])+j for j in range(self.layer_assignment[i])] for i in range(len(self.layer_assignment))]
         print("Solved OctoPipe layer_assignment:", self.layer_assignment)
-        os.makedirs("schedule_results",exist_ok=True)
-        with open("schedule_results/partition.txt", 'w') as f:
+        os.makedirs(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}",exist_ok=True)
+        with open(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/partition.txt", 'w') as f:
             f.write(str(self.layer_assignment))
             f.flush()
 
@@ -503,7 +503,7 @@ class PipelineScheduler:
     def print_memory_footprint(self, device_id=(0,), show_mem=True):
         peak_mem_usages = [0 for _ in range(len(self.devices))]
         for device in self.devices:
-            aim_file_path = "schedule_results/memory/device{}.txt".format(device.did)
+            aim_file_path = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/memory/device{device.did}.txt"
             save_to_file(aim_file_path, "Device {} mem usage:\n".format(device.did), mode='w')
             last_mem_record = 0
             for t, mem_record in device.mem_usage_record.items():
@@ -590,7 +590,7 @@ class PipelineScheduler:
 
     def execute_workload(self, time):
         for device in self.devices:
-            if gpc["FAILURE_DEVICE"] and device.did in FAILURE_INDEX.get(self.pipeline_idx,[]):
+            if gpc["FAILURE_DEVICE"] and device.did in ALL_TPfail_map[self.pipeline_idx]:
                     continue
             processing_workload = device.execute_workload(run_schedule=self.run_schedule,time=time)
             self.record_workload(processing_workload)

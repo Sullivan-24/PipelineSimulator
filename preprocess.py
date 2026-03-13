@@ -1,11 +1,7 @@
-import copy
 import json
-import os
-from enum import Enum, IntEnum
-import os
-
-import pdb
+from enum import Enum
 import ast
+import math
 class WorkloadType(Enum):
     FORWARD = 'f'
     BACKWARD = 'b'
@@ -408,57 +404,103 @@ def generate_comm_graph(comp_graph, stage_placement, max_end_time, send_immediat
     print(f"wrong comm order:{find_mismatch(comm_matrix)}")
     return comm_graph
 
-def generate_():
+def generate_schedule(num_microbatches,MODEL_NAME,
+                      SEQ_LEN, NUM_LAYER, DP_SIZE, PP_SIZE, TP_SIZE,
+                      FAILURE, FALCON ,HETER, HETER_RATIOS,Failure_ranks_map,
+                      Available_ranks_map,FAILURE_GLOBAL_RANKS,Failure_ranks_info,
+                      ):
+
+    send_immediately = False
     stage_placement = ""
     input_str=""
-    file_path = '/home/PJLAB/matenghui/code/PipelineSimulator/schedule_results'
-    # os.makedirs(file_path,exist_ok=True)
+    layer_partition = []
+    file_path = f'/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}'
     with open(file_path+'/placement.txt', 'r', encoding='utf-8') as file:
         stage_placement = file.read()
     with open(file_path+'/result.txt', 'r', encoding='utf-8') as file:
         input_str = file.read()
+    with open(file_path+"/partition.txt", "r") as f:
+        content = f.read().strip()
+        layer_partition = eval(content)
     stage_placement = json.loads(stage_placement)
-    dp_size=4
-    pp_size = len(stage_placement)
+    assert PP_SIZE == len(stage_placement)
 
     transfer_info = None 
     with open(file_path+'/transfer_info.txt', 'r', encoding='utf-8') as file:
         transfer_info = file.read()
     transfer_info = ast.literal_eval(transfer_info)
-    DP_Transfer = True
+    DP_Transfer = False
     for index,info in enumerate(transfer_info):
         if len(info) > 0:
             DP_Transfer = True
             break
-    num_microbatches = 16#pp_size*2
-    send_immediately = False
-    unified_scheduler, recomp_stages, max_end_time, microbatch_id_infor = order_result_mutichunk(input_str, stage_placement, num_microbatches, dp_size, pp_size)
-    comm_graph = generate_comm_graph(unified_scheduler,stage_placement,max_end_time, send_immediately, dp_size, pp_size, transfer_info, microbatch_id_infor)
+
+    unified_scheduler, recomp_stages, max_end_time, microbatch_id_infor = order_result_mutichunk(input_str, stage_placement, num_microbatches, DP_SIZE, PP_SIZE)
+    comm_graph = generate_comm_graph(unified_scheduler,stage_placement,max_end_time, send_immediately, DP_SIZE, PP_SIZE, transfer_info, microbatch_id_infor)
     scheduler_type = judge_scheduler_type(stage_placement)
     split_backward = judge_split_backward(unified_scheduler)
     last_stage = max(max(row) for row in stage_placement)
     first_stage = min(min(row) for row in stage_placement)
     pp_ranks_containing_last_stage = [i for i, row in enumerate(stage_placement) if last_stage in row]
-    # self.Thepp_ranks_containg_first_stage = [i for i, row in enumerate(self.stage_placement) if self.first_stage in row]
-    # result = {'num_microbatches':num_microbatches, 'pp_size':pp_size, \
-    #           'stage_placement':stage_placement, 'scheduler_type': scheduler_type, 'split_backward':split_backward, \
-    #           'first_stage':first_stage, 'last_stage':last_stage, 'pp_ranks_containing_last_stage':pp_ranks_containing_last_stage,\
-    #            'unified_scheduler':unified_scheduler, 'comm_graph':comm_graph, 'recomp_stages':recomp_stages}
-    # with open(file_path+'/runtime.json',WorkloadType.WEIGHT.value) as file:
-    #     json.dump(result,file)
-    # print(f'num_microbatches:{num_microbatches*dp_size}, pp_size:{pp_size}, stage_placement:{stage_placement}, scheduler_type:{scheduler_type}, split_backward:{split_backward}, \
-    #       recomp_stages:{recomp_stages}, comm_graph:{comm_graph}')
-    DP_Transfer=True
-    if DP_Transfer:
-        return num_microbatches*dp_size, pp_size, stage_placement, scheduler_type ,\
-                split_backward, unified_scheduler, comm_graph, first_stage ,\
-                last_stage, pp_ranks_containing_last_stage, recomp_stages, dp_size, \
-                DP_Transfer, num_microbatches
-    else:
-        return num_microbatches, pp_size, stage_placement, scheduler_type ,\
-                split_backward, unified_scheduler, comm_graph, first_stage ,\
-                last_stage, pp_ranks_containing_last_stage, recomp_stages, dp_size, \
-                DP_Transfer, num_microbatches
+    # MICRO_BSZ = int(8/DP_SIZE) # maintain the same global bsz, global_batch_size=gpc.config.data.micro_bsz* gpc.config.data.micro_num* gpc.get_world_size(ParallelMode.DATA)
 
-if __name__ == '__main__':
-    generate_()
+    HETER_GLOBAL_RANKS = []
+    Heter_ranks_map = [[[] for _ in range(PP_SIZE) ] for _ in range(DP_SIZE)]
+    Heter_ranks_info = []
+    slow_ratio_dict={}
+    slow_ratio_map = [[x - 1 for x in row] for row in HETER_RATIOS]
+    for dp_index in range(len(slow_ratio_map)):
+        for pp_index in range(len(slow_ratio_map[dp_index])):
+            if slow_ratio_map[dp_index][pp_index]>0:
+                Heter_ranks_map[dp_index][pp_index] = [0]
+
+
+                # for tp_local_rank in TPGroup:
+                #     Available_ranks_map[dp_index][pp_index].append(pp_index*(DP_SIZE*TP_SIZE)+dp_index*TP_SIZE+tp_local_rank)
+    per_stage_layer_num = NUM_LAYER/PP_SIZE #!!!
+    if HETER:
+        for dp_index,pps in enumerate(Heter_ranks_map):
+            for pp_index,heter_local_tp_ranks in enumerate(pps):
+                for heter_tp in heter_local_tp_ranks:
+                    Heter_global_rank = pp_index*(DP_SIZE*TP_SIZE)+dp_index*TP_SIZE+heter_tp
+                    slow_ratio_dict[Heter_global_rank] = slow_ratio_map[dp_index][pp_index]
+                    HETER_GLOBAL_RANKS.append(Heter_global_rank)
+                    Heter_ranks_info.append(f"dp{dp_index}, pp:{pp_index}, tp:{heter_tp}, slow_ratio:{slow_ratio_map[dp_index][pp_index]}")
+
+    result = {
+        'MODEL_NAME': MODEL_NAME,
+        'SEQ_LEN': SEQ_LEN,
+        'NUM_LAYER': NUM_LAYER,
+        'num_microbatches': num_microbatches,
+        'PP_SIZE': PP_SIZE,
+        'DP_SIZE': DP_SIZE,
+        'TP_SIZE': TP_SIZE,
+        'stage_placement': stage_placement,
+        'DP_Transfer': DP_Transfer,
+        'layer_partition': layer_partition,
+        'split_backward': split_backward,
+        'FAILURE': FAILURE,
+        'FALCON': FALCON,
+        'HETER': HETER,
+        'slow_ratio_map': slow_ratio_map.tolist() if hasattr(slow_ratio_map, 'tolist') else slow_ratio_map,
+        'Failure_ranks_map': Failure_ranks_map,
+        'transfer_info': transfer_info,
+        'Available_ranks_map': Available_ranks_map,
+        'FAILURE_GLOBAL_RANKS': FAILURE_GLOBAL_RANKS,
+        'Failure_ranks_info': Failure_ranks_info,
+        'HETER_GLOBAL_RANKS': HETER_GLOBAL_RANKS,
+        'Heter_ranks_map': Heter_ranks_map,
+        'Heter_ranks_info': Heter_ranks_info,
+        'slow_ratio_dict': slow_ratio_dict,
+        'per_stage_layer_num': per_stage_layer_num,
+
+        'first_stage': first_stage,
+        'last_stage': last_stage,
+        'pp_ranks_containing_last_stage': pp_ranks_containing_last_stage,
+        'recomp_stages': recomp_stages,
+        'scheduler_type': scheduler_type,
+        'unified_scheduler': unified_scheduler,
+        'comm_graph': comm_graph,
+    }
+    with open(file_path+'/runtime.json', mode='w') as file:
+        json.dump(result,file,indent=4)
