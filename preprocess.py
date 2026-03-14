@@ -429,12 +429,13 @@ def generate_schedule(num_microbatches,MODEL_NAME,
     with open(file_path+'/transfer_info.txt', 'r', encoding='utf-8') as file:
         transfer_info = file.read()
     transfer_info = ast.literal_eval(transfer_info)
-    DP_Transfer = False
-    for index,info in enumerate(transfer_info):
-        if len(info) > 0:
-            DP_Transfer = True
-            break
-
+    DP_Transfer = True
+    # for index,info in enumerate(transfer_info):
+    #     if len(info) > 0:
+    #         DP_Transfer = True
+    #         break
+    # if FALCON:
+    #     DP_Transfer = True
     unified_scheduler, recomp_stages, max_end_time, microbatch_id_infor = order_result_mutichunk(input_str, stage_placement, num_microbatches, DP_SIZE, PP_SIZE)
     comm_graph = generate_comm_graph(unified_scheduler,stage_placement,max_end_time, send_immediately, DP_SIZE, PP_SIZE, transfer_info, microbatch_id_infor)
     scheduler_type = judge_scheduler_type(stage_placement)

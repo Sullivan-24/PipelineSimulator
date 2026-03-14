@@ -103,17 +103,17 @@ ALL_TPfail_map = [[] for _ in range(DP_SIZE)]
 FAILURE_GLOBAL_RANKS = []
 Failure_ranks_info = []
 Available_ranks_map = [[[i for i in range(TP_SIZE)] for _ in range(PP_SIZE) ] for _ in range(DP_SIZE)]
-HETER_DP_ID
-HETER_DEVICE = True
+
+HETER_DEVICE = False
 HETER_DEVICE_Transfer = False
-HETER_RATIOS[0][1] = 3
-HETER_RATIOS[1][2] = 1.5
-FAILURE_DEVICE = True
-BEST = True
+# HETER_RATIOS[0][1] = 3
+# HETER_RATIOS[1][2] = 1.5
+FAILURE_DEVICE = False
+BEST = False
 # Failure_ranks_map[0][2]= [0,1,2,3]
 opti = False#for layer paratation
 NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
-
+NMB_PER_DP = [6,10]
 if BEST == True:
     SCHEDULE_METHOD = Schedule.OctoPipe
     LAYER_ADAPT = False
