@@ -76,7 +76,8 @@ def save_canvas_screenshot(canvas, out_path):
 class SchedulingPainter:
     """Scheduling Painter"""
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict, enable_tk: bool = True) -> None:
+        self._enable_tk = enable_tk
         self._device_size   = config["device_num"]
         self._devices       = config["devices"]
         self._pp_size       = config["stage_num"]
@@ -96,8 +97,9 @@ class SchedulingPainter:
         self._backward_b_length = [_len * config["pixel_base"] for _len in config["backward_length"]]
         self._backward_w_length = [_len * config["pixel_base"] for _len in config["backward_length2"]]
 
-        self._tk_root = tk.Tk()
-        self._tk_root.title("SchedulingPainter")
+        if self._enable_tk:
+            self._tk_root = tk.Tk()
+            self._tk_root.title("SchedulingPainter")
 
         self._highlight_state = {}
         self._item2color = {}
@@ -157,6 +159,30 @@ class SchedulingPainter:
 
         _, max_key_pid, _, _ = parse_microbatch_key(max_key)
 
+        if self._max_time == -1:
+            if SPLIT_BACKPROP:
+                self._max_time = (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base
+            else:
+                self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
+
+        # Always compute schedule_res_content regardless of enable_tk
+        schedule_res_content = ""
+        for microbatch_key, offset in data.items():
+            k, pid, mid, did = parse_microbatch_key(microbatch_key)
+            block_width = self._forward_length[pid] if k in ('f', 'r') else (self._backward_b_length[pid] if k == 'b' else self._backward_w_length[pid])
+
+            if HEAD_DP:
+                schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,did,offset,offset+block_width)
+            else:
+                schedule_res_content += "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width)
+
+        save_to_file(SCH_FILE_PATH, schedule_res_content, 'w')
+        save_to_file(TEMP_RES_PATH, schedule_res_content, 'w')
+
+        if not self._enable_tk:
+            return
+
+        # --- tk drawing below ---
         # canvas_width = data[k] + self._backward_b_length[max_key_pid] + 2 * self._pp_align
         # 按照 Device 画示意图
         canvas_height = (self._pp_height + self._pp_align) * self._device_size
@@ -165,19 +191,13 @@ class SchedulingPainter:
         label_canvas = tk.Canvas(self._tk_root, width=canvas_width, height=30)
         y_label = (0 + 30) // 2 + 5
 
-        if self._max_time == -1:
-            if SPLIT_BACKPROP:
-                self._max_time = (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base
-            else:
-                self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
-
         label_canvas.create_text(self._pp_align + 145, y_label, text="MinExeTime:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
-                # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
+                # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base,
                 round(self._max_time),
                 self._pp_size // self._device_size,
-                self._basic_forward_length[max_key_pid], 
-                self._basic_backward_b_length[max_key_pid], 
-                self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
+                self._basic_forward_length[max_key_pid],
+                self._basic_backward_b_length[max_key_pid],
+                self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0,
                 # int(sum(self._comm_length) / len(self._comm_length))
                 COMM_TIME
             ),
@@ -211,7 +231,6 @@ class SchedulingPainter:
             main_canvas.create_rectangle(x0, y0, x1, y1, fill="#FFFFFF", outline="black")
 
         # 3. Draw execution block for each microbatch according to start and end time
-        schedule_res_content = ""
         for microbatch_key, offset in data.items():
             k, pid, mid, did = parse_microbatch_key(microbatch_key)
 
@@ -225,19 +244,13 @@ class SchedulingPainter:
             # y1 = (self._pp_height + self._pp_align) * (pid + 1) - pad
             y1 = (self._pp_height + self._pp_align) * (did + 1) - pad + 5
 
-            # save schedule representation in painter
-            if HEAD_DP:
-                schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,did,offset,offset+block_width)
-            else:
-                schedule_res_content += "{}_{}_{},{},{}\n".format(k,mid,pid,offset,offset+block_width)
-
             tag = f"p_{pid}_m_{mid}_{k}"
             color = set_color(pid,workload_type=k,layer_num=self._pp_size)
 
             block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
             # 求余考虑virtual stage的情况
             bold_font = font.Font(
-                # family="Calibri Light", 
+                # family="Calibri Light",
                 underline= pid // self._device_size % 2,
                 weight= tk.font.NORMAL if pid // self._device_size % 2 else tk.font.BOLD
             )
@@ -259,9 +272,6 @@ class SchedulingPainter:
             self._item2step[block] = data_step_idx[microbatch_key]
             # 求余考虑virtual stage的情况
             self._item2mid[block] = mid
-        
-        save_to_file(SCH_FILE_PATH, schedule_res_content, 'w')
-        save_to_file(TEMP_RES_PATH, schedule_res_content, 'w')
 
         # Register hook for highlighting execution block of this microbatch
         def _trigger_hook(event):
@@ -298,7 +308,7 @@ class SchedulingPainter:
                 for pid in range(self._pp_size)
                 for fb in ("f", "b", "w", "r") #点击后的效果，加上w的判断
             ]
-            
+
             items_same_microbatch = []
             for tag in tags:
                 found = main_canvas.find_withtag(tag)
@@ -317,11 +327,13 @@ class SchedulingPainter:
 class MultiPipelinePainter:
     """Scheduling Painter"""
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict, enable_tk: bool = True) -> None:
+        self._enable_tk = enable_tk
         self.dp_size = len(config)
         self.all_dp_config = config
-        self._tk_root = tk.Tk()
-        self._tk_root.title("SchedulingPainter")
+        if self._enable_tk:
+            self._tk_root = tk.Tk()
+            self._tk_root.title("SchedulingPainter")
         self._highlight_state = {}
         self._item2color = {}
         self._item2block = {}
@@ -397,11 +409,32 @@ class MultiPipelinePainter:
                 if data[k] + length + 2 * self._pp_align > canvas_width:
                     max_key = k
                     canvas_width = data[k] + length + 2 * self._pp_align
+
+        # Always compute schedule_res_content regardless of enable_tk
+        schedule_res_content = ""
+        for dp_idx, data in all_dp_data.items():
+            self.set_para_by_dp_idx(config=self.all_dp_config[dp_idx])
+            data = {key: val * self._pixel_base for key, val in data.items()}
+
+            for microbatch_key, offset in data.items():
+                k, pid, mid, did = parse_microbatch_key(microbatch_key)
+                block_width = self._forward_length[pid] if k in ('f', 'r') else (self._backward_b_length[pid] if k == 'b' else self._backward_w_length[pid])
+
+                if HEAD_DP:
+                    schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,did,offset,offset+block_width)
+                else:
+                    schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,dp_idx,offset,offset+block_width)
+
+        save_to_file(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/result.txt", schedule_res_content, 'w')
+
+        if not self._enable_tk:
+            return
+
+        # --- tk drawing below ---
         canvas_height = (self._pp_height + self._pp_align) * self._device_size * len(all_dp_data)
         # 1. Create main canvas
         main_canvas = tk.Canvas(self._tk_root, bg='#FFFFFF', width=canvas_width, height=canvas_height+5)
         main_canvas.pack()
-        schedule_res_content = ""
         for dp_idx, data in all_dp_data.items():
             self.set_para_by_dp_idx(config=self.all_dp_config[dp_idx])
             # Convert data offset to pixels
@@ -438,12 +471,12 @@ class MultiPipelinePainter:
                         self._max_time = (data[max_key] + self._backward_b_length[max_key_pid])//self._pixel_base
 
                 # label_canvas.create_text(self._pp_align + 145, y_label, text="Time:{}, Chunk:{}, F:{}, B:{}, W:{}, C:{}".format(
-                #         # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base, 
+                #         # (data[max_key] + self._backward_w_length[max_key_pid])//self._pixel_base,
                 #         round(self._max_time),
                 #         self._pp_size // self._device_size,
-                #         self._basic_forward_length[max_key_pid], 
-                #         self._basic_backward_b_length[max_key_pid], 
-                #         self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0, 
+                #         self._basic_forward_length[max_key_pid],
+                #         self._basic_backward_b_length[max_key_pid],
+                #         self._basic_backward_w_length[max_key_pid] if SPLIT_BACKPROP else 0,
                 #         # int(sum(self._comm_length) / len(self._comm_length))
                 #         COMM_TIME
                 #     ),
@@ -465,7 +498,7 @@ class MultiPipelinePainter:
                 main_canvas.create_rectangle(x0, y0, x1, y1, fill="#FFFFFF", outline="black")
 
             # 3. Draw execution block for each microbatch according to start and end time
-            
+
             for microbatch_key, offset in data.items():
                 k, pid, mid, did = parse_microbatch_key(microbatch_key)
 
@@ -475,19 +508,13 @@ class MultiPipelinePainter:
                 x1 = x0 + block_width
                 y1 = (self._pp_height + self._pp_align) * (did + dp_idx * self._device_size + 1) - pad + 5
 
-                # save schedule representation in painter
-                if HEAD_DP:
-                    schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,did,offset,offset+block_width)
-                else:
-                    schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,dp_idx,offset,offset+block_width)
-
                 tag = f"p_{pid}_m_{mid}_{k}"
                 color = set_color(pid,workload_type=k,layer_num=self._pp_size)
 
                 block = main_canvas.create_rectangle(x0, y0, x1, y1, fill=color, tags=tag)
                 # 求余考虑virtual stage的情况
                 bold_font = font.Font(
-                    # family="Calibri Light", 
+                    # family="Calibri Light",
                     underline= pid // self._device_size % 2,
                     weight= tk.font.NORMAL if pid // self._device_size % 2 else tk.font.BOLD
                 )
@@ -503,8 +530,6 @@ class MultiPipelinePainter:
                 self._item2step[block] = data_step_idx[microbatch_key]
                 # 求余考虑virtual stage的情况
                 self._item2mid[block] = mid
-
-        save_to_file(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/result.txt", schedule_res_content, 'w')
 
         # Register hook for highlighting execution block of this microbatch
         def _trigger_hook(event):
@@ -532,7 +557,7 @@ class MultiPipelinePainter:
                 for pid in range(self._pp_size)
                 for fb in ("f", "b", "w", "r") #点击后的效果，加上w的判断
             ]
-            
+
             items_same_microbatch = []
             for tag in tags:
                 found = main_canvas.find_withtag(tag)

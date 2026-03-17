@@ -241,7 +241,7 @@ class Executor:
             }
             res_all_dp["res"][dp_idx]=res
             res_all_dp["painter_conf"][dp_idx]=painter_conf
-        MPP(res_all_dp["painter_conf"]).draw(res_all_dp["res"])
+        MPP(res_all_dp["painter_conf"], enable_tk=False).draw(res_all_dp["res"])
 
 if __name__ == "__main__":
     # Example
