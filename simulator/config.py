@@ -79,7 +79,7 @@ STAGE_PLACEMENT = Placement.INTERLEAVED
 # STAGE_PLACEMENT = Placement.SEARCHED
 # STAGE_PLACEMENT = Placement.WAVELIKE
 SPLIT_BACKPROP = True
-LAYER_ADAPT = False#TODO
+LAYER_ADAPT = False #TODO
 if SCHEDULE_METHOD == Schedule.STANDARD_INTERLEAVED:
     STAGE_PLACEMENT = Placement.INTERLEAVED
     CHUNK_NUM = LAYER_NUM // PP_SIZE
@@ -105,7 +105,7 @@ Failure_ranks_info = []
 Available_ranks_map = [[[i for i in range(TP_SIZE)] for _ in range(PP_SIZE) ] for _ in range(DP_SIZE)]
 
 HETER_DEVICE = True
-HETER_DEVICE_Transfer = True
+HETER_DEVICE_Transfer = False
 HETER_RATIOS[0][1] = 2
 # HETER_RATIOS[1][1] = 2
 FAILURE_DEVICE = False
@@ -113,10 +113,10 @@ BEST = False
 # Failure_ranks_map[0][2]= [0,1,2,3]
 opti = False#for layer paratation
 NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
-# NMB_PER_DP = [10,6]
+# NMB_PER_DP = [13,3]
 if BEST == True:
     SCHEDULE_METHOD = Schedule.OctoPipe
-    LAYER_ADAPT = False 
+    LAYER_ADAPT = True 
     opti = False
     HETER_DEVICE_Transfer = True
 if SCHEDULE_METHOD != Schedule.OctoPipe:
@@ -251,8 +251,9 @@ SWITCH_WORKLOAD_TYPE = True
 
 # f_b_w = [1,1.6,0.4] #llama2 40layers,32layers
 #qwen H200:
-f_b_w = [1,1.3,0.3] #7b
-
+f_b_w = [1,1.3,0.3] #7b wrong, should be [1,1.6,0.4] 
+f_b_w = [1,1.55,0.45] # 45: 70:20
+# f_b_w = [1,1,1] #
 
 #H800
 # if LAYER_NUM == 80 and PP_SIZE==16:
