@@ -106,14 +106,38 @@ Available_ranks_map = [[[i for i in range(TP_SIZE)] for _ in range(PP_SIZE) ] fo
 
 HETER_DEVICE = True
 HETER_DEVICE_Transfer = False
-HETER_RATIOS[0][1] = 2
-# HETER_RATIOS[1][1] = 2
+
+# HETER_RATIOS[0][0] = 3
+# HETER_RATIOS[0][1] = 1.5
+# HETER_RATIOS[0][2] = 3
+# HETER_RATIOS[0][3] = 1.5
+# HETER_RATIOS[0][4] = 1.5
+# HETER_RATIOS[0][5] = 1.5
+# HETER_RATIOS[0][6] = 3
+# HETER_RATIOS[0][7] = 1.5
+
+
+# HETER_RATIOS[1][0] = 1.5
+# HETER_RATIOS[1][1] = 3
+# HETER_RATIOS[1][2] = 1.5
+# HETER_RATIOS[1][3] = 3
+# HETER_RATIOS[1][4] = 3
+# HETER_RATIOS[1][5] = 3
+# HETER_RATIOS[1][6] = 1.5
+# HETER_RATIOS[1][7] = 3
+
+
 FAILURE_DEVICE = False
-BEST = False
 # Failure_ranks_map[0][2]= [0,1,2,3]
+
+Good = False
+BEST = False
 opti = False#for layer paratation
 NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
-# NMB_PER_DP = [13,3]
+# NMB_PER_DP = [12,4]
+if Good:
+    SCHEDULE_METHOD = Schedule.OctoPipe
+    LAYER_ADAPT = True
 if BEST == True:
     SCHEDULE_METHOD = Schedule.OctoPipe
     LAYER_ADAPT = True 
@@ -251,10 +275,10 @@ SWITCH_WORKLOAD_TYPE = True
 
 # f_b_w = [1,1.6,0.4] #llama2 40layers,32layers
 #qwen H200:
-f_b_w = [1,1.3,0.3] #7b wrong, should be [1,1.6,0.4] 
-f_b_w = [1,1.55,0.45] # 45: 70:20
-# f_b_w = [1,1,1] #
-
+# f_b_w = [1,1.6,0.4] #7b 
+# f_b_w = [1,1.55,0.45] # 14b
+f_b_w = [1,1.5,0.5]#32b [40:60:20]
+f_b_w = [1,1,1]
 #H800
 # if LAYER_NUM == 80 and PP_SIZE==16:
 #     f_b_w = [1,1.8,0.5]
