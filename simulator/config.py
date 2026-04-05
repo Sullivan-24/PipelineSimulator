@@ -72,7 +72,7 @@ SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
-SCHEDULE_METHOD = Schedule.OctoPipe
+# SCHEDULE_METHOD = Schedule.OctoPipe
 # SCHEDULE_METHOD = Schedule.ZBV
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
 STAGE_PLACEMENT = Placement.INTERLEAVED
@@ -105,18 +105,18 @@ Failure_ranks_info = []
 Available_ranks_map = [[[i for i in range(TP_SIZE)] for _ in range(PP_SIZE) ] for _ in range(DP_SIZE)]
 
 HETER_DEVICE = True
-HETER_DEVICE_Transfer = False
-# HETER_RATIOS[0][1] = 3
-HETER_RATIOS[1][1] = 3
+HETER_DEVICE_Transfer = True
+HETER_RATIOS[0][1] = 2
+# HETER_RATIOS[1][1] = 2
 FAILURE_DEVICE = False
-BEST = True
+BEST = False
 # Failure_ranks_map[0][2]= [0,1,2,3]
 opti = False#for layer paratation
 NMB_PER_DP = [MICRO_BATCH_NUM]*DP_SIZE
-# NMB_PER_DP = [6,10]
+# NMB_PER_DP = [10,6]
 if BEST == True:
     SCHEDULE_METHOD = Schedule.OctoPipe
-    LAYER_ADAPT = False
+    LAYER_ADAPT = False 
     opti = False
     HETER_DEVICE_Transfer = True
 if SCHEDULE_METHOD != Schedule.OctoPipe:
@@ -249,7 +249,10 @@ SAVE_MEMORY = True
 CONSTRAIN_WARMUP = False
 SWITCH_WORKLOAD_TYPE = True
 
-f_b_w = [1,1.6,0.4] #llama2 40layers,32layers
+# f_b_w = [1,1.6,0.4] #llama2 40layers,32layers
+#qwen H200:
+f_b_w = [1,1.3,0.3] #7b
+
 
 #H800
 # if LAYER_NUM == 80 and PP_SIZE==16:
@@ -265,17 +268,20 @@ f_b_w = [1,1.6,0.4] #llama2 40layers,32layers
 # if not SPLIT_BACKPROP:
 #     f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
 
-#A100
-if LAYER_NUM == 80 and PP_SIZE==16:
-    f_b_w = [1,1.5,0.6]
-elif LAYER_NUM == 64 and PP_SIZE==8:
-    f_b_w = [1,1.5,0.5]#llama2,64layers
-elif LAYER_NUM == 40 and PP_SIZE==4:
-    f_b_w = [1,1.6,0.4]
-elif LAYER_NUM == 32 and PP_SIZE==2:
-    f_b_w = [1,1.45,0.3]
-if not SPLIT_BACKPROP:
-    f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
+# #A100
+# if LAYER_NUM == 80 and PP_SIZE==16:
+#     f_b_w = [1,1.5,0.6]
+# elif LAYER_NUM == 64 and PP_SIZE==8:
+#     f_b_w = [1,1.5,0.5]#llama2,64layers
+# elif LAYER_NUM == 40 and PP_SIZE==4:
+#     f_b_w = [1,1.6,0.4]
+# elif LAYER_NUM == 32 and PP_SIZE==2:
+#     f_b_w = [1,1.45,0.3]
+# if not SPLIT_BACKPROP:
+#     f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
+
+
+
 F_TIME = 10
 F_TIMES = [F_TIME] * LAYER_NUM
 B_TIMES = [F_TIME*f_b_w[1]] * LAYER_NUM
