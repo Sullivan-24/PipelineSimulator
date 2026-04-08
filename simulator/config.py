@@ -278,7 +278,7 @@ SWITCH_WORKLOAD_TYPE = True
 # f_b_w = [1,1.6,0.4] #7b 
 # f_b_w = [1,1.55,0.45] # 14b
 f_b_w = [1,1.5,0.5]#32b [40:60:20]
-f_b_w = [1,1,1]
+# f_b_w = [1,1,1]
 #H800
 # if LAYER_NUM == 80 and PP_SIZE==16:
 #     f_b_w = [1,1.8,0.5]
@@ -477,10 +477,10 @@ if CHUNK_NUM > PP_SIZE:
 
 # --------------------- Save File Config ---------------------
 SAVE_RES_TO_FILE = True
-SCH_FILE_PATH = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/schedules/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}_c{CHUNK_NUM}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
-PLA_FILE_PATH = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/placements/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}_c{CHUNK_NUM}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
-TEMP_PLA_PATH = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/placement.txt"
-TEMP_RES_PATH = f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/result.txt"
+SCH_FILE_PATH = f"schedule_results/{MODEL_NAME}/schedules/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}_c{CHUNK_NUM}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
+PLA_FILE_PATH = f"schedule_results/{MODEL_NAME}/placements/heter{HETER_DEVICE}/vs{VOCAB_SIZE}_l{LAYER_NUM}_s{SEQ_LEN}_h{HIDDEN_SIZE}/mb{MICRO_BATCH_NUM}_pp{PP_SIZE}_tp{TP_SIZE}_zr{ZERO_SIZE}_c{CHUNK_NUM}/{SCHEDULE_METHOD.name}_{STAGE_PLACEMENT.name}_w{SPLIT_BACKPROP}_l{LAYERWISE}_o{OVERLAP_DEGREE}.txt"
+TEMP_PLA_PATH = f"schedule_results/{MODEL_NAME}/placement.txt"
+TEMP_RES_PATH = f"schedule_results/{MODEL_NAME}/result.txt"
 
 STAGE_NUM = int(PP_SIZE * CHUNK_NUM)
 assert STAGE_NUM <= LAYER_NUM, f"Stage ({STAGE_NUM}) should be less than Layer ({LAYER_NUM}). "
