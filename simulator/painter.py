@@ -425,7 +425,7 @@ class MultiPipelinePainter:
                 else:
                     schedule_res_content += "{}_{}_{}_{},{},{}\n".format(k,mid,pid,dp_idx,offset,offset+block_width)
 
-        save_to_file(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/result.txt", schedule_res_content, 'w')
+        save_to_file(f"schedule_results/{MODEL_NAME}/result.txt", schedule_res_content, 'w')
 
         if not self._enable_tk:
             return
@@ -569,6 +569,6 @@ class MultiPipelinePainter:
 
         main_canvas.bind("<Button-1>", _trigger_hook)
 
-        button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_postscript(main_canvas, f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/_schedule.png"))
+        button = tk.Button(self._tk_root, text="Save as PDF", command=lambda: save_canvas_postscript(main_canvas, f"schedule_results/{MODEL_NAME}/_schedule.png"))
         button.pack()
         self._tk_root.mainloop()

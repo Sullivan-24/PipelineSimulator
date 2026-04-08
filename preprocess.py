@@ -414,7 +414,7 @@ def generate_schedule(num_microbatches,MODEL_NAME,
     stage_placement = ""
     input_str=""
     layer_partition = []
-    file_path = f'/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}'
+    file_path = f'schedule_results/{MODEL_NAME}'
     with open(file_path+'/placement.txt', 'r', encoding='utf-8') as file:
         stage_placement = file.read()
     with open(file_path+'/result.txt', 'r', encoding='utf-8') as file:

@@ -586,7 +586,7 @@ class Device:
                                 return proc_workload
             elif gpc["SCHEDULE_METHOD"] == Schedule.OctoPipe and gpc["HEAD_DP"]:
                 self.executable_workloads = self.get_executable_workload(time=time)
-                save_to_file(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n", 'a')
+                save_to_file(f"schedule_results/{MODEL_NAME}/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n", 'a')
                 
                 if self.get_executable_workload_num_by_type(wtype=WorkloadType.B):
                     self.warmup_end_flag = True
@@ -658,7 +658,7 @@ class Device:
                         return proc_workload
             elif gpc["SCHEDULE_METHOD"] == Schedule.OctoPipe and not gpc["HEAD_DP"]:
                 self.executable_workloads = self.get_executable_workload(time=time)
-                save_to_file(f"/mnt/shared-storage-user/ailab-sys/matenghui/InternEvo/PipelineSimulator/schedule_results/{MODEL_NAME}/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n", 'a')
+                save_to_file(f"schedule_results/{MODEL_NAME}/workload_statistics/device{self.did}.txt",f"{time},{len(self.executable_workloads)}\n", 'a')
                 
                 if self.get_executable_workload_num_by_type(wtype=WorkloadType.B):
                     self.warmup_end_flag = True
