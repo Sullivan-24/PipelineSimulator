@@ -72,7 +72,7 @@ SCHEDULE_METHOD = Schedule.STANDARD_1F1B
 # SCHEDULE_METHOD = Schedule.STANDARD_INTERLEAVED
 # SCHEDULE_METHOD = Schedule.STANDARD_ZBH
 # SCHEDULE_METHOD = Schedule.Mist
-# SCHEDULE_METHOD = Schedule.OctoPipe
+SCHEDULE_METHOD = Schedule.OctoPipe
 # SCHEDULE_METHOD = Schedule.ZBV
 # SCHEDULE_METHOD = Schedule.STANDARD_AFAB
 STAGE_PLACEMENT = Placement.INTERLEAVED
@@ -92,7 +92,7 @@ test_upp = True if SCHEDULE_METHOD == Schedule.OctoPipe else False
 # --------------------- Solver config ---------------------
 
 CHUNK_NUM = 1
-DP_SIZE = 2
+DP_SIZE = 1
 HETER_RATIOS = [[1 for _ in range(PP_SIZE)]for _ in range(DP_SIZE)]
 HETER_DP_ID = []
 HETER_PP_ID = []
@@ -106,26 +106,29 @@ Available_ranks_map = [[[i for i in range(TP_SIZE)] for _ in range(PP_SIZE) ] fo
 
 HETER_DEVICE = True
 HETER_DEVICE_Transfer = False
-
-# HETER_RATIOS[0][0] = 3
 # HETER_RATIOS[0][1] = 1.5
-# HETER_RATIOS[0][2] = 3
-# HETER_RATIOS[0][3] = 1.5
-# HETER_RATIOS[0][4] = 1.5
-# HETER_RATIOS[0][5] = 1.5
-# HETER_RATIOS[0][6] = 3
-# HETER_RATIOS[0][7] = 1.5
+# HETER_RATIOS[0][1] = 2
+# HETER_RATIOS[0][1] = 2.5
 
+HETER_RATIOS[0][3] = 1.5
+HETER_RATIOS[0][3] = 2
+HETER_RATIOS[0][3] = 2.5
 
-# HETER_RATIOS[1][0] = 1.5
-# HETER_RATIOS[1][1] = 3
-# HETER_RATIOS[1][2] = 1.5
-# HETER_RATIOS[1][3] = 3
-# HETER_RATIOS[1][4] = 3
-# HETER_RATIOS[1][5] = 3
-# HETER_RATIOS[1][6] = 1.5
-# HETER_RATIOS[1][7] = 3
+COMM_TIME = [[0 for _ in range(PP_SIZE)] for _ in range(PP_SIZE)]
+# qwen2:
+# COMM_TIME[0][1] = 140
+# COMM_TIME[1][0] = 140
+# COMM_TIME[0][1] = 280
+# COMM_TIME[1][0] = 280
+# COMM_TIME[0][1] =  420
+# COMM_TIME[1][0] =  420
 
+COMM_TIME[2][3] = 140
+COMM_TIME[3][2] = 140
+COMM_TIME[2][3] = 280
+COMM_TIME[3][2] = 280
+COMM_TIME[2][3] = 420
+COMM_TIME[3][2] = 420
 
 FAILURE_DEVICE = False
 # Failure_ranks_map[0][2]= [0,1,2,3]
@@ -217,8 +220,30 @@ CE_W_TIME = 0
 F_TIME = 0
 B_TIME = 0
 W_TIME = 0
-COMM_TIME = [[0 for _ in range(PP_SIZE)] for _ in range(PP_SIZE)]
+
+# llama2
 # COMM_TIME[0][1] = 120
+# COMM_TIME[1][0] = 120
+# COMM_TIME[0][1] = 280
+# COMM_TIME[1][0] = 280
+# COMM_TIME[0][1] =  400
+# COMM_TIME[1][0] =  400
+
+# COMM_TIME[0][1] = 120
+# COMM_TIME[1][0] = 120
+# COMM_TIME[0][1] = 240
+# COMM_TIME[1][0] = 240
+# COMM_TIME[0][1] = 360
+# COMM_TIME[1][0] = 360
+
+# COMM_TIME[2][3] = 120
+# COMM_TIME[3][2] = 120
+# COMM_TIME[2][3] = 240
+# COMM_TIME[3][2] = 240
+# COMM_TIME[2][3] = 380
+# COMM_TIME[3][2] = 380
+
+
 
 if SCHEDULE_METHOD in (Schedule.STANDARD_ZBH, Schedule.ZBV):
     SPLIT_BACKPROP = True
@@ -275,10 +300,20 @@ SWITCH_WORKLOAD_TYPE = True
 
 # f_b_w = [1,1.6,0.4] #llama2 40layers,32layers
 #qwen H200:
-# f_b_w = [1,1.6,0.4] #7b 
-# f_b_w = [1,1.55,0.45] # 14b
-f_b_w = [1,1.5,0.5]#32b [40:60:20]
-# f_b_w = [1,1,1]
+if LAYER_NUM == 80 and PP_SIZE==16:
+    f_b_w = [1,1.8,0.5]
+    if ZERO_SIZE == 4 and TP_SIZE ==4:#A100
+        f_b_w = [1,1.5,0.6]
+elif LAYER_NUM == 64 and PP_SIZE==8:
+    f_b_w = [1,1.5,0.5]#llama2,64layers
+elif LAYER_NUM == 48 and PP_SIZE==4:
+    f_b_w = [1,1.55,0.45]
+elif LAYER_NUM == 28 and PP_SIZE==2:
+    f_b_w = [1,1.6,0.4]
+if not SPLIT_BACKPROP:
+    f_b_w = [f_b_w[0],f_b_w[1]+f_b_w[2],0]
+
+
 #H800
 # if LAYER_NUM == 80 and PP_SIZE==16:
 #     f_b_w = [1,1.8,0.5]

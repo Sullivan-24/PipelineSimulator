@@ -1,0 +1,138 @@
+Estimated time cost 2100.0.
+Optimal Result Cost: 0.02.
+MinExeTime:5236.0.
+Estimated time cost 2940.0.
+Optimal Result Cost: 0.02.
+MinExeTime:7756.0.
+Estimated time cost 2940.0.
+Result Found Cost: 60.00.
+MinExeTime:3360.0.
+Estimated time cost 2100.0.
+Optimal Result Cost: 0.02.
+MinExeTime:5236.0.
+Estimated time cost 2100.0.
+Optimal Result Cost: 0.01.
+MinExeTime:5306.0.
+Estimated time cost 2940.0.
+Optimal Result Cost: 0.01.
+MinExeTime:7686.0.
+Estimated time cost 2520.0.
+Optimal Result Cost: 0.01.
+MinExeTime:6426.0.
+Estimated time cost 2520.0.
+Optimal Result Cost: 0.01.
+MinExeTime:6496.0.
+Estimated time cost 2100.0.
+Result Found Cost: 60.05.
+MinExeTime:10024.0.
+Estimated time cost 2520.0.
+Result Found Cost: 20.15.
+MinExeTime:10024.0.
+Estimated time cost 2520.0.
+Result Found Cost: 18.72.
+MinExeTime:10024.0.
+Estimated time cost 2100.0.
+Result Found Cost: 60.01.
+MinExeTime:10486.0.
+Estimated time cost 2520.0.
+Result Found Cost: 60.01.
+MinExeTime:10486.0.
+Estimated time cost 2160.0.
+Optimal Result Cost: 0.02.
+MinExeTime:5085.0.
+Estimated time cost 2520.0.
+Optimal Result Cost: 0.03.
+MinExeTime:4005.0.
+Estimated time cost 2880.0.
+Result Found Cost: 60.00.
+MinExeTime:3219.0.
+Estimated time cost 2880.0.
+Result Found Cost: 27.82.
+MinExeTime:9117.0.
+Estimated time cost 2160.0.
+Result Found Cost: 9.49.
+MinExeTime:9117.0.
+Estimated time cost 2520.0.
+Result Found Cost: 2.43.
+MinExeTime:9117.0.
+Estimated time cost 2520.0.
+Result Found Cost: 4.83.
+MinExeTime:9117.0.
+Estimated time cost 2160.0.
+Result Found Cost: 42.29.
+MinExeTime:9882.0.
+Estimated time cost 2880.0.
+Result Found Cost: 34.23.
+MinExeTime:9882.0.
+Estimated time cost 1920.0.
+Optimal Result Cost: 0.04.
+MinExeTime:3940.0.
+Estimated time cost 2400.0.
+Optimal Result Cost: 0.03.
+MinExeTime:4880.0.
+Estimated time cost 2160.0.
+Optimal Result Cost: 0.04.
+MinExeTime:4660.0.
+Estimated time cost 2400.0.
+Optimal Result Cost: 0.03.
+MinExeTime:5380.0.
+Estimated time cost 2400.0.
+Optimal Result Cost: 0.03.
+MinExeTime:4880.0.
+Estimated time cost 2160.0.
+Optimal Result Cost: 0.04.
+MinExeTime:4160.0.
+Estimated time cost 2040.0.
+Optimal Result Cost: 0.04.
+MinExeTime:3800.0.
+Estimated time cost 1920.0.
+Result Found Cost: 60.03.
+MinExeTime:7160.0.
+Estimated time cost 2040.0.
+Result Found Cost: 49.64.
+MinExeTime:7040.0.
+Estimated time cost 2160.0.
+Result Found Cost: 16.92.
+MinExeTime:7020.0.
+Estimated time cost 2400.0.
+Result Found Cost: 42.06.
+MinExeTime:7020.0.
+Estimated time cost 2400.0.
+Result Found Cost: 28.52.
+MinExeTime:7760.0.
+Estimated time cost 2400.0.
+Result Found Cost: 60.12.
+MinExeTime:7760.0.
+Estimated time cost 2040.0.
+Result Found Cost: 60.02.
+MinExeTime:7760.0.
+Estimated time cost 1920.0.
+Result Found Cost: 60.05.
+MinExeTime:2600.0.
+Estimated time cost 1920.0.
+Result Found Cost: 60.01.
+MinExeTime:2600.0.
+Estimated time cost 1920.0.
+Result Found Cost: 60.04.
+MinExeTime:2500.0.
+Estimated time cost 1920.0.
+Result Found Cost: 47.87.
+MinExeTime:2500.0.
+Estimated time cost 2160.0.
+Result Found Cost: 60.05.
+MinExeTime:3159.0.
+Estimated time cost 2160.0.
+Optimal Result Cost: 0.27.
+MinExeTime:5085.0.
+Estimated time cost 2160.0.
+Result Found Cost: 4.46.
+MinExeTime:3159.0.
+Estimated time cost 2160.0.
+Result Found Cost: 42.35.
+MinExeTime:3312.0.
+Estimated time cost 2100.0.
+Result Found Cost: 33.60.
+MinExeTime:3360.0.
+Estimated time cost 2100.0.
+Result Found Cost: 60.01.
+MinExeTime:3514.0.
