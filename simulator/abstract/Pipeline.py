@@ -93,9 +93,12 @@ class PipelineScheduler:
             self.placement = solver_results["assignments"]
             self.layer_assignment = [len(p) for p in self.placement]
             self.layer_assignment = [self.layer_num // self.device_num] * self.device_num#TODO
+            
         if LAYER_ADAPT:
             self.layer_assignment=suggest_allocation#[5, 5, 3, 6, 6, 6, 6, 6, 5, 2, 6, 6, 5, 3, 5, 5]#
+        # self.layer_assignment = [8,13,6,13]
         self.placement = [[sum(self.layer_assignment[:i])+j for j in range(self.layer_assignment[i])] for i in range(len(self.layer_assignment))]
+        
         print("Solved OctoPipe layer_assignment:", self.layer_assignment)
         os.makedirs(f"schedule_results/{MODEL_NAME}",exist_ok=True)
         with open(f"schedule_results/{MODEL_NAME}/partition.txt", 'w') as f:
