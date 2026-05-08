@@ -1,0 +1,141 @@
+{
+  "status": "succeeded",
+  "inputs": {
+    "profile_json": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/1f1b_l16_hid4096_seq32768_voc32000_mb8.json",
+    "actual_json": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/1f1b_l16_hid4096_seq32768_voc32000_mb8_iter.json",
+    "drop_warmup": 2,
+    "train_iterations": 50,
+    "fit_iters": 50,
+    "verification_mode": "window",
+    "verification_window": 3,
+    "abs_error_pct_threshold": 25.0,
+    "outputs": {
+      "forward_model_output": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_forward_time_model.json",
+      "prediction_output": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_pre_iter.json",
+      "comparison_output": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_prediction_comparison.json",
+      "result_output": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_end2end_result.json"
+    }
+  },
+  "steps": [
+    {
+      "name": "bocd_iteration_detector",
+      "command": [
+        "/Users/ma/miniconda3/bin/python3.13",
+        "/Users/ma/code/Greyhound/detector/control_plane/bocd_iteration_detector.py",
+        "--input-json",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/1f1b_l16_hid4096_seq32768_voc32000_mb8_iter.json",
+        "--verification-mode",
+        "window",
+        "--verification-window",
+        "3"
+      ],
+      "cwd": "/Users/ma/code/PipelineSimulator",
+      "returncode": 0,
+      "duration_sec": 0.1152031421661377,
+      "stdout_lines": [
+        "fluctuation_indices=[]"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "fit_forward_time_model",
+      "command": [
+        "/Users/ma/miniconda3/bin/python3.13",
+        "/Users/ma/code/PipelineSimulator/fit_forward_time_model.py",
+        "--input",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/1f1b_l16_hid4096_seq32768_voc32000_mb8.json",
+        "--output",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_forward_time_model.json",
+        "--drop-warmup",
+        "2",
+        "--train-iterations",
+        "50"
+      ],
+      "cwd": "/Users/ma/code/PipelineSimulator",
+      "returncode": 0,
+      "duration_sec": 0.11627888679504395,
+      "stdout_lines": [
+        "Forward model:",
+        "forward_ms = 85.793349 + 0.043860178 * attn_sum_sq_m",
+        "",
+        "Split: train iterations 2-51 (50 iterations, 400 rows), validation iterations 52-99 (48 iterations, 384 rows)",
+        "",
+        "Metrics:",
+        "  train_forward: MAE=1.39%, RMSE=1.84%, P95=3.14%, R2=0.9847",
+        "  validation_forward: MAE=1.49%, RMSE=1.74%, P95=3.12%, R2=0.9876",
+        "  all_forward: MAE=1.44%, RMSE=1.79%, P95=3.12%, R2=0.9861",
+        "",
+        "Derived micro-batch time predictions: f_b_ratio -> 1f1b",
+        "  metrics compare forward time only; bwd/wwd are derived from the ratio.",
+        "  train:",
+        "    fwd: MAE=1.39%, RMSE=1.84%, P95=3.14%, matched=400, original=400, predicted=400",
+        "  validation:",
+        "    fwd: MAE=1.49%, RMSE=1.74%, P95=3.12%, matched=384, original=384, predicted=384",
+        "  all:",
+        "    fwd: MAE=1.44%, RMSE=1.79%, P95=3.12%, matched=784, original=784, predicted=784",
+        "",
+        "Component models:",
+        "  attention: attn_ms = 24.05491 + 0.0430821 * attn_sum_sq_m",
+        "  mlp: mlp_ms = 32.96748",
+        "",
+        "Warnings:",
+        "  - total_tokens is constant in this dataset, so the forward model cannot identify an MLP token-length slope; MLP cost is folded into the bias term. The component MLP model still reports the measured constant linear_ms if available.",
+        "",
+        "Saved model to /Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_forward_time_model.json"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "predict_iteration_time_from_profile",
+      "command": [
+        "/Users/ma/miniconda3/bin/python3.13",
+        "/Users/ma/code/PipelineSimulator/predict_iteration_time_from_profile.py",
+        "--input",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_forward_time_model.json",
+        "--output",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_pre_iter.json",
+        "--drop-warmup",
+        "2",
+        "--actual",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/1f1b_l16_hid4096_seq32768_voc32000_mb8_iter.json",
+        "--comparison-output",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_prediction_comparison.json",
+        "--fit-comm-time",
+        "--fit-iters",
+        "50",
+        "--abs-error-pct-threshold",
+        "25.0"
+      ],
+      "cwd": "/Users/ma/code/PipelineSimulator",
+      "returncode": 0,
+      "duration_sec": 0.8249950408935547,
+      "stdout_lines": [
+        "Predicted 48 iterations with method=1f1b, num_stages=4, split_backward=False.",
+        "Prediction starts at iteration 52 (requested --drop-warmup 2, profile prediction_start_iteration=52).",
+        "Fitted comm_time=0.009869s, overhead=0.150725s from iterations 2-51.",
+        "Comm fitting uses copied original micro-batch times through iteration 51.",
+        "Mean predicted iteration time: 4254.211 ms",
+        "Predicted iteration time percentiles: min=3566.160 ms, p50=4242.185 ms, p90=4587.034 ms, p95=4630.637 ms, max=4938.044 ms",
+        "Saved predictions to /Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_pre_iter.json",
+        "Compared 48 predictions with 100 measured iter_time values (align_by_iteration=True).",
+        "iter_time per-iteration differences (first 5):",
+        "  iter=52: pred=4.3620s, actual=4.4500s, error=-0.0880s (-1.98%)",
+        "  iter=53: pred=4.1074s, actual=4.1300s, error=-0.0226s (-0.55%)",
+        "  iter=54: pred=4.2211s, actual=4.2600s, error=-0.0389s (-0.91%)",
+        "  iter=55: pred=4.3489s, actual=4.4300s, error=-0.0811s (-1.83%)",
+        "  iter=56: pred=3.6083s, actual=3.6600s, error=-0.0517s (-1.41%)",
+        "iter_time largest absolute differences:",
+        "  iter=80: pred=4.9380s, actual=5.3200s, abs_error=0.3820s (7.18%)",
+        "  iter=60: pred=4.9380s, actual=5.3100s, abs_error=0.3720s (7.00%)",
+        "  iter=99: pred=4.5410s, actual=4.8000s, abs_error=0.2590s (5.40%)",
+        "  iter=76: pred=4.4906s, actual=4.7200s, abs_error=0.2294s (4.86%)",
+        "  iter=62: pred=4.5323s, actual=4.7400s, abs_error=0.2077s (4.38%)",
+        "iter_time: count=48, mean_pred=4.2542s, mean_actual=4.3496s, mean_error=-0.0954s, MAE=0.1005s (2.20%), RMSE=0.1312s (2.75%), P95_abs=0.2486s (5.21%)",
+        "iter_time abs_error_pct >= 25.00%: 0 iterations",
+        "  iteration_ids: []",
+        "Saved comparison to /Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l16_hid4096_seq32768_voc32000_mb8_prediction_comparison.json"
+      ],
+      "stderr_lines": []
+    }
+  ]
+}

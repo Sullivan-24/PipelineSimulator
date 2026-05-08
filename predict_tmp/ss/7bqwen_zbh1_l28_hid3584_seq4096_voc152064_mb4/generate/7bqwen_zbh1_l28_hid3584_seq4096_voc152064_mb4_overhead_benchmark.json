@@ -1,0 +1,108 @@
+{
+  "inputs": {
+    "actual_json": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/7bqwen_zbh1_l28_hid3584_seq4096_voc152064_mb4_iter.json",
+    "forward_model_json": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/7bqwen_zbh1_l28_hid3584_seq4096_voc152064_mb4/generate/7bqwen_zbh1_l28_hid3584_seq4096_voc152064_mb4_forward_time_model.json",
+    "repeat": 5,
+    "warmup_runs": 2,
+    "prediction_start_iteration": 52,
+    "prediction_iteration_count": 1948,
+    "bocd_warmup": 50,
+    "bocd_denominator_excludes_warmup": true
+  },
+  "bocd_plus_verification": {
+    "summary": {
+      "runs": 5,
+      "denominator": 1950,
+      "mean_total_sec": 0.34490006705746057,
+      "median_total_sec": 0.3435464589856565,
+      "mean_per_item_sec": 0.00017687182926023618,
+      "median_per_item_sec": 0.00017617767127469565,
+      "mean_per_item_ms": 0.17687182926023617,
+      "median_per_item_ms": 0.17617767127469566,
+      "mean_per_item_us": 176.87182926023618,
+      "median_per_item_us": 176.17767127469565,
+      "durations_sec": [
+        0.3435464589856565,
+        0.34059608401730657,
+        0.35517595894634724,
+        0.34549545822665095,
+        0.3396863751113415
+      ]
+    },
+    "event_count": 17
+  },
+  "microbatch_time_prediction": {
+    "summary": {
+      "runs": 5,
+      "denominator": 1948,
+      "mean_total_sec": 0.012000858411192894,
+      "median_total_sec": 0.00918820803053677,
+      "mean_per_item_sec": 6.160604933877256e-06,
+      "median_per_item_sec": 4.716739235388486e-06,
+      "mean_per_item_ms": 0.006160604933877256,
+      "median_per_item_ms": 0.004716739235388486,
+      "mean_per_item_us": 6.160604933877256,
+      "median_per_item_us": 4.716739235388486,
+      "durations_sec": [
+        0.008952833013609052,
+        0.00918820803053677,
+        0.009077667025849223,
+        0.023536083986982703,
+        0.009249499998986721
+      ]
+    },
+    "last_result": {
+      "iteration_count": 1948,
+      "microbatch_count": 7792,
+      "last_iteration": {
+        "iteration": 1999,
+        "fwd_times": [
+          0.08395145028518253,
+          0.08095113207971798,
+          0.08395145028518253,
+          0.0821463869548837
+        ],
+        "bwd_times": [
+          0.1124109919318594,
+          0.10839356585474237,
+          0.1124109919318594,
+          0.10999401213258928
+        ],
+        "wwd_times": [
+          0.0292990561495287,
+          0.028251945095821573,
+          0.0292990561495287,
+          0.02866908904725441
+        ]
+      }
+    }
+  },
+  "iteration_time_prediction": {
+    "summary": {
+      "runs": 5,
+      "denominator": 1948,
+      "mean_total_sec": 0.35341280815191567,
+      "median_total_sec": 0.33871266595087945,
+      "mean_per_item_sec": 0.0001814234128089916,
+      "median_per_item_sec": 0.00017387713857848022,
+      "mean_per_item_ms": 0.1814234128089916,
+      "median_per_item_ms": 0.17387713857848022,
+      "mean_per_item_us": 181.4234128089916,
+      "median_per_item_us": 173.8771385784802,
+      "durations_sec": [
+        0.3348562498576939,
+        0.3550830418244004,
+        0.40057675004936755,
+        0.33871266595087945,
+        0.337835333077237
+      ]
+    },
+    "last_result": {
+      "iteration_count": 1948,
+      "method": "zbh",
+      "split_backward": true,
+      "num_stages": 2,
+      "last_predicted_iteration_time_sec": 1.0613932784489755
+    }
+  }
+}

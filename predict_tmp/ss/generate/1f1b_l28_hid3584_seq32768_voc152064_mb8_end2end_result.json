@@ -1,0 +1,89 @@
+{
+  "status": "failed",
+  "inputs": {
+    "profile_json": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/1f1b_l28_hid3584_seq32768_voc152064_mb8.json",
+    "actual_json": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/1f1b_l28_hid3584_seq32768_voc152064_mb8_iter.json",
+    "drop_warmup": 2,
+    "train_iterations": 50,
+    "fit_iters": 50,
+    "verification_mode": "window",
+    "verification_window": 3,
+    "abs_error_pct_threshold": 25.0,
+    "outputs": {
+      "forward_model_output": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l28_hid3584_seq32768_voc152064_mb8_forward_time_model.json",
+      "prediction_output": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l28_hid3584_seq32768_voc152064_mb8_pre_iter.json",
+      "comparison_output": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l28_hid3584_seq32768_voc152064_mb8_prediction_comparison.json",
+      "result_output": "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l28_hid3584_seq32768_voc152064_mb8_end2end_result.json"
+    }
+  },
+  "steps": [
+    {
+      "name": "bocd_iteration_detector",
+      "command": [
+        "/Users/ma/miniconda3/bin/python3.13",
+        "/Users/ma/code/Greyhound/detector/control_plane/bocd_iteration_detector.py",
+        "--input-json",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/1f1b_l28_hid3584_seq32768_voc152064_mb8_iter.json",
+        "--verification-mode",
+        "window",
+        "--verification-window",
+        "3"
+      ],
+      "cwd": "/Users/ma/code/PipelineSimulator",
+      "returncode": 0,
+      "duration_sec": 0.3953280448913574,
+      "stdout_lines": [
+        "index=200 value=12.390000 detection_index=200 verification_index=202 drop=199 mean_before=8.174750 mean_after=9.300000 degradation=12.099462% verdict=change_point",
+        "index=400 value=12.480000 detection_index=400 verification_index=402 drop=199 mean_before=8.340350 mean_after=9.630000 degradation=13.392004% verdict=change_point",
+        "index=600 value=12.190000 detection_index=600 verification_index=602 drop=199 mean_before=8.310950 mean_after=10.066667 degradation=17.440894% verdict=change_point",
+        "index=800 value=12.610000 detection_index=800 verification_index=802 drop=198 mean_before=8.454550 mean_after=9.723333 degradation=13.048852% verdict=change_point",
+        "index=1000 value=12.430000 detection_index=1000 verification_index=1002 drop=199 mean_before=8.454750 mean_after=9.800000 degradation=13.727041% verdict=change_point",
+        "index=1200 value=12.300000 detection_index=1200 verification_index=1202 drop=199 mean_before=8.499650 mean_after=9.716667 degradation=12.525043% verdict=change_point",
+        "index=1400 value=12.970000 detection_index=1400 verification_index=1402 drop=199 mean_before=8.625050 mean_after=10.266667 degradation=15.989773% verdict=change_point",
+        "index=1600 value=12.220000 detection_index=1600 verification_index=1602 drop=198 mean_before=8.679950 mean_after=9.740000 degradation=10.883470% verdict=change_point",
+        "fluctuation_indices=[200, 400, 600, 800, 1000, 1200, 1400, 1600]"
+      ],
+      "stderr_lines": []
+    },
+    {
+      "name": "fit_forward_time_model",
+      "command": [
+        "/Users/ma/miniconda3/bin/python3.13",
+        "/Users/ma/code/PipelineSimulator/fit_forward_time_model.py",
+        "--input",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/1f1b_l28_hid3584_seq32768_voc152064_mb8.json",
+        "--output",
+        "/Users/ma/code/PipelineSimulator/predict_tmp/ss/generate/1f1b_l28_hid3584_seq32768_voc152064_mb8_forward_time_model.json",
+        "--drop-warmup",
+        "2",
+        "--train-iterations",
+        "50",
+        "--exclude-metric-iterations",
+        "200,400,600,800,1000,1200,1400,1600"
+      ],
+      "cwd": "/Users/ma/code/PipelineSimulator",
+      "returncode": 1,
+      "duration_sec": 0.1035771369934082,
+      "stdout_lines": [],
+      "stderr_lines": [
+        "Traceback (most recent call last):",
+        "  File \"/Users/ma/code/PipelineSimulator/fit_forward_time_model.py\", line 1222, in <module>",
+        "    main()",
+        "    ~~~~^^",
+        "  File \"/Users/ma/code/PipelineSimulator/fit_forward_time_model.py\", line 1199, in main",
+        "    model = fit_forward_time_model(",
+        "        args.input,",
+        "    ...<5 lines>...",
+        "        exclude_metric_iterations=exclude_metric_iterations,",
+        "    )",
+        "  File \"/Users/ma/code/PipelineSimulator/fit_forward_time_model.py\", line 829, in fit_forward_time_model",
+        "    rows = _rows_from_profile(profile, drop_warmup=drop_warmup)",
+        "  File \"/Users/ma/code/PipelineSimulator/fit_forward_time_model.py\", line 52, in _rows_from_profile",
+        "    fwd_times = profile[\"fwd_times\"]",
+        "                ~~~~~~~^^^^^^^^^^^^^",
+        "KeyError: 'fwd_times'"
+      ]
+    }
+  ],
+  "failed_step": "fit_forward_time_model"
+}
